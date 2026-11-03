@@ -63,7 +63,7 @@ Open work handed to different AIs side by side and follow it together.
 
 ### The same screen on your phone
 
-By default, Aether opens only on the computer it is installed on. Install Tailscale on the computer and your phone, sign in to the same account, then turn on Use on your phone in Settings > Server info to get the same screen in your phone browser.
+By default, Aether opens only on the computer it is installed on. Install Tailscale on the computer and your phone, sign in to the same account, then turn on Use on your phone in Settings > Server info to get the same screen in your phone browser. It will not open while the computer is asleep, so turn off automatic sleep in its power settings.
 
 </td>
 </tr>
@@ -102,6 +102,7 @@ npm --prefix server test
 ## Access and security
 
 - **By default:** Aether is reachable only from the computer it is installed on, and sign-in is off.
+- **If you forget your password:** On the installed computer, run `bin/Reset Aether Password.command` (Mac) or `bin\reset-password.cmd` (Windows) in the program folder.
 - **From other devices:** Do not expose it directly to the internet. Keep it inside Tailscale, as Use on your phone does. If you run from source, turn on authentication with `AETHER_AUTH_MODE` in `server/.env` first. See [`server/.env.example`](server/.env.example) for the options.
 - **Be careful:** AI agents can edit files and run commands on this computer. Check your approval settings before you use it.
 

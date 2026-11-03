@@ -24,22 +24,16 @@
   </picture>
 </p>
 
-Aether is an app you install on your own computer. Instead of watching a terminal, you hand work to AI agents in a chat window and answer their questions and approval requests right there. There is nothing to sign up for, and conversations are stored on your computer.
-
-## Who it is for
-
-- You use AI agents in a terminal, but watching the screen all the time is hard.
-- You run several pieces of work at once and do not want to miss the one waiting for you.
-- You would rather keep conversations on your computer without creating an account.
+Aether is an app you install on your own computer. Instead of watching a terminal, you hand work to AI agents in a chat window and answer their questions and approval requests right there.
 
 ## Features
 
 - **A chat window, not a terminal** — Files the AI read and commands it ran appear as cards.
-- **No account, on your own computer** — Conversations are stored on your computer, and you can back them up and restore them in Settings.
+- **No account, on your own computer** — There is nothing to sign up for. Conversations are stored on your computer, and you can back them up and restore them in Settings.
 - **See what is waiting, at a glance** — The list shows which work is waiting for you and for how long.
 - **Several AIs, one window** — Choose the AI for each piece of work and keep several open side by side.
 
-## <img src="web/src/assets/chamding-inspect.webp" alt="" height="30" align="top"> A look around
+## <img src="web/src/assets/chamding-inspect.webp" alt="" height="30" align="top"> Screenshots
 
 <table>
 <tr>
@@ -57,7 +51,7 @@ When the AI asks a question or needs approval, a card appears in the conversatio
 
 ### Several AIs, side by side
 
-Choose the AI for each piece of work, and keep several open side by side.
+Open work handed to different AIs side by side and follow it together.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="deploy/readme/split-en-dark.png"><img src="deploy/readme/split-en-light.png" alt="Two pieces of work open side by side. One is awaiting approval and the other is working." width="100%"></picture>
 
@@ -115,4 +109,4 @@ npm --prefix server test
 
 Code is licensed under the [Apache License 2.0](LICENSE). Third-party notices are in [`NOTICE`](NOTICE).
 
-The Chamding mascot and the Aether name and logos are not covered by this license. To distribute a modified version, replace those files and use a different name. See [`BRAND.md`](BRAND.md) for details.
+The Aether name, logos, and character artwork are not covered by this license. To distribute a modified version, replace those files and use a different name. See [`BRAND.md`](BRAND.md) for details.

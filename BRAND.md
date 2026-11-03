@@ -4,7 +4,7 @@ Aether의 코드는 Apache License 2.0으로 제공합니다. 다만 아래 브�
 
 ## 대상
 
-- 마스코트 참딩(Chamding)의 이름, 외형, 그림
+- 캐릭터 참딩(Chamding)의 이름, 외형, 그림
 - Aether의 이름과 로고
 - 다음 경로의 파일
   - `web/src/assets/` 안의 `chamding-*`, `aether-chamding-mark.png`, `aether-mark.svg`
@@ -28,7 +28,7 @@ Aether의 코드는 Apache License 2.0으로 제공합니다. 다만 아래 브�
 
 ---
 
-Aether's code is licensed under the Apache License 2.0. The brand assets above (the Chamding mascot's name, appearance and artwork, the Aether name and logos, and the listed files) are not covered by that license. All rights are reserved by the copyright holder (dhryu).
+Aether's code is licensed under the Apache License 2.0. The brand assets above (the Chamding character's name, appearance and artwork, the Aether name and logos, and the listed files) are not covered by that license. All rights are reserved by the copyright holder (dhryu).
 
 **You may** run Aether, build this repository as is for personal or internal use, pass on an unmodified copy with this notice, and mention the name to describe or refer to Aether.
 

@@ -304,6 +304,7 @@ class SessionManager {
       delete meta.observedModel;
       delete meta.modelLabel;
     }
+    if ("model" in patch || "effort" in patch) delete meta.observedEffort;
     store.saveMeta(meta);
     entry.meta = meta;
     return true;
@@ -522,6 +523,7 @@ class SessionManager {
         model: live.model,
         accountDefaultModel: live.accountDefaultModel,
         observedModel: live.observedModel,
+        observedEffort: live.observedEffort,
         modelLabel: live.modelLabel,
         // 되돌릴 때 이 칸을 비운다. 남아 있는 값은 그 뒤에 새 프로세스가 발급한 키다.
         resume: live.resumeKey,
@@ -593,6 +595,7 @@ class SessionManager {
       model: entry.meta.model ?? providerImpl.defaultModel,
       accountDefaultModel: entry.meta.accountDefaultModel,
       observedModel: entry.meta.observedModel,
+      observedEffort: entry.meta.observedEffort,
       modelLabel: entry.meta.modelLabel,
       // 되돌릴 때 이 칸을 비운다. 남아 있는 값은 그 뒤에 새 프로세스가 발급한 키다.
       resume: entry.meta.resumeKey,
@@ -746,6 +749,7 @@ class SessionManager {
       observedModel: s.observedModel, // 스트림에서 본 실제 모델. 있으면 목록 카드가 우선한다
       modelLabel: s.modelLabel, // 목록 카드용 표시 이름. 없으면 화면이 직접 번역한다
       effort: s.effort, // /effort 설정(미지정이면 undefined → 칩 미표시)
+      observedEffort: s.observedEffort,
       permissionMode: s.permissionMode, // 권한 모드(프론트 칩 표시용)
       status: (s.isEnded ? "ended" : "active") as DerivedStatus,
       createdAt: s.createdAt,
@@ -770,6 +774,7 @@ class SessionManager {
         observedModel: e.meta.observedModel,
         modelLabel: e.meta.modelLabel,
         effort: e.meta.effort, // /effort 설정(meta 영속본)
+        observedEffort: e.meta.observedEffort,
         permissionMode: e.meta.permissionMode ?? ("manual" as const),
         status: e.status,
         createdAt: e.meta.createdAt ?? 0,
@@ -1433,6 +1438,7 @@ class SessionManager {
       preview: s.lastWorkPreview(),
       status: s.isEnded ? "ended" : "active",
       lastViewedAt: s.lastViewedAt,
+      observedEffort: s.observedEffort,
       archivedAt: s.archivedAt,
       ...autoResumeField(s.autoResume),
       ...handoffField(s),
@@ -1461,6 +1467,7 @@ class SessionManager {
       preview,
       status: e.status,
       lastViewedAt: e.meta.lastViewedAt,
+      observedEffort: e.meta.observedEffort,
       archivedAt: e.meta.archivedAt,
       ...autoResumeField(e.meta.autoResume),
       ...handoffField(e.meta),

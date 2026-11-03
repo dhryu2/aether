@@ -506,6 +506,7 @@ function main() {
                   modelId: "grok-4.6",
                   displayName: "Grok 4.6",
                   _meta: {
+                    reasoningEffort: "high",
                     reasoningEfforts: [
                       { value: "low", label: "낮음" },
                       { value: "medium", label: "보통" },

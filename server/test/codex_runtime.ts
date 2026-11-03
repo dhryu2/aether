@@ -117,6 +117,7 @@ async function main() {
       "① 모델별 추론 강도 목록이 실린다",
       hs.models[0].supportedEffortLevels,
     );
+    check(hs.models[0].defaultEffort === "medium", "① 모델의 기본 강도가 실린다", hs.models[0].defaultEffort);
     // 8i: Codex는 강도마다 설명을 직접 준다. 그걸 버리면 화면이 자기 표를 들어야 하므로 그대로 실어야 한다.
     check(
       hs.models[0].supportedEffortDescriptions?.medium?.text === "보통",

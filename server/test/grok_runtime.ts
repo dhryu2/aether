@@ -122,6 +122,7 @@ async function main() {
   {
     const h = start({ model: "grok-4.6" });
     const hs = await h.rt.handshake();
+    check(hs.models.find((m) => m.value === "grok-4.6")?.defaultEffort === "high", "① 모델의 기본 강도가 실린다", hs.models);
     check(hs.models.some((m) => m.value === "grok-4.6" && m.isDefault), "① 모델 목록에 기본 grok-4.6이 있다", hs.models);
     check((await h.rt.handshake()) === hs, "① 여러 번 불러도 같은 결과 객체(공통 계층이 같은 관측을 다시 기억하지 않는다)");
     check(h.resumeKeys[0] === FAKE_GROK_SESSION_ID, "① 이어가기 식별자를 가장 이른 시점에 알린다", h.resumeKeys);

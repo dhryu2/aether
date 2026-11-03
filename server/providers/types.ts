@@ -194,6 +194,8 @@ export type RuntimeStartOptions = {
   workspaceSource?: string;
   /** resume 식별자를 가장 이른 시점에 알린다(멱등 — 같은 값 반복 호출 가능). */
   onResumeKey: (key: string) => void;
+  /** 턴에 실제로 적용된 강도를 턴이 끝나야 아는 실행기가 알린다. 모델 목록으로 미리 아는 실행기는 부르지 않는다. */
+  onEffortObserved?: (effort: string) => void;
   /**
    * 모델 턴이 아닌 장기 명령의 수명주기(runtime → 세션).
    *

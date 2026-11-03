@@ -46,6 +46,7 @@ export function readGrokModels(init: Record<string, unknown>): RuntimeModel[] {
       isDefault: value === current || rec?.isDefault === true,
       supportsEffort: levels.length > 0,
       supportedEffortLevels: levels,
+      ...(typeof extra?.reasoningEffort === "string" ? { defaultEffort: extra.reasoningEffort } : {}),
       ...(Object.keys(descriptions).length ? { supportedEffortDescriptions: descriptions } : {}),
     });
   }

@@ -327,9 +327,13 @@ export class ClaudeRuntime implements AgentRuntime {
         toolConfig: { askUserQuestion: { previewFormat: "markdown" } },
         // UserPromptSubmit 훅 — 프롬프트 제출 직전, 이번 턴의 회상·스킬 힌트만 넣는다.
         //   세션 시작 안내와 달리 매 턴 발동한다. 사용자 글 원본은 바꾸지 않는다.
-        ...(wantsTurnHook
-          ? { hooks: { UserPromptSubmit: [{ hooks: [(input: unknown) => this.onUserPromptSubmit(input as { prompt?: string })] }] } }
-          : {}),
+        hooks: {
+          // Stop 훅 — 실제 적용된 강도는 이 입력에만 실려 온다(모델 목록과 시작 정보에는 없다).
+          Stop: [{ hooks: [async (input: unknown) => this.onStop(input as { effort?: { level?: string } })] }],
+          ...(wantsTurnHook
+            ? { UserPromptSubmit: [{ hooks: [(input: unknown) => this.onUserPromptSubmit(input as { prompt?: string })] }] }
+            : {}),
+        },
       },
     });
   }
@@ -343,6 +347,11 @@ export class ClaudeRuntime implements AgentRuntime {
    * UserPromptSubmit 훅 — 프롬프트 제출 직전, 공통 계층이 정한 이번 턴 배경만 넣는다.
    * 모델 입력에만 붙는다. 사용자 글, 저장본, 화면은 원본 그대로다.
    */
+  private onStop(input: { effort?: { level?: string } }): { continue: true } {
+    if (input.effort?.level) this.opts.onEffortObserved?.(input.effort.level);
+    return { continue: true };
+  }
+
   private async onUserPromptSubmit(
     input: { prompt?: string },
   ): Promise<{ continue: true; hookSpecificOutput?: { hookEventName: "UserPromptSubmit"; additionalContext: string } }> {

@@ -135,6 +135,8 @@ export type SessionMeta = {
    * 모델을 새로 고르면 다음 응답이 오기 전까지 비운다.
    */
   observedModel?: string;
+  /** provider가 마지막 턴에 실제로 적용했다고 알린 강도. 강도나 모델을 바꾸면 다음 턴까지 비운다. */
+  observedEffort?: string;
   /**
    * 목록 카드에 쓸 사람이 읽는 모델 이름. 이 세션의 모델 목록에서 찾는다.
    * 맞는 줄이 없으면 빈 값이다. 이름을 지어내지 않는다.

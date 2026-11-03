@@ -755,6 +755,13 @@ export function modelList(s: State): ModelInfo[] {
   return s.availableModels ?? []
 }
 /** 현재 effort 라벨 — /effort 변경(로컬 알림)을 우선, 없으면 세션 메타(영속본). 미설정이면 빈 문자열(칩 미표시). */
+/** 칩에 보여 줄 강도. provider가 알려 준 실제 값, 고른 값, 모델 목록의 기본값 순이다. 모르면 빈 문자열. */
+export function effectiveEffort(s: State): string {
+  const id = chromeSessionId(s)
+  const observed = id ? s.sessions.find((x) => x.id === id)?.observedEffort : undefined
+  return observed || currentEffort(s) || currentModelInfo(s)?.defaultEffort || ''
+}
+
 export function currentEffort(s: State): string {
   const id = chromeSessionId(s)
   if (!id) return ''
@@ -1171,6 +1178,11 @@ function prependEvents(id: string, events: AetherEvent[], hasOlder: boolean, pag
     older,
   })
   return true
+}
+
+// 다음 턴이 새 값을 알릴 때까지 지난 턴의 강도를 보이지 않는다.
+function forgetObservedEffort(id: string) {
+  set({ sessions: state.sessions.map((x) => (x.id === id ? { ...x, observedEffort: undefined } : x)) })
 }
 
 function pushLocal(id: string, item: LocalEvent) {
@@ -2179,6 +2191,7 @@ export const actions = {
     try {
       await ensureAwake(id)
       await api.setModel(id, model)
+      forgetObservedEffort(id)
       pushLocal(id, { seq: localSeq--, ts: Date.now(), kind: 'local_notice', variant: 'model', detail: model })
       // 모델 변경 → effort를 새 모델 지원범위로 clamp(+SDK 재적용). model notice 반영된 state 기준으로 계산.
       reconcileEffortToModel(id)
@@ -2204,6 +2217,7 @@ export const actions = {
     try {
       await ensureAwake(id)
       await api.setEffort(id, effort)
+      forgetObservedEffort(id)
       pushLocal(id, { seq: localSeq--, ts: Date.now(), kind: 'local_notice', variant: 'effort', detail: effort })
     } catch (e) {
       set({ error: errMsg(e) })

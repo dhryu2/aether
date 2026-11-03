@@ -112,8 +112,14 @@ async function main() {
       "같은 관측 모델은 meta를 다시 쓰지 않는다",
     );
 
+    runtime.emitEffort("medium");
+    check(metaOf(live.id)?.observedEffort === "medium" && rowOf(live.id)?.observedEffort === "medium", "실행기가 알린 실제 강도를 meta와 세션 목록에 적는다", metaOf(live.id)?.observedEffort);
+    await live.setEffort("brisk");
+    check(metaOf(live.id)?.observedEffort === undefined, "강도를 바꾸면 지난 턴의 실제 강도를 지운다", metaOf(live.id)?.observedEffort);
+    runtime.emitEffort("medium");
     await live.setModel("mock-small");
     const chosen = metaOf(live.id);
+    check(metaOf(live.id)?.observedEffort === undefined, "모델을 바꾸면 지난 턴의 실제 강도를 지운다", metaOf(live.id)?.observedEffort);
     check(chosen?.model === "mock-small" && chosen.observedModel === undefined, "모델을 고르면 다음 응답 전까지 관측 모델을 지운다", chosen);
     check(chosen?.modelLabel === "Mock Small", "고른 별칭의 표시 이름으로 다시 계산한다", chosen?.modelLabel);
     check(rowOf(live.id)?.observedModel === undefined && rowOf(live.id)?.modelLabel === "Mock Small", "목록도 지운 관측 모델과 새 표시 이름을 보여 준다", rowOf(live.id));

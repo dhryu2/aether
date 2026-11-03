@@ -364,6 +364,7 @@ export class CodexRuntime implements AgentRuntime {
         resolvedModel: m.model,
         supportsEffort: m.supportedReasoningEfforts.length > 0,
         supportedEffortLevels: m.supportedReasoningEfforts.map((e) => e.reasoningEffort),
+        defaultEffort: m.defaultReasoningEffort,
         // 강도 설명은 Codex가 강도마다 직접 준다(`ReasoningEffortOption.description` — 필수 필드).
         //   8i 전엔 이걸 버리고 이름만 남겼고, 화면이 자기 표로 설명을 붙였다(Claude 어휘 하드코딩).
         //   provider 원문이므로 `text`에 담는다 — 번역이 아니라서 특정 로케일의 값인 척하면 안 된다.

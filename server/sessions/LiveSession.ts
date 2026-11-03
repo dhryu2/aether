@@ -239,6 +239,8 @@ export class LiveSession {
   accountDefaultModel?: string; // 마지막으로 확인한 계정 기본 모델의 정식 id. 목록 카드 표시 전용(runtime에 안 넘긴다).
   /** 스트림에서 마지막으로 본 실제 모델. 목록 카드는 고른 모델보다 이 값을 우선한다. */
   observedModel?: string;
+  /** provider가 마지막 턴에 실제로 적용했다고 알린 강도. */
+  observedEffort?: string;
   /** 목록 카드용 표시 이름. 이 세션 모델 목록에서 찾았고, 없으면 비운다. */
   modelLabel?: string;
   effort?: SessionEffort; // /effort로 설정한 reasoning effort. 미지정 = 계정 기본. setEffort로 런타임 변경 가능.
@@ -344,6 +346,7 @@ export class LiveSession {
     model?: string;
     accountDefaultModel?: string;
     observedModel?: string;
+    observedEffort?: string;
     modelLabel?: string;
     resume?: string;
     createdAt?: number;
@@ -369,6 +372,7 @@ export class LiveSession {
     this.model = opts.model;
     this.accountDefaultModel = opts.accountDefaultModel;
     this.observedModel = opts.observedModel?.trim() || undefined;
+    this.observedEffort = opts.observedEffort;
     this.modelLabel = opts.modelLabel?.trim() || undefined;
     // 목록을 다시 받기 전에는 저장된 표시 이름을 유지한다. 유효 모델이 그 사이 바뀌면 비운다.
     this.modelLabelFor = this.effectiveModel();
@@ -451,6 +455,7 @@ export class LiveSession {
       onPlan: (ask) => this.requestPlan(ask),
       workspaceSource: this.workspaceSource,
       onResumeKey: (key) => this.persistResumeKey(key),
+      onEffortObserved: (effort) => this.noteObservedEffort(effort),
       onCommandOperation: (operation) => this.recordCommandOperation(operation),
       onTodoList: (items) => this.ingest({ kind: "todo_list", items }),
     });
@@ -786,6 +791,7 @@ export class LiveSession {
       model: this.model,
       accountDefaultModel: this.accountDefaultModel,
       observedModel: this.observedModel,
+      observedEffort: this.observedEffort,
       modelLabel: this.modelLabel,
       resumeKey: this.resumeKey,
       createdAt: this.createdAt,
@@ -868,11 +874,13 @@ export class LiveSession {
   async setModel(model: string): Promise<{ deferred: boolean }> {
     const previous = this.model;
     const previousObserved = this.observedModel;
+    const previousEffort = this.observedEffort;
     const previousLabel = this.modelLabel;
     const previousLabelFor = this.modelLabelFor;
     this.model = model;
     // 다음 응답 전까지는 방금 고른 모델이 목록에 보여야 한다. 스트림에서 본 값은 그 응답이 오기 전에 치운다.
     this.observedModel = undefined;
+    this.observedEffort = undefined;
     this.refreshModelLabel();
     this.persistMeta("setModel");
     if (this.ended) return { deferred: true };
@@ -881,6 +889,7 @@ export class LiveSession {
     } catch (e) {
       this.model = previous;
       this.observedModel = previousObserved;
+      this.observedEffort = previousEffort;
       this.modelLabel = previousLabel;
       this.modelLabelFor = previousLabelFor;
       this.persistMeta("setModel 되돌리기");
@@ -1122,6 +1131,14 @@ export class LiveSession {
     this.persistMeta("관측 모델");
   }
 
+  /** provider가 알린 실제 강도를 기억한다. 값이 바뀔 때만 meta를 쓰고 화면에 알린다. */
+  private noteObservedEffort(effort: string) {
+    if (this.disposed || effort === this.observedEffort) return;
+    this.observedEffort = effort;
+    this.persistMeta("관측 강도");
+    this.onTitleChange?.(this);
+  }
+
   /** 세션 생성 중의 모델 확인용 — `setModel`에 상한을 건다(생성 요청이 무한정 매달리지 않게). */
   async setModelWithin(model: string, timeoutMs: number): Promise<{ deferred: boolean }> {
     return this.within(this.setModel(model), timeoutMs);
@@ -1224,7 +1241,9 @@ export class LiveSession {
   /** 세션 effort 변경(/effort). 다음 턴부터 적용. meta.json 영속. 끝난 세션·거부 처리는 setModel과 동일. */
   async setEffort(effort: SessionEffort): Promise<{ deferred: boolean }> {
     const previous = this.effort;
+    const previousObserved = this.observedEffort;
     this.effort = effort;
+    this.observedEffort = undefined;
     this.persistMeta("setEffort");
     if (this.ended) return { deferred: true };
     try {
@@ -1232,6 +1251,7 @@ export class LiveSession {
       return { deferred: false };
     } catch (e) {
       this.effort = previous;
+      this.observedEffort = previousObserved;
       this.persistMeta("setEffort 되돌리기");
       throw e;
     }

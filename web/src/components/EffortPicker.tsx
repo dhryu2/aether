@@ -3,7 +3,7 @@
 //   그래서 강도를 지원하지 않는 모델이거나 목록을 아직/끝내 못 받은 상태에서는 칩 자체가 뜨지 않는다.
 //
 // 화면 구성은 ModelPicker와 함께 공통 ChipPicker가 맡는다(원래 두 파일이 같은 본문을 각자 갖고 있었다).
-import { actions, chromeSessionId, convoLoading, currentEffort, currentModelInfo, paneView, supportedEfforts, useStore } from '../lib/store'
+import { actions, chromeSessionId, convoLoading, currentEffort, effectiveEffort, currentModelInfo, paneView, supportedEfforts, useStore } from '../lib/store'
 import { useT } from '../lib/i18n'
 import { effortDescription } from '../lib/effortLabels'
 import { ChipPicker, type ChipOption } from './ui'
@@ -16,6 +16,7 @@ export function EffortPicker({ compact, direction = 'down', roomId }: { compact?
   const t = useT()
   const efforts = supportedEfforts(s)
   const cur = currentEffort(s)
+  const shown = effectiveEffort(s)
   // 설명의 출처는 모델 목록에 실려 오는 표 하나뿐이다(8i). 화면에 예비 표를 두지 않는다.
   const descriptions = currentModelInfo(s)?.supportedEffortDescriptions
   // 초기 replay 중엔 모델·effort 파생값이 중간값 → 자리표시자로 가리고 caught_up 후 실값 표시(숨김 판정도 보류 — 칩 pop-in/out 방지).
@@ -29,9 +30,9 @@ export function EffortPicker({ compact, direction = 'down', roomId }: { compact?
   const unmatched = s.modelsStatus === 'ok' && !currentModelInfo(s)
   const unknown = s.modelsStatus === 'asleep' || s.modelsStatus === 'failed' || unmatched
 
-  if (!loading && efforts.length === 0 && !(unknown && cur)) return null
+  if (!loading && efforts.length === 0 && !(unknown && shown)) return null
 
-  const label = cur || t('session.effort.default')
+  const label = shown || t('session.effort.default')
 
   const options: ChipOption<SessionEffort>[] = efforts.map((e) => ({
     value: e,
@@ -53,7 +54,7 @@ export function EffortPicker({ compact, direction = 'down', roomId }: { compact?
         return false
       }}
       label={label}
-      title={unknown ? t('session.effort.lockedTitle') : t('session.effort.title', { level: cur || t('session.effort.default'), count: efforts.length })}
+      title={unknown ? t('session.effort.lockedTitle') : t('session.effort.title', { level: label, count: efforts.length })}
       loading={loading}
       loadingLabel={t('session.effort.checking')}
       skeletonWidth={36}

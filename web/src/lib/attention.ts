@@ -147,6 +147,7 @@ export function patchSessionFromPresence(item: SessionListItem, p: PresenceSessi
     preview: p.preview ?? item.preview,
     status: p.status,
     lastViewedAt: p.lastViewedAt,
+    observedEffort: p.observedEffort, // 없으면 강도나 모델을 바꾼 것이다 — 그대로 덮어쓴다
     archivedAt: p.archivedAt, // 없으면 보관 해제 — 그대로 덮어쓴다
     autoResume: p.autoResume, // 없으면 예약이 없어졌다 — 그대로 덮어쓴다
     ...handoffPatch(p), // 없으면 지워진 것이다 — 그대로 덮어쓴다

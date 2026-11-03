@@ -116,6 +116,8 @@ export type ModelInfo = {
   supportsEffort?: boolean;
   supportedEffortLevels?: readonly string[];
   supportedEffortDescriptions?: Readonly<Record<string, LocalizedText>>;
+  /** 강도를 고르지 않으면 provider가 이 모델에 적용하는 강도. provider가 알려 줄 때만 있다. */
+  defaultEffort?: string;
   /**
    * 이 줄은 계정 기본 모델을 따라가는 "기본값" 선택지다. 어댑터만 채운다.
    * `isDefault`(고르지 않은 세션이 쓰는 모델 표시)와 뜻이 다르다 — 실제 모델 줄에 `isDefault`를 붙이는 provider가 있다.
@@ -168,6 +170,8 @@ export type SessionListItem = {
   /** 목록 카드용 표시 이름. 서버가 모델 목록에서 찾았고, 비어 있으면 화면이 직접 번역한다. */
   modelLabel?: string;
   effort?: SessionEffort;
+  /** provider가 마지막 턴에 실제로 적용했다고 알린 강도. 강도나 모델을 바꾸면 다음 턴까지 비운다. */
+  observedEffort?: string;
   permissionMode: PermissionMode;
   status: DerivedStatus;
   createdAt: number;
@@ -319,6 +323,7 @@ export type PresenceSession = {
   preview?: string;
   status: DerivedStatus;
   lastViewedAt?: number;
+  observedEffort?: string;
   /** 보관한 시각(ms). 보관·해제 때 이 칸이 바뀐 갱신이 흘러간다. */
   archivedAt?: number;
   /** 자동 재개 예약. 예약 문장(사람이 정한 짧은 문장)은 싣는다. `at`이나 `gaveUp`이 있을 때만 온다. */

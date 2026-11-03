@@ -233,6 +233,11 @@ export class MockRuntime implements AgentRuntime {
     opts.onResumeKey(opts.resumeKey ?? MOCK_RESUME_KEY);
   }
 
+  /** 턴이 끝나야 실제 강도를 아는 실행기를 흉내 낸다. */
+  emitEffort(effort: string) {
+    this.opts.onEffortObserved?.(effort);
+  }
+
   /** 테스트가 스트림에 실제 모델을 싣는다. 코어는 원본이 아니라 model_info만 본다. */
   emitModel(model: string) {
     this.emit({ t: "model", model });

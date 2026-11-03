@@ -100,6 +100,33 @@ console.log("\n=== trackAutoResume ===");
   ar.trackAutoResume(t, ev("x"), [blocked(2_000_000_000)]);
   ar.trackAutoResume(t, ev("x"), [blocked()]);
   eq("두 번째 알림에 시각이 없으면 앞의 until 유지", ar.trackAutoResume(t, ev("x"), [done("failed")]), { type: "blocked", until: 2_000_000_000_000 });
+
+  // 사람 입력 없이 스스로 열린 턴: 정상 턴 뒤 막힘 -> 실패 -> 모델 호출 없는 빈 성공 턴(실제 사고 순서).
+  t = fresh();
+  ar.trackAutoResume(t, ev("user_msg"), []);
+  ar.trackAutoResume(t, ev("x"), [done("ok")]);
+  eq("턴 밖의 막힘은 판정을 내지 않는다", ar.trackAutoResume(t, ev("x"), [blocked(2_000_000_000)]), undefined);
+  check(t.blocked === undefined, "턴 밖의 막힘은 턴 안의 막힘으로 치지 않는다(알림을 줄이지 않게)");
+  eq("턴 밖 막힘 다음 실패 -> blocked", ar.trackAutoResume(t, ev("x"), [done("failed")]), { type: "blocked", until: 2_000_000_000_000 });
+  eq("막힌 뒤 입력 없는 성공 턴은 예약을 지우지 않는다", ar.trackAutoResume(t, ev("x"), [done("ok")]), undefined);
+  ar.trackAutoResume(t, ev("user_msg"), []);
+  eq("입력이 들어온 뒤의 성공은 settled", ar.trackAutoResume(t, ev("x"), [done("ok")]), { type: "settled" });
+
+  t = fresh();
+  ar.trackAutoResume(t, ev("user_msg"), []);
+  ar.trackAutoResume(t, ev("x"), [blocked(), done("failed")]);
+  eq("막힌 뒤 사람이 중단한 턴은 settled", ar.trackAutoResume(t, ev("x"), [done("interrupted")]), { type: "settled" });
+
+  t = fresh();
+  ar.trackAutoResume(t, ev("x"), [done("ok")]);
+  ar.trackAutoResume(t, ev("x"), [blocked()]);
+  eq("턴 밖 막힘 다음 성공은 settled", ar.trackAutoResume(t, ev("x"), [done("ok")]), { type: "settled" });
+  eq("끝난 턴의 막힘은 다음 턴으로 넘어가지 않는다", ar.trackAutoResume(t, ev("x"), [done("failed")]), undefined);
+
+  t = fresh();
+  ar.trackAutoResume(t, ev("x"), [blocked()]);
+  ar.trackAutoResume(t, ev("user_msg"), []);
+  eq("새 입력은 턴 밖의 막힘을 지운다", ar.trackAutoResume(t, ev("x"), [done("failed")]), undefined);
 }
 
 console.log("\n=== worthNotifying 순서 ===");

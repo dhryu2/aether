@@ -37,6 +37,10 @@ export type AutoResumeTrack = {
   turnOpen: boolean;
   /** 이번 턴에 본 한도 막힘. until은 ms. */
   blocked?: { until?: number };
+  /** 턴 밖에서 본 한도 막힘. 입력 없이 스스로 열린 턴은 시작을 알기 전에 막힘이 먼저 올 수 있다. */
+  idleBlocked?: { until?: number };
+  /** 막혀서 끝난 뒤 아직 새 입력이 없다. 이때의 성공 턴은 막힌 일을 이어 간 것이 아니다. */
+  awaitingInput?: boolean;
   /** 직전 턴이 실패로 끝났는지. 막힘 알림이 실패보다 늦게 오는 경우를 위한 것. */
   lastEnd?: "failed" | "other";
 };
@@ -45,13 +49,15 @@ export type AutoResumeVerdict = { type: "blocked"; until?: number } | { type: "s
 
 /**
  * 사건 하나를 보고 "막혀서 멈춘 턴이 끝났다"/"턴이 정상으로 끝났다"를 판별한다. 한 원본 사건 안의 여러 중립 사건은 배열 순서대로 본다.
- * 턴 밖에서 온 막힘(정상 턴 뒤의 한도 상태 갱신)은 아무것도 돌려주지 않는다.
+ * 턴 밖에서 온 막힘은 그 자리에서 아무것도 돌려주지 않고, 다음 턴이 실패하면 막힘으로 판정한다.
  */
 export function trackAutoResume(state: AutoResumeTrack, ev: AetherEvent, agentEvents: readonly AgentEvent[]): AutoResumeVerdict | undefined {
   if (ev.kind === "user_msg") {
     state.turnOpen = true;
     state.blocked = undefined;
     state.lastEnd = undefined;
+    state.idleBlocked = undefined;
+    state.awaitingInput = false;
     return undefined;
   }
   let verdict: AutoResumeVerdict | undefined;
@@ -63,21 +69,27 @@ export function trackAutoResume(state: AutoResumeTrack, ev: AetherEvent, agentEv
       } else if (state.lastEnd === "failed") {
         verdict = { type: "blocked", until };
         state.lastEnd = "other";
+        state.awaitingInput = true;
+      } else {
+        state.idleBlocked = { until: until ?? state.idleBlocked?.until };
       }
     } else if (a.type === "turn_completed") {
       if (a.status === "failed") {
-        if (state.blocked) {
-          verdict = { type: "blocked", until: state.blocked.until };
+        const seen = state.blocked ?? state.idleBlocked;
+        if (seen) {
+          verdict = { type: "blocked", until: seen.until };
           state.lastEnd = "other";
+          state.awaitingInput = true;
         } else {
           state.lastEnd = "failed";
         }
       } else {
-        verdict = { type: "settled" };
+        if (a.status !== "ok" || !state.awaitingInput) verdict = { type: "settled" };
         state.lastEnd = "other";
       }
       state.turnOpen = false;
       state.blocked = undefined;
+      state.idleBlocked = undefined;
     }
   }
   return verdict;

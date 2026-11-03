@@ -76,6 +76,7 @@ export const stream: Dict = {
 
   // 대기 큐 버블
   'stream.queued.cancel': { ko: '대기 취소', en: 'Cancel queued message' },
+  'stream.queued.images': { ko: '사진 {count}장', en: 'Images: {count}' },
   'stream.queued.title': { ko: '대기 중: 현재 응답이 끝나면 자동으로 전송돼요', en: 'Queued — will send automatically once the current turn finishes' },
   'stream.queued.edit': { ko: '대기 메시지 수정', en: 'Edit queued message' },
   'stream.queued.sendNow': { ko: '지금 보내기', en: 'Send queued messages now' },
@@ -136,9 +137,9 @@ export const stream: Dict = {
   'stream.code.download': { ko: '파일로 저장', en: 'Download file' },
 
   // diff 미리보기
-  'stream.diff.secretHidden': { ko: '🔒 비밀 정보가 있는 경로라 미리보기를 숨겼어요', en: '🔒 Secret path, content preview hidden' },
+  'stream.diff.secretHidden': { ko: '비밀 정보가 있는 경로라 미리보기를 숨겼어요', en: 'Secret path, content preview hidden' },
   'stream.diff.binary': { ko: '바이너리 파일이라 미리보기가 없어요', en: 'Binary file, no preview' },
   'stream.diff.truncated': { ko: '파일이 커서 변경 내용을 생략했어요', en: 'File too large, diff omitted (truncated)' },
   'stream.diff.noPreview': { ko: '변경 미리보기 없음', en: 'No change preview' },
-  'stream.diff.inexact': { ko: '⚠ 미리보기가 실제 결과와 다를 수 있어요', en: '⚠ Preview may differ from the actual result (inexact)' },
+  'stream.diff.inexact': { ko: '미리보기가 실제 결과와 다를 수 있어요', en: 'Preview may differ from the actual result (inexact)' },
 }

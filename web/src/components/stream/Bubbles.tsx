@@ -221,7 +221,7 @@ export function QueuedBubble({
           </>
         ))}
       >
-        {imageCount > 0 && <span style={{ opacity: 0.8 }}>🖼×{imageCount}{text ? ' ' : ''}</span>}
+        {imageCount > 0 && <span style={{ opacity: 0.8 }}>{t('stream.queued.images', { count: imageCount })}{text ? ' ' : ''}</span>}
         <UserText text={text} />
       </div>
     </div>

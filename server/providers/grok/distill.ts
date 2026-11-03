@@ -25,11 +25,12 @@ import path from "node:path";
 import { config } from "../../config";
 import { st } from "../../i18n";
 import { UnknownModelNameError, pinnedModel, resolveAndApply } from "../distillModel";
-import type { DistillOptions, RuntimeModel } from "../types";
+import type { DistillOptions, ProviderUsage, RuntimeModel } from "../types";
+import { usageFromGrokBilling } from "./billingUsage";
 import { grokAgentArgs } from "./args";
 import { grokAuthHome, grokChildEnv, spawnGrokCli } from "./env";
 import { readGrokModels } from "./models";
-import { GROK_CLIENT_INFO, GrokStdio } from "./transport";
+import { GROK_CLIENT_INFO, GrokRpcError, GrokStdio } from "./transport";
 
 /** 10a S12 정본. 테스트가 글자 단위로 대조한다. */
 export const DISTILL_DISALLOWED_TOOLS =
@@ -331,6 +332,47 @@ export async function listGrokBackgroundModels(): Promise<RuntimeModel[]> {
   } finally {
     await stdio?.close().catch(() => { /* 목록 조회 뒤 이미 닫힌 통신선을 다시 닫아도 무해하다. */ });
     if (grokHome) removeTempDir(grokHome);
+  }
+}
+
+/**
+ * 세션 없이 계정 한도를 읽는다. 프롬프트를 보내지 않으므로 모델을 부르지 않는다.
+ * 인증 파일을 복제하면 토큰 갱신이 원본과 어긋날 수 있어 대화 세션과 같은 설정 폴더로 띄운다.
+ */
+export async function readGrokAccountUsage(timeoutMs: number): Promise<ProviderUsage> {
+  let stdio: GrokStdio | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    stdio = new GrokStdio({
+      args: grokAgentArgs({ permissionMode: "manual" }),
+      env: grokChildEnv(),
+      onNotification: () => {},
+      onServerRequest: async (r) => {
+        throw new Error(`사용량 조회는 역방향 요청을 받지 않는다(${r.method})`);
+      },
+      onExit: () => {},
+    });
+    // 상한은 두 요청 합쳐 하나다. 닫으면 기다리던 요청이 실패로 끝난다.
+    const owned = stdio;
+    timer = setTimeout(() => void owned.close(), timeoutMs);
+    timer.unref?.();
+    await stdio.request(
+      "initialize",
+      {
+        protocolVersion: 1,
+        clientInfo: GROK_CLIENT_INFO,
+        clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+      },
+      timeoutMs,
+    );
+    return usageFromGrokBilling(await stdio.request("_x.ai/billing", {}, timeoutMs));
+  } catch (error) {
+    // 청구 조회를 지원하지 않는 버전은 정상 기능 탐지다. 대화 세션의 사용량 조회와 같게 다룬다.
+    if (error instanceof GrokRpcError && error.code === -32601) return { windowsAvailable: false, windows: [] };
+    throw error;
+  } finally {
+    if (timer) clearTimeout(timer);
+    await stdio?.close().catch(() => { /* 조회 뒤 이미 닫힌 통신선을 다시 닫아도 무해하다. */ });
   }
 }
 

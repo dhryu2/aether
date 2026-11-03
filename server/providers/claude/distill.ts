@@ -2,6 +2,7 @@ import { createClaudeTurnFailureTracker } from "./turnFailure";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import type { ClassifiedError } from "../../../shared/errors";
 import { modelSelectionError } from "./errorOrigin";
+import { usageFromClaude, type ClaudeUsageRaw } from "./usage";
 import { classifyServiceError } from './errorOrigin';
 import { classifyError } from '../../observability/event';
 /**
@@ -45,7 +46,7 @@ import { config } from "../../config";
 import { pick } from "../../i18n";
 import { resolveAndApply } from "../distillModel";
 import { modelEnv } from "../modelEnv";
-import type { DistillOptions, RuntimeModel } from "../types";
+import type { DistillOptions, ProviderUsage, RuntimeModel } from "../types";
 import { claudeModelTraits } from "./modelTraits";
 import { loadClaudeSdk } from "./sdk";
 import { readTurns, TurnFailedError, type TurnInspection } from "../turnReader";
@@ -78,6 +79,7 @@ function inputQueue() {
 
 /** 띄운 보조 query에서 이 파일이 쓰는 만큼. 시험이 가짜로 바꿔 끼운다. */
 type ToollessQuery = AsyncIterable<unknown> & {
+  usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET?(): Promise<ClaudeUsageRaw>;
   supportedModels(): Promise<Array<{ value: string; displayName: string; description: string; resolvedModel?: string; supportsEffort?: boolean; supportedEffortLevels?: string[] }>>;
   setModel(model?: string): Promise<void>;
   applyFlagSettings(settings: { effortLevel?: unknown }): Promise<void>;
@@ -268,6 +270,16 @@ function toRows(models: Awaited<ReturnType<ToollessQuery["supportedModels"]>>): 
  * 배경 작업과 같은 설치본 CLI를 띄우므로 실제로 쓸 별칭 대응이 그대로 나온다.
  */
 export async function listClaudeBackgroundModels(): Promise<RuntimeModel[]> {
+  return askIdleQuery(config.distillTimeoutMs, async (qh) => toRows(await qh.supportedModels()));
+}
+
+/** 세션 없이 계정 한도를 읽는다. 프롬프트를 보내지 않으므로 모델을 부르지 않는다. */
+export async function readClaudeAccountUsage(timeoutMs: number): Promise<ProviderUsage> {
+  return askIdleQuery(timeoutMs, async (qh) => usageFromClaude(await qh.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET?.()));
+}
+
+/** 프롬프트 없는 보조 query를 띄워 한 가지만 묻고, 성공·실패·시간 초과 모두 프로세스를 닫는다. */
+async function askIdleQuery<T>(timeoutMs: number, ask: (qh: ToollessQuery) => Promise<T>): Promise<T> {
   // 프롬프트를 보내지 않으므로 어느 폴더든 같다. 사용자 폴더를 열지 않으려고 임시 폴더에서 띄운다.
   const { input, qh } = await spawnImpl(os.tmpdir());
   let timedOut = false;
@@ -275,11 +287,11 @@ export async function listClaudeBackgroundModels(): Promise<RuntimeModel[]> {
     timedOut = true;
     void qh.interrupt().catch(() => { /* 취소한 질의가 이미 종료된 경우를 허용한다. */ });
     try { qh.close?.(); } catch { /* 이미 죽음 */ }
-  }, config.distillTimeoutMs);
+  }, timeoutMs);
   timer.unref?.();
   const reader = readTurns(qh, createClaudeMessageInspector());
   try {
-    return toRows(await qh.supportedModels());
+    return await ask(qh);
   } catch (e) {
     if (e instanceof Error) throw timedOut ? classifyError(e, 'external_environment') : classifyServiceError(e);
     throw e;

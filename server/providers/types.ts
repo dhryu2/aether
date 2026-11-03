@@ -398,6 +398,11 @@ export interface ProviderServices {
    * 있는 것만 본다. 못 쓰면 새 세션 창이 그 줄을 흐리게 그리고, 세션 만들기 요청은 거절된다.
    */
   availability(): Promise<ProviderAvailability>;
+  /**
+   * 세션 없이 계정 구독 한도를 읽는다. 모델을 부르지 않는다. 구독 한도가 없는 provider는 구현하지 않는다.
+   * 시간 안에 답이 없으면 throw한다. 이 조회를 위해 띄운 프로세스는 어떤 경우에도 남기지 않는다.
+   */
+  usage?(timeoutMs: number): Promise<ProviderUsage>;
   /** 부팅 때 살아 있는 세션이 없을 때 한 번 부른다. 강제 종료로 남은 이 provider의 임시 자원을 치운다. 던지지 않는다. */
   cleanupAtBoot?(): void;
 }

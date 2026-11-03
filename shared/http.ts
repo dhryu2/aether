@@ -81,6 +81,14 @@ export type UsageResponse = {
   context?: { used: number; size: number };
 };
 
+/** 세션과 상관없는 계정 한도. `usage`가 null이면 이번에 확인하지 못했다는 뜻이다. */
+export type AccountUsageEntry = {
+  provider: string;
+  displayName: string;
+  usage: Pick<UsageResponse, "windowsAvailable" | "windows"> | null;
+};
+export type AccountUsageResponse = { providers: AccountUsageEntry[] };
+
 export type LocalizedText = {
   text?: string;
   byLocale?: Readonly<Record<string, string>>;

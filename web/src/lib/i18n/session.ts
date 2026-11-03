@@ -95,10 +95,12 @@ export const session: Dict = {
   // SessionStatus
   'session.status.title': { ko: '현재 세션 사용량', en: 'Usage for this work' },
   'session.status.loading': { ko: '사용량 불러오는 중', en: 'Loading usage' },
-  'session.status.noActive': { ko: '세션을 열면 사용량이 보여요', en: 'Open a work item to see usage' },
+  'session.status.accountTitle': { ko: 'AI 서비스 한도', en: 'AI service limits' },
+  'session.status.accountFailed': { ko: '지금 확인하지 못했어요. 새로고침해 보세요.', en: 'Could not check right now. Try refreshing.' },
+  'session.status.noServices': { ko: '한도를 알려 주는 AI 서비스가 없어요.', en: 'No AI service reports limits.' },
   'session.status.liveOnly': {
-    ko: '세션이 실행 중일 때만 사용량을 볼 수 있어요. 메시지를 보내면 다시 실행돼요',
-    en: 'Usage shows after this work is awake. Send one message to wake it.',
+    ko: '이 세션은 잠들어 있어요. 세션별 정보는 세션이 깨어나면 보여요.',
+    en: 'This work is asleep. Its details show when it wakes.',
   },
   'session.status.notSupported': {
     ko: '이 AI 서비스는 사용량을 알려주지 않아요.',

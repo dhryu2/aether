@@ -10,7 +10,7 @@ import { claudeLogin } from "../../auth/claudeLogin";
 import { resolveClaudeBin } from "../../auth/claudeLogin";
 import { cliAvailability, isCommandInstalled } from "../installed";
 import type { ProviderServices } from "../types";
-import { runDistill, listClaudeBackgroundModels } from "./distill";
+import { runDistill, listClaudeBackgroundModels, readClaudeAccountUsage } from "./distill";
 import { claudeSdkLoadable } from "./sdk";
 
 /**
@@ -31,6 +31,7 @@ export const claudeServices: ProviderServices = {
   auth: claudeLogin,
   distill: runDistill,
   listBackgroundModels: listClaudeBackgroundModels,
+  usage: readClaudeAccountUsage,
   availability: async () => {
     const bin = resolveClaudeBin();
     // 프로그램이 없으면 SDK를 불러오지 않는다. 프로그램이 있어도 SDK 모듈이 없으면 세션을 못 연다.

@@ -570,6 +570,11 @@ function main() {
         return;
       }
       case "_x.ai/billing":
+        if (process.env.FAKE_GROK_BILLING === "hang") return;
+        if (process.env.FAKE_GROK_BILLING === "unsupported") {
+          fail(id, "Method not found", -32601);
+          return;
+        }
         ok(id, {
           config: {
             currentPeriod: {

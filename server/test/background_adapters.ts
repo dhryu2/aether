@@ -225,6 +225,50 @@ console.log("── Grok ──");
 }
 
 // ───────────────────────────── Ollama ─────────────────────────────
+console.log("── 세션 없는 계정 한도 ──");
+{
+  // Claude: 값을 읽어도, 응답이 없어도 임시 프로세스를 닫는다.
+  const fakeUsageQuery = (usage: () => Promise<unknown>) => {
+    const state = { closed: 0 };
+    let finish = () => {};
+    const done = new Promise<void>((resolve) => { finish = resolve; });
+    claude.setClaudeDistillSpawnForTest(() => ({
+      async *[Symbol.asyncIterator]() { await done; },
+      supportedModels: async () => [],
+      setModel: async () => {},
+      applyFlagSettings: async () => {},
+      interrupt: async () => {},
+      close: () => { state.closed++; finish(); },
+      usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET: usage as never,
+    }));
+    return state;
+  };
+  let query = fakeUsageQuery(async () => ({
+    rate_limits_available: true,
+    rate_limits: { five_hour: { utilization: 12, resets_at: "2030-01-01T00:00:00Z" }, internal: { utilization: 99 } },
+  }));
+  const read = await claude.readClaudeAccountUsage(1000);
+  check(read.windows.length === 1 && read.windows[0]?.utilization === 12, "Claude: 표시할 한도 창만 옮긴다", read);
+  check(query.closed > 0, "Claude: 값을 읽으면 프로세스를 닫는다");
+  query = fakeUsageQuery(() => new Promise((_, reject) => setTimeout(() => reject(new Error("닫힘")), 50)));
+  check((await rejects(claude.readClaudeAccountUsage(10))) instanceof Error, "Claude: 응답이 없으면 실패로 끝난다");
+  check(query.closed > 0, "Claude: 응답이 없으면 제한 시간에 프로세스를 닫는다");
+  claude.setClaudeDistillSpawnForTest(null);
+
+  // Grok: 가짜 프로세스가 끝나야 함수가 돌아온다(close를 기다린다).
+  const { readGrokAccountUsage } = await import("../providers/grok/distill");
+  const billed = await readGrokAccountUsage(10_000);
+  check(billed.windowsAvailable && billed.windows[0]?.utilization === 42, "Grok: 세션 없이 한도를 읽는다", billed);
+  process.env.FAKE_GROK_BILLING = "unsupported";
+  const unsupported = await readGrokAccountUsage(10_000);
+  check(!unsupported.windowsAvailable && unsupported.windows.length === 0, "Grok: 조회를 지원하지 않는 버전은 한도 없음이다", unsupported);
+  process.env.FAKE_GROK_BILLING = "hang";
+  const started = Date.now();
+  const hung = await rejects(readGrokAccountUsage(3000));
+  check(hung instanceof Error && Date.now() - started < 8000, "Grok: 응답이 없으면 전체 상한 안에 닫고 실패한다", Date.now() - started);
+  delete process.env.FAKE_GROK_BILLING;
+}
+
 console.log("── Ollama ──");
 {
   // 옵션 없음은 저장값(현행 규칙 판)을 쓴다. 판이 없는 저장값은 버리고 새로 고르므로 판을 함께 적는다.

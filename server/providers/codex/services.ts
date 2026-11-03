@@ -8,6 +8,9 @@
  *     (Phase 8 §0.1-4: provider 장애 시 조용한 fallback 금지).
  */
 import { codexAuth } from "./auth";
+import { controlRequest } from "../../codex/control";
+import { usageFromCodexRateLimits } from "./usage";
+import type { GetAccountRateLimitsResponse } from "../../codex/protocol/v2/GetAccountRateLimitsResponse";
 import { resolveCodexBin } from "../../codex/appServer";
 import { cliAvailability } from "../installed";
 import { runCodexDistill, listCodexBackgroundModels, purgeOrphanDistillHomes } from "./distill";
@@ -26,6 +29,8 @@ export const codexServices: ProviderServices = {
   auth: codexAuth,
   distill: runCodexDistill,
   listBackgroundModels: listCodexBackgroundModels,
+  // 로그인 확인에 쓰는 제어 프로세스에 묻는다. 놀면 저절로 내려가고, 임시 인증 사본을 만들지 않는다.
+  usage: async (timeoutMs) => usageFromCodexRateLimits(await controlRequest<GetAccountRateLimitsResponse>("account/rateLimits/read", undefined, timeoutMs)),
   availability: () => cliAvailability(resolveCodexBin(), codexAuth),
   // 배경 작업이 강제 종료돼 남긴 임시 설정 폴더(복제된 인증 파일 포함)를 치운다.
   cleanupAtBoot: purgeOrphanDistillHomes,

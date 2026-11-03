@@ -1,5 +1,5 @@
 // 설정 안의 사용량. 지금 작업의 한도 막대, 그리고 비용과 저장소를 한 줄로 보여 준다.
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { api } from '../lib/api'
 import { chromeSessionId, useStore } from '../lib/store'
@@ -8,7 +8,7 @@ import { formatCostUsd } from '../lib/formatCost'
 import { httpStatus } from '../lib/errors'
 import { useT } from '../lib/i18n'
 import { rateLimitLabel } from '../lib/usageLabels'
-import type { UsageResponse } from '../lib/types'
+import type { AccountUsageEntry, UsageResponse } from '../lib/types'
 import { C, R } from '../design/tokens'
 import { IconButton, Skeleton } from './ui'
 import { Group, GroupNote, Sep } from './settings/parts'
@@ -61,38 +61,90 @@ function UsageBlock({ label, pct, detail }: { label: string; pct: number | null;
   )
 }
 
+function windowBlocks(usage: AccountUsageEntry['usage'], t: ReturnType<typeof useT>): ReactNode[] {
+  if (!usage?.windowsAvailable) return []
+  return usage.windows.map((w) => {
+    const reset = w.resetsAt ? new Date(w.resetsAt) : null
+    const detail = reset && !Number.isNaN(reset.getTime())
+      ? t('session.status.resetAt', { date: fmtShortDateTime(reset.getTime()) })
+      : null
+    return <UsageBlock key={w.key} label={rateLimitLabel(w.key, t, w.windowMinutes)} pct={w.utilization} detail={detail} />
+  })
+}
+
+function Blocks({ blocks }: { blocks: ReactNode[] }) {
+  return (
+    <Group>
+      {blocks.map((block, i) => (
+        <div key={i}>
+          {i > 0 && <Sep />}
+          {block}
+        </div>
+      ))}
+    </Group>
+  )
+}
+
 export function SessionStatus() {
   const s = useStore()
   const t = useT()
   const narrow = useNarrow()
   const id = chromeSessionId(s)
+  const [account, setAccount] = useState<AccountUsageEntry[] | null>(null)
+  const [accountFailed, setAccountFailed] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [usage, setUsage] = useState<UsageResponse | null>(null)
   const [stats, setStats] = useState<{ dataBytes: number; sessions: number } | null>(null)
   const [err, setErr] = useState('')
+  const latestId = useRef(id)
 
-  const load = async () => {
-    setErr('')
-    if (!id) {
-      setUsage(null)
-      setStats(null)
-      return
-    }
-    void api.getStats().then(setStats).catch(() => { /* 공통 API가 원인을 처리했으며 통계 없이 사용량 표시를 계속한다. */ })
+  const loadAccount = async (fresh: boolean) => {
+    setRefreshing(true)
     try {
-      setUsage(await api.getUsage(id))
-    } catch (e) {
-      setErr(httpStatus(e) === 501 ? t('session.status.notSupported') : t('session.status.liveOnly'))
+      setAccount((await api.accountUsage(fresh)).providers)
+      setAccountFailed(false)
+    } catch {
+      // 이미 그린 값이 있으면 두고, 실패했다는 안내를 함께 보인다.
+      setAccountFailed(true)
+    } finally {
+      setRefreshing(false)
     }
   }
 
-  useEffect(() => { void load() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const loadSession = async () => {
+    const asked = id
+    setErr('')
+    void api.getStats().then(setStats).catch(() => { /* 공통 API가 원인을 처리했으며 통계 없이 사용량 표시를 계속한다. */ })
+    if (!id) {
+      setUsage(null)
+      return
+    }
+    try {
+      const next = await api.getUsage(id)
+      if (latestId.current === asked) setUsage(next)
+    } catch (e) {
+      if (latestId.current !== asked) return
+      setUsage(null)
+      const status = httpStatus(e)
+      setErr(t(status === 501 ? 'session.status.notSupported' : status === 404 ? 'session.status.liveOnly' : 'session.status.accountFailed'))
+    }
+  }
+
+  useEffect(() => { void loadAccount(false) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // 세션을 바꾸면 이전 세션의 값을 새 세션 아래에 두지 않는다. 늦게 온 이전 응답도 버린다.
+    latestId.current = id
+    setUsage(null)
+    void loadSession()
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 새로고침 때는 이미 그린 값을 둔 채 바꿔 끼우므로, 아직 받은 값이 없을 때만 스켈레톤이다.
-  const loading = !!id && !usage && !err
+  const accountLoading = !account && !accountFailed
+  const sessionLoading = !!id && !usage && !err
 
-  const blocks: ReactNode[] = []
+  const sessionBlocks: ReactNode[] = []
   if (usage?.context && usage.context.size > 0) {
-    blocks.push(
+    sessionBlocks.push(
       <UsageBlock
         key="context"
         label={t('session.status.context')}
@@ -104,66 +156,72 @@ export function SessionStatus() {
       />,
     )
   }
-  if (usage?.windowsAvailable) {
-    for (const w of usage.windows) {
-      const reset = w.resetsAt ? new Date(w.resetsAt) : null
-      const detail = reset && !Number.isNaN(reset.getTime())
-        ? t('session.status.resetAt', { date: fmtShortDateTime(reset.getTime()) })
-        : null
-      blocks.push(
-        <UsageBlock key={w.key} label={rateLimitLabel(w.key, t, w.windowMinutes)} pct={w.utilization} detail={detail} />,
-      )
-    }
-  }
 
   const notes: string[] = []
-  if (!id) notes.push(t('session.status.noActive'))
-  else if (err) notes.push(err)
-  else if (usage && !usage.windowsAvailable) notes.push(t('session.status.noRateLimit'))
+  if (err) notes.push(err)
   if (id && usage) {
     const amount = formatCostUsd(usage.costUsd)
     if (amount) notes.push(t('session.status.sessionCost', { amount }))
   }
-  if (id && stats) notes.push(t('session.status.storageStats', { bytes: bytes(stats.dataBytes), count: stats.sessions }))
+  if (stats) notes.push(t('session.status.storageStats', { bytes: bytes(stats.dataBytes), count: stats.sessions }))
+
+  const heading = { fontSize: 13, fontWeight: 600, color: C.label2 }
 
   return (
-    <section>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingLeft: 16, marginBottom: 8 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: C.label2 }}>{t('session.status.title')}</div>
-        <IconButton
-          label={t('common.refresh')}
-          size={narrow ? 44 : 28}
-          className={narrow ? 'hit-44' : undefined}
-          onClick={() => void load()}
-          style={{ background: C.fill, color: C.label2 }}
-        >
-          <RefreshCw size={narrow ? 16 : 14} />
-        </IconButton>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingLeft: 16, marginBottom: 8 }}>
+          <div style={heading}>{t('session.status.accountTitle')}</div>
+          <IconButton
+            label={t('common.refresh')}
+            size={narrow ? 44 : 28}
+            className={narrow ? 'hit-44' : undefined}
+            disabled={refreshing}
+            onClick={() => { void loadAccount(true); void loadSession() }}
+            style={{ background: C.fill, color: C.label2 }}
+          >
+            <RefreshCw size={narrow ? 16 : 14} />
+          </IconButton>
+        </div>
+        {accountLoading && (
+          <div role="status" aria-busy="true" aria-label={t('session.status.loading')}>
+            <Group>
+              {Array.from({ length: SKELETON_ROWS }, (_, i) => (
+                <div key={i}>
+                  {i > 0 && <Sep />}
+                  <UsageBlockSkeleton />
+                </div>
+              ))}
+            </Group>
+          </div>
+        )}
+        {accountFailed && <GroupNote>{t('session.status.accountFailed')}</GroupNote>}
+        {account && account.length === 0 && !accountFailed && <GroupNote>{t('session.status.noServices')}</GroupNote>}
+        {account?.map((entry) => {
+          const blocks = windowBlocks(entry.usage, t)
+          return (
+            <div key={entry.provider} style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 13, color: C.label3, paddingLeft: 16, marginBottom: 6 }}>{entry.displayName}</div>
+              {blocks.length > 0 && <Blocks blocks={blocks} />}
+              {blocks.length === 0 && (
+                <GroupNote>{t(entry.usage ? 'session.status.noRateLimit' : 'session.status.accountFailed')}</GroupNote>
+              )}
+            </div>
+          )
+        })}
       </div>
-      {loading && (
-        <div role="status" aria-busy="true" aria-label={t('session.status.loading')}>
-          <Group>
-            {Array.from({ length: SKELETON_ROWS }, (_, i) => (
-              <div key={i}>
-                {i > 0 && <Sep />}
-                <UsageBlockSkeleton />
-              </div>
-            ))}
-          </Group>
-          <Skeleton width={180} height={12} style={{ margin: '12px 16px 0' }} />
+      {(sessionLoading || sessionBlocks.length > 0) && (
+        <div>
+          <div style={{ ...heading, paddingLeft: 16, marginBottom: 8 }}>{t('session.status.title')}</div>
+          {sessionLoading && (
+            <div role="status" aria-busy="true" aria-label={t('session.status.loading')}>
+              <Group><UsageBlockSkeleton /></Group>
+            </div>
+          )}
+          {!sessionLoading && sessionBlocks.length > 0 && <Blocks blocks={sessionBlocks} />}
         </div>
       )}
-      {!loading && blocks.length > 0 && (
-        <Group>
-          {blocks.map((block, i) => (
-            <div key={i}>
-              {i > 0 && <Sep />}
-              {block}
-            </div>
-          ))}
-        </Group>
-      )}
-      {!loading && notes.length > 0 && <GroupNote>{notes.join(' ')}</GroupNote>}
+      {notes.length > 0 && <GroupNote>{notes.join(' ')}</GroupNote>}
     </section>
   )
 }

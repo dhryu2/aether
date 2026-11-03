@@ -16,6 +16,8 @@ export type {
   ProviderList,
   ProvidersResponse,
   ProviderAvailability,
+  AccountUsageEntry,
+  AccountUsageResponse,
   ProviderAvailabilityResponse,
   RememberedModelsResponse,
   UsageWindow,

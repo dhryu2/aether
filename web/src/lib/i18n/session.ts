@@ -36,12 +36,6 @@ export const session: Dict = {
     ko: '지금 쓸 수 있는 AI 서비스가 없어요. 설정에서 로그인하거나 AI 서비스를 설치하면 세션을 시작할 수 있어요.',
     en: 'No service is available right now. Log in from Settings or install a service to start work.',
   },
-  'session.newSession.modelLabel': { ko: '모델', en: 'Model' },
-  'session.newSession.modelPlaceholder': { ko: '비워 두면 계정 기본 모델', en: 'Leave empty for the account default' },
-  'session.newSession.modelNote': {
-    ko: '비워 두면 계정 기본 모델로 시작해요. 없는 모델이면 이 창에서 알려 줘요. 세션 안에서는 /model로 바꿔요.',
-    en: 'Leave it empty to start with the account default. An unknown model is reported in this window. Inside the work, change it with /model.',
-  },
   'session.newSession.creating': { ko: '만드는 중', en: 'Creating' },
   'session.newSession.start': { ko: '세션 시작', en: 'Start work' },
   'session.newSession.safety': { ko: '안전', en: 'Safety' },

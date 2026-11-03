@@ -1,7 +1,7 @@
-// 새 작업 창. 이름, 폴더, 서비스, 모델, 안전을 묶음으로 고르고 발을 눌러 만든다.
-// 모델은 칩으로 고르지 않는다. 세션을 만들기 전에는 그 계정이 쓸 수 있는 모델을 알 수 없다.
+// 새 작업 창. 이름, 폴더, 서비스, 안전을 묶음으로 고르고 발을 눌러 만든다.
+// 모델은 여기서 고르지 않는다. 계정 기본 모델로 만들고, 세션 안의 모델 칩에서 바꾼다.
 // 폴더는 최근 폴더를 바로 고르고, 다른 폴더는 같은 창 안의 탐색 화면으로 넘어가 고른다.
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { actions, defaultNewSessionProvider, getState, newSessionFolderCandidates, useStore } from '../lib/store'
 import { recentFolders } from '../lib/sessionGroups'
@@ -9,7 +9,7 @@ import { useT } from '../lib/i18n'
 import { api } from '../lib/api'
 import { reportClientError } from '../lib/errorReporting'
 import { newSessionProviderView, type AvailabilityState, type ProviderListState } from '../lib/newSessionProviders'
-import { C, FONT, Z } from '../design/tokens'
+import { C, Z } from '../design/tokens'
 import { Button, ModalCard, ModalFooter, ModalHeader, ModalShell } from './ui'
 import { GroupTitle } from './settings/parts'
 import { FolderChoices } from './folderPicker/FolderChoices'
@@ -34,7 +34,6 @@ function NewSessionWindow() {
   const nameRef = useRef<HTMLInputElement>(null)
   const pickedRowRef = useRef<HTMLButtonElement>(null)
   const returnFocusRef = useRef(false)
-  const errorId = useId()
   const browser = useFolderBrowser()
   const { load } = browser
   // 폴더 헤더에서 열면 그 폴더. 아니면 지금 보는 세션의 폴더, 그다음 최근 폴더. 후보가 없으면 홈이다.
@@ -54,7 +53,6 @@ function NewSessionWindow() {
   const [name, setName] = useState('')
   // 복사본에서 작업은 끈 채로 시작한다(사용자 결정). 켜면 원 폴더와 떨어진 복사본에서 일한다.
   const [isolate, setIsolate] = useState(false)
-  const [model, setModel] = useState('')
   const [provider, setProvider] = useState(() => defaultNewSessionProvider(getState()))
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
@@ -198,15 +196,12 @@ function NewSessionWindow() {
     if (!fanout && !soloId) return // 고를 서비스가 없으면 만드는 중 상태로 들어가지 않는다(이름 칸 Enter로도 들어올 수 있다)
     setCreating(true)
     setError('')
-    const opts = { model: model.trim() || undefined, isolateWorkspace: useCopy, name: name.trim() || undefined }
+    const opts = { isolateWorkspace: useCopy, name: name.trim() || undefined }
     const r = fanout
       ? await actions.startSameWork(picked || undefined, { ...opts, providers: selectedIds, prompt })
       : await actions.createSession(picked || undefined, { ...opts, provider: soloId ?? '' })
     setCreating(false)
-    if (!r.ok) {
-      setError(r.error)
-      setModel('')
-    }
+    if (!r.ok) setError(r.error)
   }
 
   return (
@@ -335,26 +330,6 @@ function NewSessionWindow() {
             )}
 
             <section>
-              <GroupTitle>{t('session.newSession.modelLabel')}</GroupTitle>
-              <input
-                className="sheet-field mono-input"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') void start() }}
-                placeholder={t('session.newSession.modelPlaceholder')}
-                disabled={creating}
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-                aria-describedby={error ? errorId : undefined}
-                style={{ ...fieldStyle(), height: narrow ? 50 : 44, padding: '0 16px', fontFamily: FONT.mono }}
-              />
-              <p style={{ fontSize: 13, color: C.label2, lineHeight: 1.45, margin: '8px 0 0', padding: '0 16px' }}>
-                {t('session.newSession.modelNote')}
-              </p>
-            </section>
-
-            <section>
               <GroupTitle>{t('session.newSession.safety')}</GroupTitle>
               <SafetyBlock
                 copyTitle={t('session.newSession.isolate.title')}
@@ -387,7 +362,7 @@ function NewSessionWindow() {
           <ModalFooter>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', alignItems: 'stretch', padding: error ? '8px 0' : undefined }}>
               {error && (
-                <p id={errorId} role="alert" style={{ margin: 0, width: '100%', padding: '0 16px', fontSize: 13, lineHeight: 1.45, color: C.del, textAlign: 'left' }}>
+                <p role="alert" style={{ margin: 0, width: '100%', padding: '0 16px', fontSize: 13, lineHeight: 1.45, color: C.del, textAlign: 'left' }}>
                   {error}
                 </p>
               )}

@@ -131,7 +131,7 @@ for (const f of ["docs/x.md", ".private/x", "CLAUDE.md", "AGENTS.md", "HANDOFF.m
   git("reset", "-q");
   fs.rmSync(path.join(work, f), { force: true });
 }
-for (const [f, name] of [["notes.md", "새 파일"], ["newdir/x.ts", "새 파일"], ["server/plan.md", "새 문서"], ["deploy/site/plan.md", "새 문서"]] as const) {
+for (const [f, name] of [["notes.md", "새 파일"], ["newdir/x.ts", "새 파일"], ["server/plan.md", "새 문서"], ["deploy/site/plan.md", "새 문서"], ["server/README.en.md", "새 문서"]] as const) {
   writeAt(f, "내용\n");
   git("add", "-f", f);
   const r = git("commit", "-q", "-m", "x");
@@ -139,7 +139,7 @@ for (const [f, name] of [["notes.md", "새 파일"], ["newdir/x.ts", "새 파일
   git("reset", "-q");
   fs.rmSync(path.join(work, f), { force: true });
 }
-for (const f of ["README.md", "server/README.md", "deploy/site/notes/9.9.9.md", "server/new.ts"]) {
+for (const f of ["README.md", "README.en.md", "server/README.md", "deploy/site/notes/9.9.9.md", "server/new.ts"]) {
   writeAt(f, "내용\n");
   const r = commit("허용");
   check(r.status === 0, `허용한다: ${f}`, r.stderr);

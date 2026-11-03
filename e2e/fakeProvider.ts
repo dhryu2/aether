@@ -79,7 +79,6 @@ class E2eRuntime implements AgentRuntime {
   readonly provider = E2E_PROVIDER
   readonly capabilities: RuntimeCapabilities = {
     supportedModels: true,
-    mcpStatus: false,
     usage: false,
     planReview: false,
   }
@@ -252,14 +251,6 @@ class E2eRuntime implements AgentRuntime {
     return {
       models: [{ value: 'e2e-small', displayName: 'E2E Small', isDefault: true, supportsEffort: false }],
     }
-  }
-
-  async mcpStatus() {
-    return []
-  }
-
-  async reconnectMcp() {
-    return { ok: false }
   }
 
   async usage() {

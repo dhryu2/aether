@@ -1127,16 +1127,6 @@ export class LiveSession {
     return this.within(this.setModel(model), timeoutMs);
   }
 
-  /** 이 세션의 MCP 서버 연결 상태(aether/기타). live 세션만. */
-  async getMcpStatus() {
-    return this.runtime.mcpStatus();
-  }
-
-  /** 실패/미연결 MCP 서버 수동 재연결. live 세션만. */
-  async reconnectMcp(serverName: string) {
-    return this.runtime.reconnectMcp(serverName);
-  }
-
   /** 세션 비용·구독 rate-limit(5h/7d) 사용률. live 세션만. */
   async getUsage() {
     return this.runtime.usage();

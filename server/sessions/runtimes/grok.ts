@@ -252,7 +252,6 @@ export class GrokRuntime implements AgentRuntime {
   readonly provider = "grok" as const;
   readonly capabilities: RuntimeCapabilities = {
     supportedModels: true,
-    mcpStatus: true,
     usage: true,
     planReview: true,
   };
@@ -261,7 +260,6 @@ export class GrokRuntime implements AgentRuntime {
   private readonly attachments: AttachmentStore;
   private stdio: GrokStdio;
   private bridge: KnowledgeBridge | null = null;
-  private knowledgeToolNames: string[] = [];
 
   private booted: Promise<RuntimeHandshake> | null = null;
   private sessionId: string | null = null;
@@ -375,7 +373,6 @@ export class GrokRuntime implements AgentRuntime {
    */
   private async openBridge(): Promise<KnowledgeBridge | null> {
     const tools = buildKnowledgeTools();
-    this.knowledgeToolNames = tools.map((t) => t.name);
     if (!tools.length) return null;
     const bridge = await openKnowledgeBridge({
       sessionId: this.opts.sessionId,
@@ -648,30 +645,6 @@ export class GrokRuntime implements AgentRuntime {
 
   async effectivePermissionPolicy(): Promise<PermissionPolicy> {
     return grokPermissionPolicy(this.permissionMode === "full");
-  }
-
-  async mcpStatus(): Promise<unknown> {
-    await this.ready();
-    if (!this.bridge) return [];
-    return [{ name: MCP_SERVER_NAME, status: "connected", tools: this.knowledgeToolNames }];
-  }
-
-  async reconnectMcp(serverName: string): Promise<unknown> {
-    await this.ready();
-    const wanted = serverName.trim();
-    if (wanted && wanted !== MCP_SERVER_NAME) throw new Error(st("notice.grok.mcpUnknown", { name: wanted }));
-    if (!this.knowledgeToolNames.length) throw new Error(st("notice.grok.mcpNone"));
-    this.assertIdleForRespawn();
-    this.bridge?.dispose();
-    this.bridge = null;
-    this.bridge = await this.openBridge();
-    if (this.disposed) {
-      this.bridge?.dispose();
-      this.bridge = null;
-      throw new Error(st("notice.grok.notReady"));
-    }
-    await this.respawnProcess();
-    return this.mcpStatus();
   }
 
   async usage(): Promise<ProviderUsage> {

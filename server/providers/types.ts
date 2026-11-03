@@ -208,14 +208,13 @@ export type RuntimeStartOptions = {
 
 /**
  * provider 고유 *추가* 표면의 지원 여부. 핵심 기능을 숨기는 용도가 아니다.
- * supportedModels·mcpStatus·usage는 부가 조회 API이고, 현재 REST가 그대로 노출한다.
+ * supportedModels·usage는 부가 조회 API이고, 현재 REST가 그대로 노출한다.
  * planReview는 추가 기능이다. 화면은 능력이 켜진 세션만 그린다.
  * 작업 복사본은 실행기 능력이 아니다. 공통 디스크 모듈이 만든다.
  * 명령은 핵심 계약이라 빠졌다.
  */
 export type RuntimeCapabilities = {
   supportedModels: boolean;
-  mcpStatus: boolean;
   usage: boolean;
   /** 계획문을 승인·수정요청·취소로 검토한다. */
   planReview: boolean;
@@ -312,8 +311,6 @@ export interface AgentRuntime {
   // ── capability 가드 대상(provider-native 조회 표면) ──
   //   모델 목록은 여기 없다 — `handshake()`가 이미 중립 목록으로 주므로 같은 일을 하는 문이 둘일 이유가 없다.
   //   `capabilities.supportedModels`는 "그 목록이 쓸 만한가"를 나타내는 표시로 남아 조회 라우트를 가른다.
-  mcpStatus(): Promise<unknown>;
-  reconnectMcp(serverName: string): Promise<unknown>;
   /** 중립 스키마로 돌려준다(8d-3 ④) — provider 원본 모양을 프론트까지 흘리지 않는다. */
   usage(): Promise<ProviderUsage>;
   /** 이 runtime이 지금 실제로 실행할 수 있는 명령만 돌려준다. */

@@ -191,8 +191,8 @@ export type CodexBackend = {
 export const CODEX_BACKEND: CodexBackend = {
   provider: "codex",
   services: codexServices,
-  /** Codex는 모델·MCP·사용량 조회를 지원한다. 명령은 모든 runtime의 핵심 계약이다. */
-  capabilities: { supportedModels: true, mcpStatus: true, usage: true, planReview: false },
+  /** Codex는 모델·사용량 조회를 지원한다. 명령은 모든 runtime의 핵심 계약이다. */
+  capabilities: { supportedModels: true, usage: true, planReview: false },
   configOverrides: [],
   env: {},
   autoReview: true,
@@ -773,18 +773,6 @@ export class CodexRuntime implements AgentRuntime {
   }
 
   // ── provider 고유 조회 ──
-
-  mcpStatus(): Promise<unknown> {
-    return this.server.request("mcpServerStatus/list", { ...(this.threadId ? { threadId: this.threadId } : {}) });
-  }
-
-  /**
-   * Codex에는 "이 서버만 다시 연결" 명령이 없다. 설정을 다시 읽어 MCP 연결을 새로 맺는 것이 가장 가까운 동작이다.
-   * 이름은 받아두되 서버 단위로만 동작한다는 점이 Claude와 다르다.
-   */
-  reconnectMcp(_serverName: string): Promise<unknown> {
-    return this.server.request("config/mcpServer/reload", {});
-  }
 
   /**
    * 구독 한도 사용률 (8h). `account/rateLimits/read`를 중립 스키마로 옮긴다.

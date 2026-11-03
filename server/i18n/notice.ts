@@ -199,14 +199,6 @@ export const notice: Dict = {
     en: 'Model "{model}" does not support reasoning effort.',
   },
   "notice.grok.notReady": { ko: "Grok 세션이 아직 준비되지 않았어요.", en: "The Grok session is not ready yet." },
-  "notice.grok.mcpNone": {
-    ko: "이 세션에는 다시 연결할 지식 도구 연결이 없어요.",
-    en: "This session has no knowledge bridge to reconnect.",
-  },
-  "notice.grok.mcpUnknown": {
-    ko: '"{name}"은(는) 이 세션의 지식 도구 연결이 아니에요.',
-    en: '"{name}" is not this session\'s knowledge bridge.',
-  },
   "notice.grok.noUsageYet": { ko: "아직 사용량 정보를 받지 못했어요(첫 응답 이후에 확인돼요).", en: "No usage information yet (available after the first turn)." },
   "notice.grok.unsupportedQuery": { ko: "이 AI 서비스에서는 지원하지 않는 기능이에요: {what}", en: "Grok sessions do not support this query: {what}" },
   "notice.grok.noSessionId": { ko: "Grok가 세션 식별자를 돌려주지 않았어요.", en: "Grok did not return a session id." },

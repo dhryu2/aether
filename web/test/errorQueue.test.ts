@@ -186,7 +186,6 @@ await test('저장소 장애 중 영구 거절 집계를 복구 시 합친다', 
 // 웹 기능 경계의 실패 주입. 실제 수집 대기열을 거쳐 전송된 원래 오류를 확인한다.
 {
   const { drafts } = await import('../src/lib/drafts')
-  const { saveOpenSet, loadOpenSet } = await import('../src/lib/sidebarQuery')
   const { rememberPrompt } = await import('../src/lib/promptHistory')
   const rows: ClientErrorInput[] = []
   const previousFetch = globalThis.fetch
@@ -213,7 +212,6 @@ await test('저장소 장애 중 영구 거절 집계를 복구 시 합친다', 
   try {
     for (const [name, write] of [
       ['drafts', () => drafts.set('session-test', '초안')],
-      ['sidebar', () => saveOpenSet('aether.test', new Set(['project']))],
       ['history', () => rememberPrompt('session-test', '문장')],
     ] as const) {
       await test(`웹 ${name}: 소유 저장 실패는 첫 건만 error, 성공 뒤 다시 수집한다`, async () => {
@@ -236,13 +234,9 @@ await test('저장소 장애 중 영구 거절 집계를 복구 시 합친다', 
       rows.length = 0
       for (const name of ['SecurityError', 'QuotaExceededError']) {
         failure = new DOMException('브라우저 저장 제한', name)
-        drafts.set('session-test', '초안'); saveOpenSet('aether.test', new Set()); rememberPrompt('session-test', '문장')
+        drafts.set('session-test', '초안'); rememberPrompt('session-test', '문장')
       }
       failure = undefined
-      storage.getItem = () => null as unknown as string
-      assert.deepEqual([...loadOpenSet('aether.test')], [])
-      storage.getItem = () => '{broken'
-      assert.deepEqual([...loadOpenSet('aether.test')], [])
       await delivered()
       assert.equal(rows.length, 0)
     })

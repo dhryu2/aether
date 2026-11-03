@@ -240,11 +240,10 @@ export type ConvoItem = AetherEvent | LocalEvent
 export type ModelsStatus = 'loading' | 'ok' | 'asleep' | 'failed'
 
 export type State = {
-  /** 방 목록(채널 id). 새 화면 정본. */
+  /** 방 목록. 새 화면 정본. */
   rooms: WorkspaceRoom[]
   /** 옛 호환·실행 메타. id=sourceSessionId. 방 목록으로 쓰지 않는다. */
   sessions: SessionListItem[]
-  /** 단체 채널 칠판 글. */
   locale: Locale // UI/알림 언어 — 기본 'ko', 설정에서 'en' 전환(localStorage 영속)
   transcriptView: TranscriptView // 대화 화면이 진행 보고를 얼마나 남기는지. 기기 단위.
   /** 방 id. 첫 칸(왼쪽 위). */

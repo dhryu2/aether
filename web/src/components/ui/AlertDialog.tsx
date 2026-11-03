@@ -46,14 +46,14 @@ export function AlertDialogBody({
       </p>
       {extra}
       <div className="flex" style={{ gap: 10, marginTop: 18, flexWrap: secondary ? 'wrap' : undefined }}>
-        <Button ref={safeRef} tone="gray" grow height={44} fontSize={15} onClick={onCancel}>
+        <Button ref={safeRef} tone="gray" grow height={44} fontSize={secondary ? 13 : 15} onClick={onCancel} style={secondary ? { whiteSpace: 'nowrap' } : undefined}>
           {cancelLabel}
         </Button>
-        <Button tone={tone === 'neutral' ? 'primary' : tone} grow height={44} fontSize={15} onClick={onConfirm} style={secondary ? { whiteSpace: 'nowrap' } : undefined}>
+        <Button tone={tone === 'neutral' ? 'primary' : tone} grow height={44} fontSize={secondary ? 13 : 15} onClick={onConfirm} style={secondary ? { whiteSpace: 'nowrap' } : undefined}>
           {confirmLabel}
         </Button>
         {secondary && (
-          <Button tone="danger" grow height={44} fontSize={15} onClick={secondary.onClick} style={{ whiteSpace: 'nowrap' }}>
+          <Button tone="danger" grow height={44} fontSize={secondary ? 13 : 15} onClick={secondary.onClick} style={{ whiteSpace: 'nowrap' }}>
             {secondary.label}
           </Button>
         )}

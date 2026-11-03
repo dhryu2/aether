@@ -13,9 +13,6 @@ export function __setSearchAuditFailure(fn: (() => boolean) | null): void {
 }
 
 export type SearchAuditFilters = {
-  channelId?: string;
-  threadId?: string;
-  botId?: string;
   fromTs?: number;
   toTs?: number;
   sessionId?: string;

@@ -66,7 +66,7 @@ type InputClass = "A" | "B" | "C" | "id";
 const INPUT_TABLE: Record<string, Record<string, InputClass>> = {
   "routes/sessions.ts": {
     id: "id", // 세션 식별자(경로) — 우리가 randomUUID로 발급
-    name: "B", // MCP 서버 이름(경로) — mcpStatus()가 아는 이름만 / rename의 표시 이름은 body의 name
+    name: "B", // rename의 표시 이름은 body의 name
     cwd: "B", // resolveWorkFolder가 존재하는 절대 경로인지 확인(SessionManager.create)
     provider: "B", // 등록표에 있는 이름만(providerEntry가 미등록 이름을 명시 거부 — 8e)
     model: "B", // 형식 가드(길이·제어문자·앞의 '-') + provider가 이름 판정(없는 이름은 거부)

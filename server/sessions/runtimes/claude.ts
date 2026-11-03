@@ -204,8 +204,8 @@ function claudeBuiltinCommand(name: (typeof CLAUDE_BUILTIN_COMMANDS)[number]): R
 
 export class ClaudeRuntime implements AgentRuntime {
   readonly provider = "claude" as const;
-  /** Claude는 SDK 컨트롤로 모델·MCP·사용량 조회를 지원한다. 명령은 모든 runtime의 핵심 계약이다. */
-  readonly capabilities: RuntimeCapabilities = { supportedModels: true, mcpStatus: true, usage: true, planReview: false };
+  /** Claude는 SDK 컨트롤로 모델·사용량 조회를 지원한다. 명령은 모든 runtime의 핵심 계약이다. */
+  readonly capabilities: RuntimeCapabilities = { supportedModels: true, usage: true, planReview: false };
 
   private readonly opts: RuntimeStartOptions;
   private readonly input = makeInputQueue();
@@ -555,16 +555,6 @@ export class ClaudeRuntime implements AgentRuntime {
    */
   async effectivePermissionPolicy(): Promise<PermissionPolicy> {
     return claudePermissionPolicy(this.opts.cwd, this.permissionMode === "full");
-  }
-
-  /** SDK mcpServerStatus() — 이 세션의 MCP 서버 연결 상태(aether/기타). */
-  async mcpStatus() {
-    return (await this.qh).mcpServerStatus();
-  }
-
-  /** SDK reconnectMcpServer() — 실패/미연결 MCP 서버 수동 재연결. */
-  async reconnectMcp(serverName: string) {
-    return (await this.qh).reconnectMcpServer(serverName);
   }
 
   /**

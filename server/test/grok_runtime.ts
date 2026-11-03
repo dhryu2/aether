@@ -421,9 +421,14 @@ async function main() {
     check((spawn?.params as { envHasMcpToken?: boolean })?.envHasMcpToken !== true, "⑪ 환경에 AETHER_MCP_TOKEN이 없다", spawn?.params);
     check((spawn?.params as { envValuesContainBearer?: boolean })?.envValuesContainBearer !== true, "⑪ 환경값에 Bearer 토큰이 없다", spawn?.params);
     check((spawn?.params as { askTimeoutEnabled?: string | null })?.askTimeoutEnabled === "false", "⑪ 질문 카드 자체 시간 제한을 끈다", spawn?.params);
-    const mcp = JSON.stringify(await h.rt.mcpStatus());
-    check(mcp.includes("aether") && mcp.includes("session_search"), "⑪ 지식 도구 목록을 세션이 직접 돌려준다", mcp.slice(0, 200));
     const url = String(servers[0]?.url ?? "");
+    const toolsRes = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: auth, "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+    });
+    const mcp = await toolsRes.text();
+    check(mcp.includes("session_search"), "⑪ 지식 창구가 도구 목록을 직접 돌려준다", mcp.slice(0, 200));
     await h.rt.dispose();
     let tokenGone = false;
     try {
@@ -548,22 +553,6 @@ async function main() {
       prompt,
     );
     check(!prompt.some((b) => b.type === "image"), "⑮ image 블록을 안 쓴다", prompt);
-    await h.rt.dispose();
-  }
-
-  {
-    const h = start();
-    await h.rt.handshake();
-    let threw = false;
-    try {
-      await h.rt.reconnectMcp("nope");
-    } catch {
-      threw = true;
-    }
-    check(threw, "⑯ 없는 창구 이름은 거절한다");
-    const mcp = await h.rt.reconnectMcp("aether");
-    check(JSON.stringify(mcp).includes("aether"), "⑯ aether 창구를 다시 연다", mcp);
-    check((await h.calls()).some((c) => c.method === "session/resume"), "⑯ 재연결은 프로세스를 다시 연다");
     await h.rt.dispose();
   }
 

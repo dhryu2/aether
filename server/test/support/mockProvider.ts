@@ -156,8 +156,6 @@ export const mockState = {
   handshakeDelayMs: 0,
   /** 참이면 처음 준비 신호 결과를 그대로 다시 돌려준다(Codex·Grok runtime처럼). */
   reuseHandshake: false,
-  /** 실제로 재연결이 시도된 MCP 서버 이름 — 라우트가 검증을 통과한 요청만 넘겼는지 본다(8d-3 ⑥ⓔ). */
-  mcpReconnects: [] as string[],
   commandCalls: [] as RuntimeCommandInvocation[],
   /** 참이면 이후 만드는 실행부가 뒤 작업 중지를 지원한다(없는 provider 흉내와 구분하는 노브). */
   stopBackgroundSupported: false,
@@ -185,8 +183,6 @@ export const mockState = {
  * push된 텍스트 1건 = 미리보기(peek) → 본문(say) → 턴 종료(done) 순서로 방출한다.
  * 텍스트가 "SECRET"으로 시작하면 그 say에 시크릿 표시를 달아, 다음 say가 영속에서 가려지는지 볼 수 있게 한다.
  */
-/** 이 가짜 provider가 "안다"고 답할 MCP 서버 이름 — 재연결 요청의 화이트리스트 검증 대상(8d-3 ⑥ⓔ). */
-export const MOCK_MCP_SERVER = "mock-bridge";
 /** 별칭이 아니라 정식 id로만 부를 수 있는 두 번째 모델 — 이름 판정이 provider 몫인지 보는 값. */
 export const MOCK_ALT_MODEL = "mock-large-2026";
 
@@ -207,7 +203,7 @@ export let lastMockRuntime: MockRuntime | null = null;
 export class MockRuntime implements AgentRuntime {
   readonly provider = MOCK_PROVIDER;
   /** provider-native 조회 표면은 일부만 지원한다. 명령은 모든 runtime이 구현하는 핵심 계약이다. */
-  readonly capabilities: RuntimeCapabilities = { supportedModels: true, mcpStatus: true, usage: false, planReview: false };
+  readonly capabilities: RuntimeCapabilities = { supportedModels: true, usage: false, planReview: false };
 
   private readonly opts: RuntimeStartOptions;
   /** 뒤 작업 중지 — mockState.stopBackgroundSupported일 때만 생긴다(선택 메서드). */
@@ -383,14 +379,6 @@ export class MockRuntime implements AgentRuntime {
     return { models: MOCK_MODELS.map((m) => ({ ...m })) };
   }
   private cachedHandshake: RuntimeHandshake | undefined;
-
-  async mcpStatus() {
-    return [{ name: MOCK_MCP_SERVER, status: "connected" }];
-  }
-  async reconnectMcp(serverName: string) {
-    mockState.mcpReconnects.push(serverName);
-    return { ok: true };
-  }
 
   // capability가 false인 표면 — 라우트가 호출하기 전에 막아야 한다. 불리면 그 자체가 게이트 실패의 증거다.
   private unsupported(): never {

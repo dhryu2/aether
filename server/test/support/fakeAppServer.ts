@@ -530,10 +530,6 @@ function main() {
           nextCursor: null,
         });
 
-      case "config/mcpServer/reload":
-        record({ method, params });
-        return ok({});
-
       // ── 아래는 시험대 전용 메서드(진짜 app-server엔 없다) ──
 
       /** 지금까지 받은 요청 기록 — 테스트가 "무엇을 어떤 순서로 보냈나"를 대조한다. */

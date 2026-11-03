@@ -52,11 +52,11 @@ export function EffortPicker({ compact, direction = 'down', roomId }: { compact?
         })
         return false
       }}
-      label={compact ? t('session.effort.compactLabel', { label }) : label}
+      label={label}
       title={unknown ? t('session.effort.lockedTitle') : t('session.effort.title', { level: cur || t('session.effort.default'), count: efforts.length })}
       loading={loading}
       loadingLabel={t('session.effort.checking')}
-      skeletonWidth={compact ? 52 : 36}
+      skeletonWidth={36}
       compact={compact}
       direction={direction}
       align={roomId ? 'left' : undefined}

@@ -121,7 +121,6 @@ export const session: Dict = {
     en: 'Thinking effort: {level} — click to choose ({count} levels)',
   },
   'session.effort.checking': { ko: 'Effort 확인 중', en: 'Checking effort' },
-  'session.effort.compactLabel': { ko: 'Effort {label}', en: 'Thinking {label}' },
   // 단계 목록은 모델 목록 응답에 실려 오므로, 그 응답을 못 받으면 지금 값만 알고 고를 수는 없다.
   'session.effort.lockedTitle': { ko: '지금은 바꿀 수 없어요', en: 'Cannot change right now' },
   'session.effort.asleepMsg': {

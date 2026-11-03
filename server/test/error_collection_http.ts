@@ -190,7 +190,7 @@ try {
   const originalGet = sessionManager.get, originalHas = sessionManager.hasDiskSession, originalCodec = sessionManager.codecOf;
   let cause: Error = new Error('시험 원인');
   function faultAtSource(): never { throw cause; }
-  const fake = {capabilities:{supportedModels:true,mcpStatus:true,usage:true},interrupt:faultAtSource,listModels:faultAtSource,getMcpStatus:faultAtSource,reconnectMcp:faultAtSource,getUsage:faultAtSource,listCommands:faultAtSource,executeCommand:faultAtSource,permissionPolicy:faultAtSource};
+  const fake = {capabilities:{supportedModels:true,usage:true},interrupt:faultAtSource,listModels:faultAtSource,getUsage:faultAtSource,listCommands:faultAtSource,executeCommand:faultAtSource,permissionPolicy:faultAtSource};
   const rows = async () => {
     await journal.status();
     const names = (await fs.readdir(directory)).filter(n=>n.endsWith('.jsonl'));

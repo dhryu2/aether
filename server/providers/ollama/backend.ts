@@ -45,7 +45,7 @@ export function ollamaBackend(): CodexBackend {
     provider: "ollama",
     services: ollamaServices,
     // 사용량 한도는 없다(로컬 모델). 화면은 그 칸을 그리지 않는다.
-    capabilities: { supportedModels: true, mcpStatus: true, usage: false, planReview: false },
+    capabilities: { supportedModels: true, usage: false, planReview: false },
     configOverrides: ollamaConfigOverrides(),
     env: { CODEX_HOME: ollamaCodexHome() },
     listModels: fetchOllamaModels,

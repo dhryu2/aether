@@ -160,7 +160,6 @@ export const routes: Dict = {
   },
   "routes.sessions.backgroundTaskIdInvalid": { ko: "작업 id 형식이 맞지 않음", en: "Invalid background task id" },
   "routes.sessions.backgroundTaskNotFound": { ko: "그 백그라운드 작업이 없어요(이미 끝났을 수 있어요)", en: "No such background task (it may have already finished)" },
-  "routes.sessions.mcpUnknown": { ko: "이 세션에 없는 MCP 서버: {name}", en: "No such MCP server in this session: {name}" },
   "routes.sessions.decisionInvalid": { ko: "decision은 'allow' 또는 'deny'", en: "decision must be 'allow' or 'deny'" },
   "routes.sessions.permissionNotFound": {
     ko: "이미 처리됐거나 만료된 요청이에요",

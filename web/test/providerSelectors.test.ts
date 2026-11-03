@@ -125,7 +125,7 @@ eq('이름 자체가 다르면 표시를 떼도 못 찾는다', currentModelInfo
 //   이름도 없다. 그런데 그건 "모른다"가 아니라 "계정 기본으로 돈다"는 뜻이고, 목록의 기본 표시가 그
 //   줄을 가리킨다. 이 줄을 안 쓰면 새 세션은 모델 칩이 '—'가 되고 강도 칩은 통째로 사라진다.
 eq('모델을 안 고른 세션은 목록의 계정 기본 줄로 본다', currentModelInfo(open('', MODELS))?.value, 'default')
-eq('그 경우 칩에는 계정 기본 줄의 이름이 나온다', currentModel(open('', MODELS)), 'Default (recommended)')
+eq('그 경우 칩에는 같은 모델을 직접 가리키는 줄의 이름이 나온다', currentModel(open('', MODELS)), 'Opus (1M context)')
 check('그 경우에도 강도 목록을 안다', supportedEfforts(open('', MODELS)).length === 5)
 eq('Codex 모양도 기본 표시만으로 계정 기본 줄을 찾는다', currentModelInfo(open('', CODEX_MODELS))?.value, 'gpt-5.6-terra')
 eq('Codex 모양도 기본 모델 칩에 사람이 읽는 이름을 쓴다', currentModel(open('', CODEX_MODELS)), 'GPT-5.6 terra')

@@ -64,10 +64,13 @@ import { stepUserSeq, userSeqsOf } from './userJump'
 // ── 언어(i18n) ── 기본 한국어, 설정에서 English 전환. 브라우저별 localStorage에 영속(기기 단위 선호).
 const LOCALE_KEY = 'aether.locale'
 const VIEW_KEY = 'aether.transcriptView'
+const LIMIT_WARNING_KEY = 'aether.limitWarning'
 const localeReadFailure = createStorageErrorReporter({ component: 'storage', operation: 'web.locale.read' })
 const localeWriteFailure = createStorageErrorReporter({ component: 'storage', operation: 'web.locale.write' })
 const viewReadFailure = createStorageErrorReporter({ component: 'storage', operation: 'web.transcript_view.read' })
 const viewWriteFailure = createStorageErrorReporter({ component: 'storage', operation: 'web.transcript_view.write' })
+const limitWarningReadFailure = createStorageErrorReporter({ component: 'storage', operation: 'web.limit_warning.read' })
+const limitWarningWriteFailure = createStorageErrorReporter({ component: 'storage', operation: 'web.limit_warning.write' })
 const paneReadFailure = createStorageErrorReporter({ component: 'storage', operation: 'web.panes.read' })
 const paneWriteFailure = createStorageErrorReporter({ component: 'storage', operation: 'web.panes.write' })
 const queueReadFailure = createStorageErrorReporter({ component: 'storage', operation: 'web.queued.read' })
@@ -85,6 +88,16 @@ function loadLocale(): Locale {
     /* localStorage 불가 환경 */
   }
   return 'ko'
+}
+function loadLimitWarning(): boolean {
+  try {
+    const off = localStorage.getItem(LIMIT_WARNING_KEY) === '0'
+    limitWarningReadFailure.reset()
+    return !off
+  } catch (error) {
+    limitWarningReadFailure.report(error)
+    return true
+  }
 }
 function loadTranscriptView(): TranscriptView {
   try {
@@ -246,6 +259,7 @@ export type State = {
   /** 옛 호환·실행 메타. id=sourceSessionId. 방 목록으로 쓰지 않는다. */
   sessions: SessionListItem[]
   locale: Locale // UI/알림 언어 — 기본 'ko', 설정에서 'en' 전환(localStorage 영속)
+  limitWarning: boolean // 입력창의 한도 경고 표시 — 기기별 localStorage 영속
   transcriptView: TranscriptView // 대화 화면이 진행 보고를 얼마나 남기는지. 기기 단위.
   /** 방 id. 첫 칸(왼쪽 위). */
   activeId: string | null
@@ -371,6 +385,7 @@ export type State = {
 let state: State = {
   locale: loadLocale(),
   transcriptView: loadTranscriptView(),
+  limitWarning: loadLimitWarning(),
   rooms: [],
   sessions: [],
   activeId: null,
@@ -1549,6 +1564,15 @@ export const actions = {
     if (locale === state.locale) return
     applyLocale(locale)
     void api.setLocale(locale).catch(() => { /* 서버 통지 실패는 UI 언어에 무해 */ })
+  },
+  setLimitWarning(on: boolean) {
+    try {
+      localStorage.setItem(LIMIT_WARNING_KEY, on ? '1' : '0')
+      limitWarningWriteFailure.reset()
+    } catch (error) {
+      limitWarningWriteFailure.report(error)
+    }
+    set({ limitWarning: on })
   },
   setTranscriptView(view: TranscriptView) {
     const next = parseTranscriptView(view)

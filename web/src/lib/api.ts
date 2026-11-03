@@ -222,8 +222,10 @@ export const api = {
   // 지금 고를 수 있는 서비스인지(프로그램 설치, 로그인, 모델 서버). 새 세션 창이 열릴 때마다 묻는다.
   providerAvailability: () => req<ProviderAvailabilityResponse>('/api/providers/availability'),
   // 서비스마다 프로그램을 띄워 읽을 수 있어 일반 요청보다 오래 기다린다.
-  accountUsage: (fresh: boolean) =>
-    req<AccountUsageResponse>(`/api/providers/usage${fresh ? '?fresh=1' : ''}`, { timeoutMs: 60_000 }),
+  accountUsage: (fresh: boolean, provider?: string) => {
+    const query = new URLSearchParams({ ...(fresh ? { fresh: '1' } : {}), ...(provider ? { provider } : {}) }).toString()
+    return req<AccountUsageResponse>(`/api/providers/usage${query ? `?${query}` : ''}`, { timeoutMs: 60_000 })
+  },
   // 세션이 뜰 때 저장해 둔 모델 목록. 서버가 provider 프로그램을 띄우지 않는다.
   rememberedModels: () => req<RememberedModelsResponse>('/api/providers/remembered-models'),
 

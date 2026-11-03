@@ -10,7 +10,7 @@
  * ③ **모르면 지어내지 않는다.** 이름도 길이도 모르면 받은 이름을 그대로 보여준다 — 표에 없다는 이유로
  *    화면에서 정보가 사라지면 새 창이 생겼을 때 아무도 모르게 된다.
  */
-import { fullestWindow, rateLimitLabel } from '../src/lib/usageLabels'
+import { rateLimitLabel, warningWindows } from '../src/lib/usageLabels'
 
 let pass = 0
 let fail = 0
@@ -40,11 +40,13 @@ eq('길이를 모르면 받은 이름 그대로', rateLimitLabel('brand_new_wind
 eq('이름도 없으면 일반 문구', rateLimitLabel(undefined, t), 'stream.rateLimit.default')
 eq('길이가 0이면 지어내지 않는다', rateLimitLabel('brand_new_window', t, 0), 'brand_new_window')
 
-// 입력창 표시는 가장 많이 찬 창 하나만 고른다
-eq('창이 없으면 null', fullestWindow([]), null)
-eq('사용률을 모르는 창뿐이면 null', fullestWindow([{ utilization: null }]), null)
-eq('가장 많이 찬 창', fullestWindow([{ key: 'a', utilization: 38 }, { key: 'b', utilization: null }, { key: 'c', utilization: 81 }])?.key, 'c')
-eq('0%도 값이다', fullestWindow([{ key: 'a', utilization: 0 }])?.key, 'a')
+// 입력창 경고는 경계를 넘은 창을 모두 보이고 나머지는 뺀다
+const keys = (windows: { key: string; utilization: number | null }[]) => warningWindows(windows).map((w) => w.key).join()
+eq('둘 다 경고면 둘 다', keys([{ key: 'week', utilization: 90 }, { key: 'session', utilization: 80 }]), 'week,session')
+eq('일주일만 경고', keys([{ key: 'week', utilization: 90 }, { key: 'session', utilization: 10 }]), 'week')
+eq('세션만 경고', keys([{ key: 'week', utilization: 10 }, { key: 'session', utilization: 80 }]), 'session')
+eq('경계값 70은 경고', keys([{ key: 'a', utilization: 70 }]), 'a')
+eq('경계 아래와 모르는 값은 뺀다', keys([{ key: 'a', utilization: 69.9 }, { key: 'b', utilization: null }]), '')
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} usageLabels: ${pass} PASS / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

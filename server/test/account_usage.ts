@@ -102,6 +102,13 @@ fake("grok", { availability: async () => ({ available: false, reason: "check_fai
 assert.equal((await accountUsage(false)).providers.find((p) => p.provider === "grok")?.usage, null);
 __resetAccountUsageForTest();
 
+// 서비스를 지정하면 그 서비스만 읽고 다른 프로그램은 띄우지 않는다.
+const codexBefore = calls.codex;
+assert.deepEqual((await accountUsage(false, "claude")).providers.map((p) => p.provider), ["claude"]);
+assert.equal(calls.codex, codexBefore);
+assert.deepEqual((await accountUsage(false, "없는서비스")).providers, []);
+__resetAccountUsageForTest();
+
 // Codex 응답 변환은 세션과 세션 밖이 같은 함수를 쓴다.
 const codex = usageFromCodexRateLimits({
   rateLimits: { limitId: "codex", primary: { usedPercent: 7, windowDurationMins: 300, resetsAt: 1787617478 } },

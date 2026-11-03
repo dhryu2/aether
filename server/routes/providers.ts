@@ -40,7 +40,7 @@ providersRouter.get("/remembered-models", (_req: Request, res: Response) => {
 
 // 세션 없이 계정 한도를 읽는다. 프로그램을 띄울 수 있어 저장값과 동시 요청 합치기를 거친다.
 providersRouter.get("/usage", async (req: Request, res: Response) => {
-  res.json(await accountUsage(req.query.fresh === "1"));
+  res.json(await accountUsage(req.query.fresh === "1", typeof req.query.provider === "string" ? req.query.provider : undefined));
 });
 
 // 새 세션 창이 열릴 때 묻는다. 확인에 프로그램 실행이 들어가 느릴 수 있어 목록(`GET /`)과 나눴다.

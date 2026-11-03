@@ -45,11 +45,10 @@ export function rateLimitLabel(limitType: string | undefined, t: Translate, wind
   }
 }
 
-/** 가장 많이 찬 한도 창. 사용률을 아는 창이 없으면 null이다. */
-export function fullestWindow<W extends { utilization: number | null }>(windows: readonly W[]): W | null {
-  let top: W | null = null
-  for (const w of windows) {
-    if (w.utilization != null && (top?.utilization == null || w.utilization > top.utilization)) top = w
-  }
-  return top
+/** 입력창에 경고로 보일 사용률. 남은 한도가 30% 이하일 때다. */
+export const LIMIT_WARN_PCT = 70
+
+/** 경고 수준인 한도 창 전부. 사용률을 모르는 창은 뺀다. */
+export function warningWindows<W extends { utilization: number | null }>(windows: readonly W[]): W[] {
+  return windows.filter((w) => w.utilization != null && w.utilization >= LIMIT_WARN_PCT)
 }

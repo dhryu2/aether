@@ -84,8 +84,9 @@ async function readWithinDeadline(entry: ProviderEntry, fresh: boolean): Promise
   }
 }
 
-export async function accountUsage(fresh: boolean): Promise<AccountUsageResponse> {
-  const entries = listProviders().filter((entry) => entry.services.usage);
+/** provider를 주면 그 서비스만 읽는다. 입력창이 다른 서비스의 프로그램까지 띄우지 않게 한다. */
+export async function accountUsage(fresh: boolean, provider?: string): Promise<AccountUsageResponse> {
+  const entries = listProviders().filter((entry) => entry.services.usage && (!provider || entry.id === provider));
   const results = await Promise.all(entries.map((entry) => readWithinDeadline(entry, fresh)));
   return { providers: results.filter((r): r is AccountUsageEntry => r !== null) };
 }

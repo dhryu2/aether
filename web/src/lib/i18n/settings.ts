@@ -6,6 +6,7 @@ export const settings: Dict = {
 
   'settings.section.general': { ko: '일반', en: 'General' },
   'settings.section.autoResume': { ko: '자동 재개', en: 'Auto-resume' },
+  'settings.limitWarning.title': { ko: '입력창에 한도 경고 표시', en: 'Show limit warnings by the input' },
   'settings.autoResume.enable': { ko: '한도가 풀리면 이어 가기', en: 'Resume when the limit lifts' },
   'settings.autoResume.text': { ko: '재개 메시지', en: 'Resume message' },
   'settings.autoResume.note': {

@@ -143,6 +143,16 @@ export function GeneralSection({ hideTitle }: { hideTitle?: boolean }) {
             itemMinWidth={narrow ? 44 : undefined}
           />
         </div>
+        <Sep />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: rowMin(narrow), padding: '0 16px', cursor: 'pointer' }}>
+          <span aria-hidden style={{ flex: 1, minWidth: 0, fontSize: 15, color: C.label }}>{t('settings.limitWarning.title')}</span>
+          <Switch
+            className={narrow ? 'hit-44' : undefined}
+            on={s.limitWarning}
+            label={t('settings.limitWarning.title')}
+            onChange={() => actions.setLimitWarning(!s.limitWarning)}
+          />
+        </label>
       </Group>
       <GroupNote>{t('settings.view.note')}</GroupNote>
       <IdleSleepRow />

@@ -137,6 +137,7 @@ export function Composer({ sessionId }: { sessionId: string }) {
   }, [handoffFrom, execId, sessionId])
   const pendingPerm = pendingPermission(s.convos[execId]) // 미해결 권한요청 → 컴포저 상단 Y/N 퀵바
   const busy = turn === 'running' || turn === 'requires_action'
+  const limitProvider = s.sessions.find((x) => x.id === execId)?.provider
   const loading = !!s.loadingConvo[execId] // 초기 대화 로딩 중 — 입력/전송 차단(init 중 컨트롤 방지)
   // 글 칸 하나만 있으면 그 글 그대로(슬래시 판정). 코드 상자가 있으면 보낼 글자로 붙인 뒤 판정한다.
   const plain = soleText(blocks)
@@ -669,7 +670,7 @@ export function Composer({ sessionId }: { sessionId: string }) {
                   )}
                 </>
               )}
-              {active && <LimitChip sessionId={execId} busy={busy} hideCalm={split && paneW < USAGE_MIN_W} />}
+              {active && s.limitWarning && limitProvider && <LimitChip sessionId={execId} provider={limitProvider} busy={busy} />}
               <div
                 className="flex-1 self-stretch"
                 style={{ cursor: 'text' }}

@@ -2,7 +2,7 @@
 //   묶음 열쇠 = 원래 고른 폴더(workspaceSource)가 있으면 그것, 없으면 지금 도는 폴더(cwd).
 //   작업 폴더를 분리한 세션이 원 프로젝트 밖으로 빠지지 않게 하려는 규칙이다.
 import type { SessionListItem } from './types'
-import { sortSessions } from './sessionOrder'
+import { sortSessions, sortTs } from './sessionOrder'
 
 /** 경로가 비어 있는 세션을 한곳에 모을 때 쓰는 열쇠. */
 export const UNKNOWN_PROJECT_KEY = ''
@@ -75,7 +75,7 @@ export function recentFolders(sessions: SessionListItem[], limit: number): strin
 
 function activityTs(session: SessionListItem | undefined): number {
   if (!session) return 0
-  return session.lastActivityAt ?? session.createdAt
+  return sortTs(session)
 }
 
 export type SessionBucketKind = 'source' | 'copy'
@@ -110,6 +110,7 @@ export type RoomForProject = {
   cwd?: string
   sourceSessionId?: string
   lastActivityAt?: number
+  lastInputAt?: number
 }
 
 export type RoomProjectGroup<R> = {
@@ -173,7 +174,7 @@ export function groupRoomsByProject<R extends RoomForProject>(
       label: folderName(key),
       title: titles.get(key) ?? folderName(key),
       rooms: roomsSorted,
-      ts: head ? (head.lastActivityAt ?? head.createdAt) : 0,
+      ts: head ? sortTs(head) : 0,
     })
   }
   groups.sort((a, b) => {
@@ -204,6 +205,7 @@ function sessionForSort(room: RoomForProject, sess: SessionListItem | undefined)
     status: 'active',
     createdAt: 0,
     lastActivityAt: room.lastActivityAt,
+    lastInputAt: room.lastInputAt,
   }
 }
 

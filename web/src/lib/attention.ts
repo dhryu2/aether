@@ -66,6 +66,7 @@ export function parsePresenceSession(raw: unknown): PresenceSession | null {
   if (typeof o.attentionPreview === 'string') out.attentionPreview = o.attentionPreview
   if (typeof o.attentionSince === 'number') out.attentionSince = o.attentionSince
   if (typeof o.lastActivityAt === 'number') out.lastActivityAt = o.lastActivityAt
+  if (typeof o.lastInputAt === 'number') out.lastInputAt = o.lastInputAt
   if (typeof o.preview === 'string') out.preview = o.preview
   if (typeof o.lastViewedAt === 'number') out.lastViewedAt = o.lastViewedAt
   if (typeof o.archivedAt === 'number') out.archivedAt = o.archivedAt
@@ -144,6 +145,7 @@ export function patchSessionFromPresence(item: SessionListItem, p: PresenceSessi
     backgroundTasks: p.backgroundTasks,
     backgroundCanStop: p.backgroundCanStop,
     lastActivityAt: p.lastActivityAt ?? item.lastActivityAt,
+    lastInputAt: p.lastInputAt ?? item.lastInputAt,
     preview: p.preview ?? item.preview,
     status: p.status,
     lastViewedAt: p.lastViewedAt,
@@ -165,6 +167,7 @@ export function patchRoomFromPresence(room: WorkspaceRoom, p: PresenceSession): 
     backgroundTasks: p.backgroundTasks,
     backgroundCanStop: p.backgroundCanStop,
     lastActivityAt: p.lastActivityAt ?? room.lastActivityAt,
+    lastInputAt: p.lastInputAt ?? room.lastInputAt,
     preview: p.preview ?? room.preview,
     status: p.status,
     lastViewedAt: p.lastViewedAt,

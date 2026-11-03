@@ -459,7 +459,8 @@ class SessionManager {
         const status: DerivedStatus =
           info.turnOpen ? "interrupted" : info.lastStatus === "crashed" ? "crashed" : "ended";
         const titled = adoptGeneratedName(id, meta);
-        this.disk.set(id, { meta: titled, status, lastActivityAt: titled.lastActivityAt ?? info.lastTs ?? titled.createdAt });
+        const restored = { ...titled, lastInputAt: titled.lastInputAt ?? store.lastUserInputTs(id) ?? titled.createdAt };
+        this.disk.set(id, { meta: restored, status, lastActivityAt: titled.lastActivityAt ?? info.lastTs ?? titled.createdAt });
         n++;
       } catch (error) {
         void reportError(error, { component: "session", operation: "session.restore", session_id: id });
@@ -535,6 +536,7 @@ class SessionManager {
         permissionModes: live.permissionModes,
         effort: live.effort, // /effort 설정 유지(재생성 후에도 동일)
         lastActivityAt: live.lastActivityAt, // 깨우기만 한 이벤트를 제외한 마지막 실제 활동시각 유지
+        lastInputAt: live.lastInputAt,
         workspaceSource: live.workspaceSource,
         lastViewedAt: live.lastViewedAt,
         attentionSticky: live.attentionSticky,
@@ -607,6 +609,7 @@ class SessionManager {
       permissionModes: entry.meta.permissionModes,
       effort: entry.meta.effort, // /effort 설정 복원(meta 영속본)
       lastActivityAt: entry.meta.lastActivityAt, // 디스크 꼬리의 깨우기 훅보다 영속된 실제 활동시각 우선
+      lastInputAt: entry.meta.lastInputAt,
       workspaceSource,
       lastViewedAt: entry.meta.lastViewedAt,
       attentionSticky: entry.meta.attentionSticky,
@@ -754,6 +757,7 @@ class SessionManager {
       status: (s.isEnded ? "ended" : "active") as DerivedStatus,
       createdAt: s.createdAt,
       lastActivityAt: s.lastActivityAt, // 마지막 활동시각(사이드바 '마지막 사용')
+      lastInputAt: s.lastInputAt,
       ...copyListFields(s.cwd, s.workspaceSource),
       preview: s.lastWorkPreview(),
       archivedAt: s.archivedAt,
@@ -779,6 +783,7 @@ class SessionManager {
         status: e.status,
         createdAt: e.meta.createdAt ?? 0,
         lastActivityAt: e.lastActivityAt ?? e.meta.createdAt ?? 0, // 디스크 꼬리 활동시각(tailInfo)
+        lastInputAt: e.meta.lastInputAt ?? e.meta.createdAt ?? 0,
         ...copyListFields(e.meta.cwd, e.meta.workspaceSource),
         preview: (() => {
           try {
@@ -1415,6 +1420,7 @@ class SessionManager {
       attentionPreview: item.attentionPreview,
       attentionSince: item.attentionSince,
       lastActivityAt: item.lastActivityAt,
+      lastInputAt: item.lastInputAt,
       preview: item.preview,
       status: item.status,
       lastViewedAt: item.lastViewedAt,
@@ -1435,6 +1441,7 @@ class SessionManager {
       attentionPreview: att.attentionPreview,
       attentionSince: att.attentionSince,
       lastActivityAt: s.lastActivityAt,
+      lastInputAt: s.lastInputAt,
       preview: s.lastWorkPreview(),
       status: s.isEnded ? "ended" : "active",
       lastViewedAt: s.lastViewedAt,
@@ -1464,6 +1471,7 @@ class SessionManager {
       attentionPreview: att.attentionPreview,
       attentionSince: att.attentionSince,
       lastActivityAt: e.lastActivityAt ?? e.meta.createdAt,
+      lastInputAt: e.meta.lastInputAt ?? e.meta.createdAt,
       preview,
       status: e.status,
       lastViewedAt: e.meta.lastViewedAt,

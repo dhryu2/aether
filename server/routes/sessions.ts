@@ -245,6 +245,7 @@ sessionsRouter.get("/", async (_req: Request, res: Response) => {
       archivedAt: item.archivedAt,
       autoResume: item.autoResume,
       lastActivityAt: item.lastActivityAt,
+      lastInputAt: item.lastInputAt,
       preview: item.preview,
       asleep: !sessionManager.get(item.id),
     }));

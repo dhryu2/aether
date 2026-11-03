@@ -254,6 +254,7 @@ export class LiveSession {
   readonly workspaceSource?: string; // 작업 폴더를 분리했을 때 원래 고른 폴더. 없으면 격리 없음.
   readonly createdAt: number; // 생성시각(1회 고정) — result마다 덮어쓰지 않는다
   lastActivityAt: number; // 마지막 이벤트(턴 입력·응답·도구 등) 시각 — 사이드바 '마지막 사용' 표기용
+  lastInputAt: number; // 사람이 마지막으로 글을 보낸 시각. 사이드바 순서가 응답마다 뒤바뀌지 않도록 정렬은 이 값을 쓴다
   lastViewedAt?: number; // 대화 통로가 따라잡은 시각. 폰·컴퓨터가 같은 "안 봄"을 본다.
   archivedAt?: number; // 보관한 시각(ms). 없으면 보관 아님.
   attentionSticky?: AttentionSticky; // 마지막 완료·실패 사건. 잠든 세션 복원용.
@@ -354,6 +355,7 @@ export class LiveSession {
     permissionModes?: PermissionMode[];
     effort?: SessionEffort;
     lastActivityAt?: number;
+    lastInputAt?: number;
     workspaceSource?: string;
     lastViewedAt?: number;
     archivedAt?: number;
@@ -400,6 +402,7 @@ export class LiveSession {
     this.persistFilter = entry.codec.persistFilter();
 
     this.lastActivityAt = opts.lastActivityAt ?? store.tailInfo(this.id, this.codec).lastTs ?? this.createdAt; // resume 시 영속 활동시각 우선 복원
+    this.lastInputAt = opts.lastInputAt ?? store.lastUserInputTs(this.id) ?? this.createdAt;
     const prevMeta = store.loadMeta(this.id);
     this.lastViewedAt = opts.lastViewedAt ?? prevMeta?.lastViewedAt;
     this.archivedAt = opts.archivedAt ?? prevMeta?.archivedAt;
@@ -799,6 +802,7 @@ export class LiveSession {
       ...(this.permissionModes ? { permissionModes: this.permissionModes } : {}),
       effort: this.effort,
       lastActivityAt: this.lastActivityAt,
+      lastInputAt: this.lastInputAt,
       workspaceSource: this.workspaceSource,
       lastViewedAt: this.lastViewedAt,
       archivedAt: this.archivedAt,
@@ -1997,6 +2001,7 @@ export class LiveSession {
     // 명령 목록·사용량·모델 관측·status 같은 비대화 사건은 세션을 최근 사용한 것처럼 올리지 않는다.
     // 사용자 글은 첫 입력이어도 활동으로 센다.
     if (ev.kind === "user_msg" || (!this.awaitingFirstInput && affectsLastActivity(ev, this.codec))) this.lastActivityAt = ev.ts;
+    if (ev.kind === "user_msg" && !(ev as { sentBy?: string }).sentBy) this.lastInputAt = ev.ts;
     this.buffer.push(ev);
     const size = JSON.stringify(ev).length;
     this.bufferSizes.push(size);

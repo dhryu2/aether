@@ -25,7 +25,7 @@ import {
 import { database, transaction } from "../db/sqlite";
 import { deleteLetterRows, deleteLetterSession } from "../db/sessionLetter";
 import { removeSessionFromAudit } from "../db/searchAudit";
-import { deleteSessionRows, eventRowsInSeqRange, eventRowsNewestFirst, eventRowsOfKinds, firstEventSeq, storedRowEvent } from "../db/sessionEvents";
+import { deleteSessionRows, eventRowsInSeqRange, eventRowsNewestFirst, eventRowsOfKindNewestFirst, eventRowsOfKinds, firstEventSeq, storedRowEvent } from "../db/sessionEvents";
 import type { ProviderEventCodec } from "./codec/types";
 import type { AetherEvent, SessionMeta } from "../types";
 
@@ -147,6 +147,16 @@ export function firstUserMessageText(id: string): string | null {
     if (text) return text;
   }
   return null;
+}
+
+/** 사람이 마지막으로 글을 보낸 시각. 이 값이 저장되기 전에 만든 세션을 복원할 때 쓴다. */
+export function lastUserInputTs(id: string): number | undefined {
+  if (sessionDiaryMode() === "blocked") return undefined;
+  assertReadable(id);
+  for (const row of eventRowsOfKindNewestFirst(id, "user_msg")) {
+    if (!(storedRowEvent(row) as { sentBy?: string }).sentBy) return row.ts;
+  }
+  return undefined;
 }
 
 /** 최신부터 64KB를 넘기는 첫 이벤트까지의 꼬리. 파일 순서로 돌려준다. */

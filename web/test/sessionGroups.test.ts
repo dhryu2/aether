@@ -145,5 +145,15 @@ eq('최근 폴더는 절대 경로를 활동 순으로, 빈 경로만 뺀다', r
 eq('최근 폴더 개수 상한', recentFolders(recentSessions, 2), ['/elsewhere/x', '/Volumes/Disk1'])
 eq('세션이 없으면 비어 있다', recentFolders([], 4), [])
 
+// 정렬은 사람의 마지막 입력을 본다. 에이전트 응답으로 lastActivityAt만 늘어도 순서가 그대로다.
+const racing = [
+  sess({ id: 'a', cwd: '/repo/aether', lastInputAt: 200, lastActivityAt: 300 }),
+  sess({ id: 'b', cwd: '/repo/aether', lastInputAt: 100, lastActivityAt: 900 }),
+  sess({ id: 'c', cwd: '/repo/other', lastInputAt: 50, lastActivityAt: 950 }),
+]
+eq('응답이 와도 세션 순서가 그대로다', groupSessions(racing)[0].sessions.map((s) => s.id), ['a', 'b'])
+eq('응답이 와도 프로젝트 순서가 그대로다', groupSessions(racing).map((g) => g.key), ['/repo/aether', '/repo/other'])
+eq('입력 시각이 없는 옛 서버면 마지막 활동을 쓴다', groupSessions([sess({ id: 'x', cwd: '/r', lastActivityAt: 1 }), sess({ id: 'y', cwd: '/r', lastActivityAt: 2 })])[0].sessions.map((s) => s.id), ['y', 'x'])
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail) process.exit(1)

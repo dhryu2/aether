@@ -176,6 +176,8 @@ export type SessionListItem = {
   status: DerivedStatus;
   createdAt: number;
   lastActivityAt?: number;
+  /** 사람이 마지막으로 글을 보낸 시각. 사이드바 정렬 기준이다. 없으면 입력 전이다. */
+  lastInputAt?: number;
   /** 작업 폴더가 원 폴더와 분리돼 있으면 true. */
   isolated?: boolean;
   /** 분리했을 때 원래 고른 폴더. 코어는 이 경로의 생성 수단을 모른다. */
@@ -289,6 +291,8 @@ export type WorkspaceRoom = {
   /** 한도 풀림을 기다리는 자동 재개 예약. `at`이나 `gaveUp`이 있을 때만 온다. */
   autoResume?: AutoResumePlan;
   lastActivityAt?: number;
+  /** 사람이 마지막으로 글을 보낸 시각. 사이드바 정렬 기준이다. 없으면 입력 전이다. */
+  lastInputAt?: number;
   preview?: string;
   asleep?: boolean;
 } & HandoffFields;
@@ -320,6 +324,8 @@ export type PresenceSession = {
   /** provider가 뒤 작업 중지를 지원하고 중지할 작업이 있으면 true. */
   backgroundCanStop?: boolean;
   lastActivityAt?: number;
+  /** 사람이 마지막으로 글을 보낸 시각. 사이드바 정렬 기준이다. 없으면 입력 전이다. */
+  lastInputAt?: number;
   preview?: string;
   status: DerivedStatus;
   lastViewedAt?: number;

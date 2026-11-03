@@ -146,6 +146,11 @@ export function eventRowsOfKinds(sessionId: string, kinds: readonly string[]): G
   return queryRows(sessionId, `AND kind IN (${kinds.map(() => "?").join(",")})`, "ASC", ...kinds);
 }
 
+/** 한 종류의 행을 최신부터 돌려준다. */
+export function eventRowsOfKindNewestFirst(sessionId: string, kind: string): Generator<StoredSessionEvent> {
+  return queryRows(sessionId, "AND kind = ?", "DESC", kind);
+}
+
 /** 파일 순서로 맨 앞 행의 순번. 행이 없으면 null. */
 export function firstEventSeq(sessionId: string): number | null {
   const row = database().prepare("SELECT seq FROM session_event WHERE session_id = ? ORDER BY byte_offset ASC LIMIT 1").get(sessionId) as { seq: number | bigint } | undefined;

@@ -64,7 +64,7 @@ import type { ProviderEventCodec, ProviderPersistFilter } from "./codec/types";
 import { mergeModelList, rememberModelList } from "../providers/modelCatalogMemory";
 import { buildCommonSystemAppend } from "./injections";
 import { filterUserMsgForPersist } from "./persistFilter";
-import { deriveWorkTitle, resolveWorkTitle } from "../../shared/workTitle";
+import { deriveWorkTitle, resolveWorkTitle, stripLeadingCommand } from "../../shared/workTitle";
 import { summarizeSessionTitle } from "./sessionTitle";
 import { readTitleSummarize } from "./titleSummarySetting";
 import { extractIndexable } from "../search/extract";
@@ -538,7 +538,7 @@ export class LiveSession {
     if (!gen) return;
     this.generatedName = gen;
     this.upsertSearchSession(gen);
-    if (readTitleSummarize()) void this.adoptSummarizedName(text, gen);
+    if (readTitleSummarize()) void this.adoptSummarizedName(stripLeadingCommand(text), gen);
   }
 
   /** 임시 제목을 요약 제목으로 바꾼다. 턴을 기다리게 하지 않고, 실패하면 임시 제목이 남는다. */

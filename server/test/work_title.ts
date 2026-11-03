@@ -15,7 +15,9 @@ check(deriveWorkTitle("Please fix the login timeout bug") === "Fix the login tim
 check(deriveWorkTitle("Help me rename session tabs") === "Rename session tabs", "help me 를 걷는다");
 check(deriveWorkTitle("세션 탭 이름을 폴더가 아니라 대화 제목으로 바꿔줘") === "세션 탭 이름을 폴더가 아니라 대화 제목으로 바꿔줘", "한국어 첫 문장을 그대로 쓴다");
 check(deriveWorkTitle("좀 도와줘 배포가 또 실패했어") === "배포가 또 실패했어", "한국어 앞 군더더기를 걷는다");
-check(deriveWorkTitle("/compact") === null, "슬래시 명령은 제목이 아니다");
+check(deriveWorkTitle("/compact") === null, "내용 없는 슬래시 명령은 제목이 아니다");
+check(deriveWorkTitle("/security-audit 이 저장소를 감사해줘.\n\n- 조건") === "이 저장소를 감사해줘", "슬래시 명령 단어를 떼고 남은 말로 뽑는다");
+check(deriveWorkTitle("/review\n로그인 코드를 봐줘") === "로그인 코드를 봐줘", "명령 뒤 줄바꿈도 공백으로 본다");
 check(deriveWorkTitle("   ") === null, "빈 말은 제목이 아니다");
 check(deriveWorkTitle("https://example.com/path fix this") === "Fix this", "URL을 제목에 넣지 않는다");
 

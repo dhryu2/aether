@@ -86,12 +86,17 @@ export function resolveWorkTitle(name?: string | null, generatedName?: string | 
   return (name ?? "").trim() || (generatedName ?? "").trim()
 }
 
+/** 맨 앞 슬래시 명령 단어를 뗀 나머지. 명령 뒤에 붙은 요청이 제목 재료다. */
+export function stripLeadingCommand(prompt: string): string {
+  return prompt.trim().replace(/^\/\S*\s*/, "")
+}
+
 /**
- * 첫 사용자 말에서 목록 제목을 뽑는다. 슬래시 명령·빈 말은 제목이 아니다.
+ * 첫 사용자 말에서 목록 제목을 뽑는다. 빈 말과 내용 없는 슬래시 명령은 제목이 아니다.
  */
 export function deriveWorkTitle(prompt: string): string | null {
-  const raw = prompt.trim()
-  if (!raw || raw.startsWith("/")) return null
+  const raw = stripLeadingCommand(prompt)
+  if (!raw) return null
 
   const promptPreview = raw.slice(0, WORK_TITLE_SOURCE_SCAN_LIMIT)
   const firstClause = promptPreview

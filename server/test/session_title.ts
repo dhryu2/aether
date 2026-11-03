@@ -112,6 +112,14 @@ console.log("\n=== 실패와 중단 ===");
   await slashLive.push("/compact");
   check(slash.calls.length === 0, "슬래시 명령은 요약하지 않는다");
   sessionManager.delete(slashLive.id);
+
+  const withArgs = holdDistill();
+  const argsLive = sessionManager.create({ cwd, provider: mock.MOCK_PROVIDER });
+  await argsLive.push("/security-audit 이 저장소를 감사해줘");
+  check(displayNameOf(argsLive.id) === "이 저장소를 감사해줘", "요청이 붙은 슬래시 명령은 남은 말로 임시 제목을 만든다", displayNameOf(argsLive.id));
+  check(withArgs.calls.length === 1 && !withArgs.calls[0].includes("/security-audit"), "요약에는 명령 단어를 빼고 넘긴다");
+  withArgs.release("저장소 감사");
+  sessionManager.delete(argsLive.id);
 }
 
 unsubPresence();

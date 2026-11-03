@@ -289,6 +289,10 @@ export function AuthGate({ children }: Props) {
             {busy ? t('nav.auth.loginBusy') : t('nav.auth.loginSubmit')}
           </Button>
         </form>
+        <details style={{ width: '100%', marginTop: 12, fontSize: 13, color: C.label2 }}>
+          <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', color: C.tint }}>{t('nav.auth.forgot')}</summary>
+          <p style={{ margin: 0, lineHeight: 1.45, whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>{t('nav.auth.forgotHelp')}</p>
+        </details>
       </GateScreen>
     )
   }

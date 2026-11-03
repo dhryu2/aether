@@ -6,7 +6,9 @@ import { useT } from '../../lib/i18n'
 import { validatePasswordForm, type PasswordField, type PasswordFormError } from '../../lib/passwordForm'
 import { C, R } from '../../design/tokens'
 import { Button, EmptyState } from '../ui'
-import { Group, GroupNote, GroupTitle, Sep, SkeletonRows } from './parts'
+import { errMsg } from '../../lib/errors'
+import { actions, getState } from '../../lib/store'
+import { Group, GroupNote, GroupTitle, Sep, SkeletonRows, TextRow } from './parts'
 import { rowMin, useNarrow, useReloginProviders } from './settingsLayout'
 
 const FIELDS: readonly { field: PasswordField; label: string; autoComplete: string }[] = [
@@ -55,6 +57,24 @@ export function PasswordSection() {
     setError({ field, text })
     refs.current[field]?.focus()
   }
+
+  const requestLogout = () => actions.showConfirm({
+    tone: 'neutral',
+    title: t('settings.logout.confirm.title'),
+    message: t('settings.logout.confirm.body'),
+    confirmLabel: t('settings.logout.action'),
+    onConfirm: () => void (async () => {
+      try {
+        // 로그아웃한 기기로 알림이 계속 가지 않게, 로그인이 살아 있을 때 구독부터 지운다.
+        if (getState().pushEnabled) await actions.disablePush()
+        await api.logout()
+        setClientToken(undefined)
+        window.location.reload()
+      } catch (e) {
+        actions.showError(errMsg(e))
+      }
+    })(),
+  })
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -118,7 +138,13 @@ export function PasswordSection() {
         </div>
       </form>
       <p id={`${id}-note`} style={{ fontSize: 13, color: C.label2, lineHeight: 1.45, margin: '8px 0 0', padding: '0 16px' }}>{t('settings.password.note')}</p>
-      <GroupNote>{t('settings.password.forgot')}</GroupNote>
+      <GroupNote><span style={{ whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>{t('settings.password.forgot')}</span></GroupNote>
+      <div style={{ marginTop: 24 }}>
+        <Group>
+          <TextRow onClick={requestLogout}>{t('settings.logout.action')}</TextRow>
+        </Group>
+        <GroupNote>{t('settings.logout.note')}</GroupNote>
+      </div>
     </section>
   )
 }

@@ -25,7 +25,7 @@ function vapidPrivate(): string | undefined {
 }
 
 function vapidSubject(): string {
-  return process.env.AETHER_VAPID_SUBJECT ?? "mailto:admin@localhost";
+  return process.env.AETHER_VAPID_SUBJECT ?? "https://github.com/dhryu2/aether";
 }
 
 export function pushEnabled(): boolean {

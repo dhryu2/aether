@@ -158,9 +158,11 @@ build_target() { # $1=이름(win-x64) $2=npm os $3=npm cpu
     # 감시 프로그램은 묶음 안(bin)에 넣는다. 설치 exe와 시험용 zip이 같은 것을 쓴다.
     mkdir -p "$dir/bin"
     makensis -V2 -WX -DOUTFILE="$dir/bin/AetherHost.exe" "$INST/windows/host.nsi"
+    cp "$INST/windows/reset-password.cmd" "$dir/bin/"
   else
     mkdir -p "$dir/bin"
     cp "$INST/mac/Uninstall Aether.command" "$dir/bin/" && chmod 755 "$dir/bin/Uninstall Aether.command"
+    cp "$INST/mac/Reset Aether Password.command" "$dir/bin/" && chmod 755 "$dir/bin/Reset Aether Password.command"
     cp "$INST/mac/aether-update.sh" "$dir/bin/" && chmod 755 "$dir/bin/aether-update.sh"
   fi
 

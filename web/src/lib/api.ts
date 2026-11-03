@@ -144,6 +144,7 @@ export const api = {
   setupPickFolder: () => req<{ path: string | null }>('/api/setup/pick-folder', { method: 'POST' }),
   setupComplete: (body: { terms: boolean; password: string; port: number; dataDir: string; projectRoot: string }) =>
     req<{ ok: true; port: number }>('/api/setup/complete', { method: 'POST', body: JSON.stringify(body) }),
+  logout: () => req<unknown>('/api/auth/logout', { method: 'POST' }),
   login: (password: string) =>
     req<{ ok: true; token?: string }>('/api/auth/login', {
       method: 'POST',

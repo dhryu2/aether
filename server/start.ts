@@ -43,8 +43,32 @@ process.on("exit", (c) => {
 const setupPort = Number(process.env.PORT);
 scrubInheritedEnv();
 
+// 프로그램 폴더의 도구가 부르는 일회성 명령. 서버를 띄우지 않고, 평소 실행과 같은 설정을 읽어 처리한 뒤 끝난다.
+const tool = process.argv[2];
+
+/** 평소 실행과 도구가 함께 쓰는 환경 준비. config.ts가 import 때 환경을 읽으므로 이 뒤에 불러온다. */
+function prepareInstalledEnv(): void {
+  if (fs.existsSync(p.envFile)) process.loadEnvFile(p.envFile);
+  process.env.AETHER_CONFIG = p.configFile;
+  // release.ts가 설치 폴더의 부모에서 git을 실행하지 않도록 묶음 버전을 명시한다.
+  process.env.AETHER_RELEASE = pkg.version;
+}
+
 try {
-  if (isFirstRun(p)) {
+  if (tool === "--reset-password" || tool === "--remote-off") {
+    if (isFirstRun(p)) {
+      printError("Aether 첫 설정이 아직 끝나지 않았습니다. / Finish the Aether first-run setup first.");
+      process.exit(1);
+    }
+    prepareInstalledEnv();
+    if (tool === "--reset-password") {
+      const { resetPassword } = await import("./setup/resetPassword");
+      process.exit(await resetPassword());
+    }
+    const { disableRemoteAccess } = await import("./remote/tailscaleServe");
+    await disableRemoteAccess();
+    process.exit(0);
+  } else if (isFirstRun(p)) {
     // index.ts는 불러오지 않는다(DB·부팅 부작용 없음). 설정 서버가 쓰는 config.ts가 import 때 환경을 읽으므로 먼저 정한다.
     log(`첫 실행입니다: ${path.basename(p.configFile)}이 없어 설정 서버를 시작합니다.`);
     process.env.AETHER_DATA_DIR = p.defaultDataDir;
@@ -58,15 +82,18 @@ try {
     // 저장이 끝나면 설정 서버가 코드 1로 끝난다. 자동 실행 장치(윈도우 AetherHost, 맥 LaunchAgent)가 진짜 서버로 다시 띄운다.
     // 자동 실행 없이 수동으로 띄웠다면 재시작 없이 그냥 끝난다 — 저장 때 start.log에 그렇게 안내한다.
   } else {
-    if (fs.existsSync(p.envFile)) process.loadEnvFile(p.envFile);
-    process.env.AETHER_CONFIG = p.configFile;
+    prepareInstalledEnv();
     // 새 버전 확인 주소: .env나 config.json에 없으면 빌드 때 묶음에 넣은 값을 쓴다. 없으면 기능이 꺼진다.
     const updateUrl = bundledUpdateUrl((pkg as { aetherUpdateUrl?: unknown }).aetherUpdateUrl, p.configFile);
     if (updateUrl) process.env.AETHER_UPDATE_URL = updateUrl;
     else if (!process.env.AETHER_UPDATE_URL && !(pkg as { aetherUpdateUrl?: unknown }).aetherUpdateUrl) log("경고: 배포 주소 없이 빌드된 묶음입니다. config.json에 updateUrl이 없으면 새 버전 확인은 꺼집니다.");
-    // release.ts가 설치 폴더의 부모에서 git을 실행하지 않도록 묶음 버전을 명시한다.
-    process.env.AETHER_RELEASE = pkg.version;
     // config.ts가 import 때 환경을 읽으므로 위 설정 뒤에 동적으로 불러온다.
+    try {
+      const { ensurePushKeys } = await import("./setup/pushKeys");
+      ensurePushKeys(p.envFile);
+    } catch (e) {
+      log(`푸시 알림 키를 저장하지 못해 알림을 끈 채로 시작합니다: ${e instanceof Error ? e.message : String(e)}`);
+    }
     await import("./index");
   }
 } catch (e) {

@@ -1,7 +1,7 @@
 // 설치 묶음 실기 시험(첫 실행부터 평소 실행까지). 맥·윈도우 공통. 사용: <묶음의 node> smoke.mjs --app <묶음 폴더> --base <빈 임시 폴더>
 // 빈 AETHER_APP_BASE로 묶음을 띄워 첫 설정 서버를 확인하고, 설정을 저장한 뒤 평소 서버로 다시 떠서 로그인까지 항목별 PASS/FAIL만 출력한다.
 // 운영 데이터·8787에는 닿지 않는다: 데이터·임시 폴더는 모두 --base 아래, 포트는 48800, AETHER_*는 지우고 시작한다.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
@@ -159,7 +159,7 @@ const bad = await login("x" + password);
 check("비밀번호 틀림은 401", bad.status === 401, bad.status);
 const good = await login(password);
 check("비밀번호 맞음은 200", good.status === 200, good.status);
-const cookie = [good.headers["set-cookie"] ?? []].flat().map((c) => c.split(";")[0]).join("; ");
+let cookie = [good.headers["set-cookie"] ?? []].flat().map((c) => c.split(";")[0]).join("; ");
 check("로그인 응답이 쿠키를 준다", cookie.length > 0);
 
 check("쿠키 없이 /api/sessions는 401", (await get("/api/sessions")).status === 401);
@@ -170,6 +170,29 @@ check("앱 안 업데이트 시작은 로그인이 필요하다", (await req("PO
 const refused = await req("POST", "/api/system/update/install", { headers: { cookie } });
 check("꺼져 있으면 앱 안 업데이트를 시작하지 않는다", refused.status === 400, String(refused.status));
 check("쿠키로 /api/sessions는 200", authed.status === 200, authed.status);
+const pushKey = (await get("/api/push/vapid", { cookie })).json?.vapidPublic;
+check("설치본이 푸시 알림 키를 스스로 만든다", typeof pushKey === "string" && pushKey.length > 40, pushKey);
+check("푸시 개인키는 .env 밖으로 나가지 않는다", !JSON.stringify((await get("/api/system/info", { cookie })).json).includes("PRIVATE"));
+// 잊은 비밀번호: 예전 안내대로 저장 파일을 지우면 로그인이 막힌다. 재설정 도구로 되살아나야 한다.
+const dataDirNow = JSON.parse(fs.readFileSync(path.join(base, "config.json"), "utf8")).dataDir;
+fs.rmSync(path.join(dataDirNow, "auth-password.json"));
+check("저장 파일이 없으면 원래 비밀번호로 로그인할 수 없다", (await login(password)).status === 401);
+const tool = (arg, input) => spawnSync(process.execPath, [path.join(serverDir, "index.mjs"), arg], { cwd: base, env: baseEnv, input, encoding: "utf8", timeout: 30000, windowsHide: true });
+const newPassword = crypto.randomBytes(12).toString("hex");
+check("재설정 도구는 짧은 비밀번호를 거절한다", tool("--reset-password", "short\n").status === 1);
+check("재설정 도구는 두 입력이 다르면 거절한다", tool("--reset-password", `${newPassword}\nother-value-1\n`).status === 1);
+const reset = tool("--reset-password", `${newPassword}\n${newPassword}\n`);
+check("재설정 도구가 성공한다", reset.status === 0, reset.stdout + reset.stderr);
+check("실행 중인 서버가 재시작 없이 새 비밀번호를 받는다", (await login(newPassword)).status === 200);
+check("재설정 뒤 옛 비밀번호는 401", (await login(password)).status === 401);
+check("재설정 뒤 기존 기기의 로그인이 풀린다", (await get("/api/sessions", { cookie })).status === 401);
+const remoteOff = tool("--remote-off");
+check("삭제 때 쓰는 폰 접속 끄기가 켜 둔 적 없어도 정상 종료한다", remoteOff.status === 0, remoteOff.stderr);
+const relogin = await login(newPassword);
+const recookie = [relogin.headers["set-cookie"] ?? []].flat().map((c) => c.split(";")[0]).join("; ");
+const out_ = await req("POST", "/api/auth/logout", { headers: { cookie: recookie } });
+check("로그아웃 응답이 쿠키를 지운다", out_.status === 200 && /aether_session=;/.test([out_.headers["set-cookie"] ?? []].flat().join("; ")), out_.headers["set-cookie"]);
+cookie = recookie; // 아래 단계는 재설정 뒤의 로그인을 쓴다
 // 새 버전 확인 주소: 묶음 package.json의 aetherUpdateUrl이 있으면 실행 중 서버에서 켜져 있어야 하고(묶음에 박힌 값이 아니라 복사본을 기준으로 비교), 없으면 꺼져 있어야 한다.
 const bundledUrl = JSON.parse(fs.readFileSync(path.join(serverDir, "package.json"), "utf8")).aetherUpdateUrl;
 const upd = await get("/api/system/update", { cookie });

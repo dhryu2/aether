@@ -350,6 +350,9 @@ Section "Uninstall"
   ; 등록된 설치를 지울 때만 실행 중인 프로세스와 등록 항목을 정리한다. 시험 설치를 지우다 진짜 설치를 건드리지 않기 위해서다.
   ReadRegStr $1 HKCU "${UNINST_KEY}" "InstallLocation"
   ${If} $1 == $INSTDIR
+    ; 폰 접속을 켜 둔 채 지우면 같은 포트의 다른 프로그램이 Tailscale 망에 열린다. 실패해도 제거는 계속한다.
+    nsExec::Exec '"$INSTDIR\node\AetherNode.exe" "$INSTDIR\server\index.mjs" --remote-off'
+    Pop $0
     Call un.StopAether
     DeleteRegValue HKCU "${RUN_KEY}" "Aether"
     Delete "$DESKTOP\Aether.lnk"

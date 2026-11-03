@@ -212,6 +212,11 @@ export const nav: Dict = {
   'nav.auth.passwordLabel': { ko: '비밀번호', en: 'Password' },
   'nav.auth.showPassword': { ko: '비밀번호 보이기', en: 'Show password' },
   'nav.auth.hidePassword': { ko: '비밀번호 숨기기', en: 'Hide password' },
+  'nav.auth.forgot': { ko: '비밀번호를 잊었어요', en: 'Forgot your password?' },
+  'nav.auth.forgotHelp': {
+    ko: 'Aether를 설치한 컴퓨터에서 아래 파일을 실행해 새 비밀번호를 정하세요.\n맥: 홈 폴더의 Applications/Aether/bin/Reset Aether Password.command\n윈도우: %LOCALAPPDATA%\\Programs\\Aether\\bin\\reset-password.cmd',
+    en: 'On the computer where Aether is installed, run this file to set a new password.\nMac: Applications/Aether/bin/Reset Aether Password.command in your home folder\nWindows: %LOCALAPPDATA%\\Programs\\Aether\\bin\\reset-password.cmd',
+  },
   'nav.auth.loginSubmit': { ko: '로그인', en: 'Continue' },
   'nav.auth.loginBusy': { ko: '확인하는 중', en: 'Checking' },
   'nav.auth.loginFailed': { ko: '비밀번호가 맞지 않아요.', en: 'That password is not right.' },

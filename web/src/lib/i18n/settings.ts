@@ -39,8 +39,8 @@ export const settings: Dict = {
     en: 'Tells you about new replies and things to confirm.',
   },
   'settings.push.unsupported': {
-    ko: '이 브라우저에서는 알림을 켤 수 없어요.',
-    en: 'Notifications cannot be turned on in this browser.',
+    ko: '이 브라우저에서는 알림을 켤 수 없어요. iPhone은 Safari 공유 메뉴에서 홈 화면에 추가한 뒤 그 앱에서 켜세요.',
+    en: 'Notifications cannot be turned on in this browser. On iPhone, add Aether to your Home Screen from the Safari Share menu and turn them on there.',
   },
   'settings.push.noVapid': {
     ko: '이 서버는 알림을 보낼 준비가 안 돼 있어요.',
@@ -157,7 +157,10 @@ export const settings: Dict = {
     ko: '켜면 같은 Tailscale 망의 기기에서 HTTPS 주소로 열 수 있어요. 로그인 비밀번호는 그대로 필요해요. 이 컴퓨터 이름과 망 이름은 공개 인증서 기록에 남아요.',
     en: 'Devices on your Tailscale network can open Aether at an HTTPS address, and your password is still required. This computer\'s name and your network name appear in public certificate logs.',
   },
-  'settings.remote.note.on': { ko: '폰에서 Tailscale을 켠 뒤 이 주소를 여세요.', en: 'Turn on Tailscale on your phone, then open this address.' },
+  'settings.remote.note.on': {
+    ko: '폰에서 Tailscale을 켠 뒤 이 주소를 여세요. 이 컴퓨터가 잠들면 열리지 않으니 전원 설정에서 자동 잠자기를 꺼 두세요.',
+    en: 'Turn on Tailscale on your phone, then open this address. It will not open while this computer is asleep, so turn off automatic sleep in its power settings.',
+  },
   'settings.remote.note.waiting': { ko: '페이지에서 허용하면 저절로 켜져요.', en: 'It turns on by itself after you approve on that page.' },
   'settings.remote.note.noTailscale': { ko: '이 컴퓨터와 폰에 Tailscale을 설치하고 같은 계정으로 로그인한 뒤 다시 확인하세요.', en: 'Install Tailscale on this computer and your phone, sign in to the same account, then check again.' },
   'settings.remote.note.offline': { ko: '이 컴퓨터에서 Tailscale을 켜고 로그인한 뒤 다시 확인하세요.', en: 'Turn on Tailscale on this computer, sign in, then check again.' },
@@ -243,9 +246,13 @@ export const settings: Dict = {
     ko: '8자 이상. 바꾸면 다른 기기는 다시 로그인해야 해요.',
     en: '8 characters or more. Other devices will need to sign in again.',
   },
+  'settings.logout.action': { ko: '이 기기에서 로그아웃', en: 'Sign Out on This Device' },
+  'settings.logout.note': { ko: '모든 기기의 로그인을 끊으려면 비밀번호를 바꾸세요.', en: 'To sign out every device, change your password.' },
+  'settings.logout.confirm.title': { ko: '이 기기에서 로그아웃할까요?', en: 'Sign out on this device?' },
+  'settings.logout.confirm.body': { ko: '이 기기의 푸시 알림도 꺼져요. 다시 쓰려면 비밀번호로 로그인하세요.', en: 'Push notifications on this device also turn off. Sign in with your password to use it again.' },
   'settings.password.forgot': {
-    ko: '잊었다면 데이터 폴더의 auth-password.json을 지우세요. 그러면 처음 설정한 비밀번호로 돌아가요.',
-    en: 'If you forget it, delete auth-password.json in the data folder. The password you first set will work again.',
+    ko: '비밀번호를 잊었다면 Aether를 설치한 컴퓨터에서 아래 파일을 실행해 새 비밀번호를 정하세요.\n맥: 홈 폴더의 Applications/Aether/bin/Reset Aether Password.command\n윈도우: %LOCALAPPDATA%\\Programs\\Aether\\bin\\reset-password.cmd',
+    en: 'If you forget your password, on the computer where Aether is installed, run this file to set a new password.\nMac: Applications/Aether/bin/Reset Aether Password.command in your home folder\nWindows: %LOCALAPPDATA%\\Programs\\Aether\\bin\\reset-password.cmd',
   },
   'settings.password.err.currentEmpty': { ko: '현재 비밀번호를 입력하세요.', en: 'Enter your current password.' },
   'settings.password.err.tooShort': { ko: '새 비밀번호는 8자 이상이어야 해요.', en: 'The new password must be at least 8 characters.' },

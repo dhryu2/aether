@@ -14,6 +14,8 @@ main() {
   fi
   echo "Aether를 제거합니다: $APP"
 
+  # 폰 접속을 켜 둔 채 지우면 같은 포트의 다른 프로그램이 Tailscale 망에 열린다. 실패해도 제거는 계속한다.
+  "$APP/node/bin/node" "$APP/server/index.mjs" --remote-off >/dev/null 2>&1 || true
   launchctl bootout "gui/$UID_T/$LABEL" >/dev/null 2>&1 || true
   # 서버가 완전히 내려갈 때까지 기다린다(최대 약 15초).
   local i=0

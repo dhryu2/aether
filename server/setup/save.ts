@@ -41,7 +41,7 @@ export const defaultSaveDeps: SaveDeps = {
   }),
 };
 
-function writeAtomic(file: string, data: string, mode: number): void {
+export function writeAtomic(file: string, data: string, mode: number): void {
   const tmp = `${file}.${crypto.randomBytes(6).toString("hex")}.tmp`;
   try {
     const fd = fs.openSync(tmp, "wx", mode);

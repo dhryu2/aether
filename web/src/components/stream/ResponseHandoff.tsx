@@ -6,13 +6,20 @@ import { actions, useStore } from '../../lib/store'
 import { handoffMenuState } from '../../lib/handoff'
 import { executionId, findRoom } from '../../lib/workspaceRooms'
 import { useT } from '../../lib/i18n'
+import type { WorkspaceRoom } from '../../lib/types'
+
+/** 지금 넘길 수 있는 세션이면 그 실행 id, 아니면 null. 답변 우클릭 메뉴도 같은 판단을 쓴다. */
+export function readyHandoffExecId(rooms: WorkspaceRoom[], sessionId: string): string | null {
+  const room = findRoom(rooms, sessionId) ?? rooms.find((r) => executionId(r) === sessionId)
+  const execId = executionId(room)
+  return room && execId && handoffMenuState(room).kind === 'ready' ? execId : null
+}
 
 export function ResponseHandoff({ sessionId }: { sessionId: string }) {
   const t = useT()
   const s = useStore()
-  const room = findRoom(s.rooms, sessionId) ?? s.rooms.find((r) => executionId(r) === sessionId)
-  const execId = executionId(room)
-  if (!room || !execId || handoffMenuState(room).kind !== 'ready') return null
+  const execId = readyHandoffExecId(s.rooms, sessionId)
+  if (!execId) return null
   return (
     <button type="button" className="response-handoff-btn press hit-44" onClick={() => actions.openHandoff(execId)}>
       <ArrowRight size={14} aria-hidden="true" />

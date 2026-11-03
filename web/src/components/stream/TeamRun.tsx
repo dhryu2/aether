@@ -8,6 +8,7 @@ import { Check, ChevronDown, Loader2, Pause, X } from 'lucide-react'
 import type { ToolEntry } from './ToolRun'
 import { teamTaskView, type TeamTaskStatus, type TeamTaskView } from '../../lib/teamTask'
 import { useT } from '../../lib/i18n'
+import { onCopyMenu } from '../contextMenuFor'
 import { C } from '../../design/tokens'
 import { Collapse } from '../ui'
 
@@ -73,7 +74,7 @@ function TaskCard({ task, t }: { task: TeamTaskView; t: (k: string) => string })
             <div className="flex flex-col" style={{ gap: 4 }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: C.label3 }}>{t('stream.team.files')}</div>
               {task.files.map((f) => (
-                <div key={f} className="font-mono truncate" style={{ fontSize: 11 }} title={f}>
+                <div key={f} className="font-mono truncate" style={{ fontSize: 11 }} title={f} onContextMenu={onCopyMenu(f, t('menu.copyPath'))}>
                   {f}
                 </div>
               ))}

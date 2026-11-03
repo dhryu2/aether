@@ -8,6 +8,7 @@ import { useT } from '../../lib/i18n'
 import { C, FONT } from '../../design/tokens'
 import { Button, EmptyState, Notice, NOTICE_TONE, SegmentedControl, Skeleton } from '../ui'
 import { Group, GroupNote, Sep } from './parts'
+import { onCopyMenu } from '../contextMenuFor'
 import { rowMin, useNarrow } from './settingsLayout'
 
 const LEVELS: readonly ServerLogLevel[] = ['log', 'warn', 'error']
@@ -99,7 +100,10 @@ export function ServerLogView() {
 function LogRow({ line: { t: at, level, msg } }: { line: LogLine }) {
   const t = useT()
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 16px' }}>
+    <div
+      style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 16px' }}
+      onContextMenu={onCopyMenu(`${at} ${level} ${msg}`, t('menu.copyLine'))}
+    >
       <span className="tabular-nums" style={{ display: 'flex', gap: 8, fontSize: 11, color: C.label3 }}>
         <span>{fmtShortDateTime(Date.parse(at))}</span>
         <span style={{ fontWeight: 600 }}>{t(`settings.logs.tag.${level}`)}</span>

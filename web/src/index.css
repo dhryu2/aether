@@ -813,6 +813,15 @@ a,
 /* 지금 보는 줄 — 옅은 파랑 면만. 테두리는 긋지 않는다(재설계 3단계). on 뒤에 둬야 이긴다. */
 .session-row-current,
 .session-row-current:hover { background: var(--c-tint-soft); }
+/* 우클릭 메뉴가 가리키는 위젯(shell/ContextMenu.tsx가 열려 있는 동안 붙인다). 윤곽선이라 배경색이 있든 없든 보인다. */
+[data-menu-target] {
+  outline: 2px solid color-mix(in srgb, var(--c-tint-fill) 55%, transparent);
+  outline-offset: -2px;
+}
+/* 코드 블록은 안쪽 칸만 둥글어서 강조선이 각져 보인다. */
+.code-block[data-menu-target] {
+  border-radius: 12px;
+}
 
 .sidebar-search {
   -webkit-appearance: none;

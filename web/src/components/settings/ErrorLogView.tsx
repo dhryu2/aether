@@ -12,6 +12,7 @@ import { findRoom, roomIdForExecution } from '../../lib/workspaceRooms'
 import { C, FONT } from '../../design/tokens'
 import { Button, Collapse, EmptyState, Notice, NOTICE_TONE, SegmentedControl, Skeleton } from '../ui'
 import { Group, GroupNote, Sep, TextRow, ValueRow } from './parts'
+import { onCopyMenu } from '../contextMenuFor'
 import { rowMin, useNarrow } from './settingsLayout'
 
 const PERIODS: readonly ErrorLogPeriod[] = ['24h', '7d', 'all']
@@ -249,7 +250,7 @@ function ErrorDetail({ group, state, onRetry }: { group: ErrorGroupSummary; stat
   }
   const e = state.latest
   return (
-    <div id={id}>
+    <div id={id} onContextMenu={onCopyMenu(errorCopyText(group, state), t('menu.copyError'))}>
       <Sep />
       <div style={{ padding: '12px 16px', fontSize: 14, lineHeight: 1.5, color: C.label, whiteSpace: 'pre-wrap', wordBreak: 'break-word', userSelect: 'text' }}>{e.message}</div>
       <Sep />

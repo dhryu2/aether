@@ -4,6 +4,8 @@
 import { Children, createContext, type ComponentProps, isValidElement, memo, use, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Check, Copy, Download, WrapText } from 'lucide-react'
 import { codeFileName } from '../lib/codeFileName'
+import { MenuItem } from './WorkMenu'
+import { copyItem, menuOf, onContextMenuFor } from './contextMenuFor'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import SyntaxHighlighter from 'react-syntax-highlighter/dist/esm/prism-light'
@@ -116,7 +118,17 @@ export const CodeBlock = memo(function CodeBlock({ language, code, index, dark: 
   const shown = collapsed ? lines.slice(0, 8).join('\n') : code
   const label = language || t('stream.code.plain')
   return (
-    <div ref={box} className="code-block" style={{ position: 'relative', maxWidth: '100%' }}>
+    <div
+      ref={box}
+      className="code-block"
+      style={{ position: 'relative', maxWidth: '100%' }}
+      onContextMenu={onContextMenuFor(() => menuOf(
+        copyItem(code, t('stream.copyCode')),
+        <MenuItem onClick={() => downloadCode(codeFileName(language, index), code)}>{t('stream.code.download')}</MenuItem>,
+        <MenuItem onClick={() => setWrap((value) => !value)}>{wrap ? t('stream.code.unwrap') : t('stream.code.wrap')}</MenuItem>,
+        long && <MenuItem onClick={() => setCollapsed((value) => !value)}>{collapsed ? t('stream.code.expand') : t('stream.code.collapse')}</MenuItem>,
+      ))}
+    >
       <SyntaxHighlighter
         language={language || 'text'}
         wrapLongLines={wrap}

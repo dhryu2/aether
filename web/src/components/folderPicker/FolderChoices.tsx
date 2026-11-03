@@ -9,6 +9,8 @@ import { useNarrow } from '../settings/settingsLayout'
 import { folderRowStyle } from './rowStyle'
 import { folderName } from '../../lib/sessionGroups'
 import { parentPath, tildeHome } from './explorerModel'
+import { MenuItem } from '../WorkMenu'
+import { copyItem, menuOf, onContextMenuFor } from '../contextMenuFor'
 
 /** 위치 종류별 그림. 폴더가 아니라 위치라서 폴더 그림과 모양·색이 다르다. */
 const PLACE_ICON = {
@@ -152,6 +154,10 @@ export function FolderChoices({
                     if (on && pickedRef) pickedRef.current = el
                   }}
                   onClick={() => onPick(path)}
+                  onContextMenu={onContextMenuFor(() => menuOf(
+                    <MenuItem onClick={() => onPick(path)}>{t('session.folderPicker.choose')}</MenuItem>,
+                    copyItem(path, t('menu.copyPath')),
+                  ))}
                   onKeyDown={(e) => onKey(e, i)}
                   className="press"
                   style={folderRowStyle(narrow, disabled)}

@@ -10,6 +10,8 @@ import { C, R } from '../../design/tokens'
 import { CodeBlock } from '../Markdown'
 import { Attachments, DocChips } from './Attachments'
 import { HandoffCard } from './HandoffCard'
+import { MenuItem } from '../WorkMenu'
+import { copyItem, menuOf, onContextMenuFor } from '../contextMenuFor'
 
 // 내 말 풍선의 글 — 시안 A: 15.5px, 여백 10/16, 모서리 20(index.css .bubble-user). 폭은 index.css .bubble-max가 정한다.
 const USER_TEXT = { maxWidth: '100%', padding: '10px 16px', fontSize: 15.5, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' } as const
@@ -66,7 +68,15 @@ export const UserBubble = memo(function UserBubble({
           {handoffFrom ? (
             <HandoffCard text={text} fromId={handoffFrom} />
           ) : (
-            <div className="bubble-user" style={USER_TEXT}>
+            <div
+              className="bubble-user"
+              style={USER_TEXT}
+              onContextMenu={onContextMenuFor(() => menuOf(
+                copyItem(text, t('stream.userBubble.copy')),
+                <MenuItem onClick={() => actions.editMessage(text, sessionId)}>{t('stream.userBubble.resend')}</MenuItem>,
+                canRewind && <MenuItem onClick={() => actions.requestRewind(sessionId, seq)}>{t('stream.userBubble.rewind')}</MenuItem>,
+              ))}
+            >
               <UserText text={text} />
             </div>
           )}
@@ -203,6 +213,13 @@ export function QueuedBubble({
         className="bubble-user"
         style={{ ...USER_TEXT, minWidth: 0, opacity: 0.55, border: `1px dashed ${C.sep}` }}
         title={t('stream.queued.title')}
+        onContextMenu={onContextMenuFor(() => (
+          <>
+            {canSendNow && <MenuItem onClick={onSendNow}>{t('stream.queued.sendNow')}</MenuItem>}
+            <MenuItem onClick={onEdit}>{t('stream.queued.edit')}</MenuItem>
+            <MenuItem onClick={onCancel}>{t('stream.queued.cancel')}</MenuItem>
+          </>
+        ))}
       >
         {imageCount > 0 && <span style={{ opacity: 0.8 }}>🖼×{imageCount}{text ? ' ' : ''}</span>}
         <UserText text={text} />
@@ -231,9 +248,9 @@ export const ChoiceBubble = memo(function ChoiceBubble({ labels }: { labels: str
 
 // W10 어시스턴트 답 (Markdown 본문은 부모가 children으로 주입). 재설계 4단계: 상자 없이 바탕 위의 글이다(시안 A).
 //   글 폭은 대화 열(760) 전체를 쓴다. 글자 15.5px, 줄 간격 1.65.
-export function AssistantBubble({ children }: { children: React.ReactNode }) {
+export function AssistantBubble({ children, onContextMenu }: { children: React.ReactNode; onContextMenu?: (e: React.MouseEvent<HTMLElement>) => void }) {
   return (
-    <div className="self-stretch bubble-assistant" style={{ lineHeight: 1.65, color: C.label }}>
+    <div className="self-stretch bubble-assistant" style={{ lineHeight: 1.65, color: C.label }} onContextMenu={onContextMenu}>
       {children}
     </div>
   )

@@ -7,6 +7,8 @@ import { backgroundAnnouncement } from '../../lib/backgroundTasks'
 import type { BackgroundTask } from '../../lib/types'
 import { Collapse } from '../ui'
 import { StatusIcon, statusTone } from '../stream/TeamRun'
+import { MenuItem } from '../WorkMenu'
+import { copyItem, menuOf, onContextMenuFor } from '../contextMenuFor'
 
 // 메인 턴이 끝난 뒤에도 백그라운드 작업을 알리는 띠. 접힌 채 시작하고, 머리를 누르면 작업 목록이 펼쳐진다.
 //   "중지"는 이 뒤 작업을 멈추는 것이고, 입력창 옆의 중단(메인 턴 멈추기)과 다르다.
@@ -118,7 +120,15 @@ export function BackgroundTasksStrip({ tasks, canStop, stopping, onStop, onStopA
             const tone = statusTone('running')
             const desc = task.description || t(`composer.background.kind.${task.kind}`)
             return (
-              <li key={task.id} className="flex items-center" style={{ minHeight: h, gap: 9, padding: isNarrow ? '0 6px 0 14px' : '0 8px 0 14px', minWidth: 0 }}>
+              <li
+                key={task.id}
+                className="flex items-center"
+                style={{ minHeight: h, gap: 9, padding: isNarrow ? '0 6px 0 14px' : '0 8px 0 14px', minWidth: 0 }}
+                onContextMenu={onContextMenuFor(() => menuOf(
+                  copyItem(desc, t('menu.copyText')),
+                  canStop && !stopping.has(task.id) && <MenuItem onClick={() => onStop(task.id)}>{t('composer.background.stopOne')}</MenuItem>,
+                ))}
+              >
                 <KindIcon size={15} style={{ color: C.label2, flexShrink: 0 }} aria-label={t(`composer.background.kind.${task.kind}`)} />
                 <span className="truncate" style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.label }} title={desc}>
                   {desc}

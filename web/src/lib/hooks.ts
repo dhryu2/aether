@@ -45,6 +45,8 @@ export function useDismiss(
 export function useScrimClose(onClose: () => void) {
   const startedOnScrim = useRef(false)
   return {
+    // 우클릭 메뉴가 막을 알아보는 표식(shell/ContextMenu.tsx). 막을 누르면 메뉴만 닫고 창은 두게 한다.
+    'data-scrim': '',
     onPointerDown: (e: ReactPointerEvent) => { startedOnScrim.current = e.target === e.currentTarget },
     onPointerUp: (e: ReactPointerEvent) => {
       const onScrim = startedOnScrim.current && e.target === e.currentTarget
@@ -74,6 +76,20 @@ export function useEscape(active: boolean, onClose: () => void) {
   }, [active])
 }
 
+// 클립보드에 쓴다. 성공하면 true를 돌려준다. useCopy와 우클릭 메뉴(components/contextMenuFor.tsx)가 함께 쓴다.
+export async function writeClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch (error) {
+    // 권한 거부·비보안 컨텍스트는 복사 기능의 정상 거절이다.
+    if (!(error instanceof DOMException && ['NotAllowedError', 'SecurityError', 'NotSupportedError'].includes(error.name))) {
+      reportClientError(error, { component: 'clipboard', operation: 'web.clipboard.write' })
+    }
+    return false
+  }
+}
+
 // 클립보드 복사 + "복사됨" 잠깐 표시 — Markdown의 코드블록과 로그인 화면이 각자 같은 코드를 갖고 있었다.
 //   원래 두 구현 모두 화면을 떠날 때 타이머를 정리하지 않아, 복사 직후 창을 닫으면 사라진 컴포넌트에 상태를 쓰려 했다.
 export function useCopy(resetMs = 1500) {
@@ -82,19 +98,12 @@ export function useCopy(resetMs = 1500) {
   useEffect(() => () => clearTimeout(timer.current), [])
   const copy = useCallback(
     (text: string) => {
-      void navigator.clipboard
-        .writeText(text)
-        .then(() => {
-          setCopied(true)
-          clearTimeout(timer.current)
-          timer.current = setTimeout(() => setCopied(false), resetMs)
-        })
-        .catch(error => {
-          // 권한 거부·비보안 컨텍스트는 복사 기능의 정상 거절이다.
-          if (!(error instanceof DOMException && ['NotAllowedError', 'SecurityError', 'NotSupportedError'].includes(error.name))) {
-            reportClientError(error, { component: 'clipboard', operation: 'web.clipboard.write' })
-          }
-        })
+      void writeClipboard(text).then(ok => {
+        if (!ok) return
+        setCopied(true)
+        clearTimeout(timer.current)
+        timer.current = setTimeout(() => setCopied(false), resetMs)
+      })
     },
     [resetMs],
   )

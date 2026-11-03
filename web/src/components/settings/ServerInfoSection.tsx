@@ -76,7 +76,7 @@ export function ServerInfoSection({ hideTitle }: { hideTitle?: boolean }) {
         <GroupNote>{t('settings.info.failed')}</GroupNote>
       ) : (
         <Group>
-          <ValueRow label={t('settings.info.version')} value={info.version} />
+          <ValueRow label={t('settings.info.version')} value={info.version} copy={info.version} />
           {update?.enabled && (
             <>
               <Sep />
@@ -96,13 +96,13 @@ export function ServerInfoSection({ hideTitle }: { hideTitle?: boolean }) {
             </>
           )}
           <Sep />
-          <ValueRow label={t('settings.info.port')} value={info.port} />
+          <ValueRow label={t('settings.info.port')} value={info.port} copy={info.port} />
           <Sep />
-          <ValueRow label={t('settings.info.authMode')} value={t(`settings.info.auth.${info.authMode}`)} />
+          <ValueRow label={t('settings.info.authMode')} value={t(`settings.info.auth.${info.authMode}`)} copy={t(`settings.info.auth.${info.authMode}`)} />
           <Sep />
-          <StackRow label={t('settings.info.dataDir')} value={info.dataDir} />
+          <StackRow label={t('settings.info.dataDir')} value={info.dataDir} copy={info.dataDir} />
           <Sep />
-          <StackRow label={t('settings.info.projectRoot')} value={info.projectRoot} />
+          <StackRow label={t('settings.info.projectRoot')} value={info.projectRoot} copy={info.projectRoot} />
         </Group>
       )}
       {link && info !== 'loading' && info !== 'failed' && <GroupNote>{t('update.row.note')}</GroupNote>}

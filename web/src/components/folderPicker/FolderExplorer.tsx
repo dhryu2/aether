@@ -8,6 +8,8 @@ import { useT } from '../../lib/i18n'
 import { Group } from '../settings/parts'
 import { rowMin } from '../settings/settingsLayout'
 import { Switch } from '../ui'
+import { MenuItem } from '../WorkMenu'
+import { copyItem, menuOf, onContextMenuFor, onCopyMenu } from '../contextMenuFor'
 import { FolderGlyph, FolderLabel, FolderSep } from './FolderChoices'
 import { FolderPathBar } from './FolderPathBar'
 import { FolderSidebar } from './FolderSidebar'
@@ -372,6 +374,14 @@ export function FolderExplorer({
                 }}
                 onClick={(ev) => onRowClick(ev, e.path)}
                 onDoubleClick={() => openEntry(e.path)}
+                // 우클릭하면 그 행을 고른다. 메뉴가 뜰 때만 고른다(터치의 길게 누르기는 건드리지 않는다).
+                onContextMenu={onContextMenuFor(() => {
+                  setSelected(e.path)
+                  return menuOf(
+                    <MenuItem onClick={() => openEntry(e.path)}>{t('menu.open')}</MenuItem>,
+                    copyItem(e.path, t('menu.copyPath')),
+                  )
+                })}
                 style={{ ...folderRowStyle(narrow), minHeight: narrow ? rowMin(true) : 36, gap: 10, userSelect: 'none' }}
               >
                 <FolderGlyph size={narrow ? 20 : 18} />
@@ -458,7 +468,7 @@ export function FolderExplorer({
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0, padding: '0 4px' }}>
         <span style={{ flexShrink: 0, fontSize: 13, fontWeight: 600, color: C.label2 }}>{t('session.folderPicker.target')}</span>
-        <span data-folder-target="" title={target ?? undefined} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: FONT.mono, fontSize: 13, color: C.label2 }}>
+        <span data-folder-target="" title={target ?? undefined} onContextMenu={onCopyMenu(target, t('menu.copyPath'))} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: FONT.mono, fontSize: 13, color: C.label2 }}>
           {target ?? '—'}
         </span>
       </div>

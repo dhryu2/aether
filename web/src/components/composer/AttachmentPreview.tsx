@@ -4,6 +4,8 @@ import { C, R, alpha } from '../../design/tokens'
 import { useT } from '../../lib/i18n'
 import { IconButton } from '../ui'
 import type { Attachment } from '../../lib/attachments'
+import { MenuItem } from '../WorkMenu'
+import { copyItem, menuOf, onContextMenuFor } from '../contextMenuFor'
 
 // 첨부 미리보기 제거(×) 버튼 스타일 — 이미지/파일 칩 두 분기 공용.
 const REMOVE_BTN_STYLE: CSSProperties = { position: 'absolute', top: -6, right: -6, background: C.label, boxShadow: `0 1px 4px ${alpha.ink(0.4)}` }
@@ -26,13 +28,18 @@ export function AttachmentPreview({ items, note, onRemove }: {
                 <X size={12} />
               </IconButton>
             )
+            // 이미지 위는 브라우저 기본 메뉴(이미지 저장)가 뜨므로 이 메뉴는 문서 칩에서 쓰인다.
+            const menu = onContextMenuFor(() => menuOf(
+              copyItem(a.name, t('menu.copyFileName')),
+              <MenuItem onClick={() => onRemove(i)}>{t('composer.attach.remove')}</MenuItem>,
+            ))
             return a.kind === 'image' && a.url ? (
-              <div key={i} style={{ position: 'relative', width: 60, height: 60, flexShrink: 0 }}>
+              <div key={i} style={{ position: 'relative', width: 60, height: 60, flexShrink: 0 }} onContextMenu={menu}>
                 <img src={a.url} alt={t('composer.attach.previewAlt')} style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: R.pill, border: `1px solid ${C.sep}` }} />
                 {remove}
               </div>
             ) : (
-              <div key={i} className="inline-flex items-center" style={{ position: 'relative', gap: 7, maxWidth: 200, padding: '7px 10px', borderRadius: R.pill, background: C.bg2, border: `1px solid ${C.sep}` }}>
+              <div key={i} className="inline-flex items-center" style={{ position: 'relative', gap: 7, maxWidth: 200, padding: '7px 10px', borderRadius: R.pill, background: C.bg2, border: `1px solid ${C.sep}` }} onContextMenu={menu}>
                 <FileText size={15} style={{ color: a.kind === 'pdf' ? C.del : C.label2, flexShrink: 0 }} />
                 <span className="truncate" style={{ fontSize: 12, fontWeight: 600, color: C.label2 }} title={a.name}>{a.name}</span>
                 <span style={{ fontSize: 10, color: C.label3, flexShrink: 0 }}>{a.kind === 'pdf' ? 'PDF' : t('composer.attach.text')}</span>

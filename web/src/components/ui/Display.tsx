@@ -2,7 +2,7 @@
  * 보여주기만 하는 작은 조각들 — 배지·아이콘 타일·점·구분선·진행바·자리표시자·회전자·빈 상태.
  * 전부 원래 여러 파일에 같은 모양으로 흩어져 있던 것들이다(아이콘 타일 14곳, 배지 9곳, 구분선 5곳 등).
  */
-import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
+import type { CSSProperties, HTMLAttributes, MouseEventHandler, ReactNode } from 'react'
 import { C, R, alpha } from '../../design/tokens'
 import type { DerivedStatus, SessionAttention } from '../../lib/types'
 
@@ -150,10 +150,10 @@ export function Divider({ margin = '14px 0', color = C.sepSoft }: { margin?: str
  * 흐름 기록 한 줄 — 양옆 가는 선 사이에 작은 아이콘과 글자. 대화 기록 압축·이어가기처럼 할 일은 없지만
  * "여기서 이런 일이 있었다"는 표시. 상자에 담으면 진짜 경고와 같은 무게로 보여서 선으로만 남긴다(감사 F3).
  */
-export function RecordLine({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
+export function RecordLine({ icon, children, onContextMenu }: { icon?: ReactNode; children: ReactNode; onContextMenu?: MouseEventHandler<HTMLElement> }) {
   const rule = <span aria-hidden style={{ flex: 1, minWidth: 16, height: 1, background: alpha.label2(0.22) }} />
   return (
-    <div className="flex items-center" style={{ alignSelf: 'stretch', gap: 10, color: C.label2, fontSize: 12, lineHeight: 1.4 }}>
+    <div className="flex items-center" style={{ alignSelf: 'stretch', gap: 10, color: C.label2, fontSize: 12, lineHeight: 1.4 }} onContextMenu={onContextMenu}>
       {rule}
       <span className="flex items-center" style={{ gap: 6, minWidth: 0, textAlign: 'center' }}>
         {icon}

@@ -2,7 +2,7 @@ import { markErrorReported, reportClientError } from './errorReporting'
 import { createClientErrorReporter, createStorageErrorReporter } from './errors'
 // 중앙 상태 — useSyncExternalStore 기반 외부 스토어 + 액션 + SSE 배선.
 // 단일사용자/이벤트구동이라 전역 1스토어로 단순화. 대화 SSE는 보이는 칸만(첫 칸 + 옆 칸, 최대 4). 주의 통로는 전역으로 하나다.
-import { useSyncExternalStore } from 'react'
+import { useSyncExternalStore, type ReactNode } from 'react'
 import { api, classifyTransportError, reportApiResponseError, RequestTimeoutError } from './api'
 import { authHeaders } from './clientAuth'
 import { isDesktopShell, showDesktopNotification } from './desktopShell'
@@ -299,6 +299,14 @@ export type State = {
   deleteMode: 'delete' | 'reset' | 'discard' // deleteTarget이 null이 아닐 때만 의미 있음
   handoffSheet: { sessionId: string; mode: 'form' | 'waiting' | 'result' } | null // 다음 작업으로 넘기기 창(null = 닫힘). sessionId는 실행 id.
   dialog: DialogState | null // 범용 확인 다이얼로그(null = 닫힘)
+  /**
+   * 우클릭 메뉴(null = 닫힘). 한 벌만 shell/ContextMenu.tsx가 그린다. 위젯은 items(메뉴 항목 요소)만 넘긴다.
+   * anchor = 우클릭한 위젯. 열려 있는 동안 강조하고, 메뉴 키로 열렸을 때는 이 위치에 띄운다.
+   * 전역 Esc가 이 메뉴 위에서 다른 일(세션 중단)을 하지 않도록 shell/useGlobalShortcuts.ts의 overlayOpen에도 든다.
+   */
+  contextMenu: { x: number; y: number; items: ReactNode; anchor?: HTMLElement; byKeyboard?: boolean } | null
+  /** 세션 이름 바꾸기 창(null = 닫힘). id = 실행 id(방 id가 아니다), name = 지금 이름. */
+  renameTarget: { id: string; name: string } | null
   /** 앱 안 업데이트 진행 화면(null = 닫힘). 앱 전체를 덮는다. */
   updateProgress: { fromVersion: string; targetVersion?: string; pageUrl?: string } | null
   isNarrow: boolean
@@ -403,6 +411,8 @@ let state: State = {
   handoffSheet: null,
   deleteMode: 'delete',
   dialog: null,
+  contextMenu: null,
+  renameTarget: null,
   updateProgress: null,
   isNarrow: typeof window !== 'undefined' ? window.innerWidth < 760 : false,
   isWide: typeof window !== 'undefined' ? window.innerWidth >= 1100 : false,
@@ -2733,6 +2743,10 @@ export const actions = {
   requestReset: (s: SessionListItem) => set({ deleteTarget: s, deleteMode: 'reset' }),
   requestDiscard: (s: SessionListItem) => set({ deleteTarget: s, deleteMode: 'discard' }),
   cancelDelete: () => set({ deleteTarget: null }),
+  openContextMenu: (menu: NonNullable<State['contextMenu']>) => set({ contextMenu: menu }),
+  closeContextMenu: () => set({ contextMenu: null }),
+  openRename: (id: string, name: string) => set({ renameTarget: { id, name } }),
+  closeRename: () => set({ renameTarget: null }),
 
   // ── 다음 작업으로 넘기기 ── 서버가 끝까지 진행하고, 화면은 창을 띄우고 결과를 받아 칸을 바꾸기만 한다.
   openHandoff: (sessionId: string) => set({ handoffSheet: { sessionId, mode: 'form' } }),

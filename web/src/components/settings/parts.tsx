@@ -2,6 +2,8 @@
 import type { ReactNode } from 'react'
 import { C, FONT } from '../../design/tokens'
 import { Skeleton } from '../ui'
+import { t as tNow } from '../../lib/i18n'
+import { onCopyMenu } from '../contextMenuFor'
 import { rowMin, useNarrow } from './settingsLayout'
 
 /** 묶음 제목. `trailing`은 오른쪽 메타(고른 경로처럼 제목이 못 담는 값). */
@@ -80,10 +82,13 @@ export function TextRow({
 }
 
 /** 이름과 값만 있는 읽기 줄. 값은 오른쪽에 숫자 폭을 맞춰 둔다. `color`는 값에만 입힌다(이름은 늘 본문색). */
-export function ValueRow({ label, value, color }: { label: string; value: ReactNode; color?: string }) {
+export function ValueRow({ label, value, color, copy }: { label: string; value: ReactNode; color?: string; copy?: string | number }) {
   const narrow = useNarrow()
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: rowMin(narrow), padding: '0 16px', fontSize: 15 }}>
+    <div
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: rowMin(narrow), padding: '0 16px', fontSize: 15 }}
+      onContextMenu={copy != null ? onCopyMenu(String(copy), tNow('menu.copyValue')) : undefined}
+    >
       <span style={{ minWidth: 0, color: C.label }}>{label}</span>
       <span className="tabular-nums" style={{ flexShrink: 0, color: color ?? C.label2 }}>{value}</span>
     </div>
@@ -91,9 +96,12 @@ export function ValueRow({ label, value, color }: { label: string; value: ReactN
 }
 
 /** 이름 위, 값 아래로 쌓는 읽기 줄. 경로처럼 긴 값이 줄바꿈되고 선택·복사할 수 있다. */
-export function StackRow({ label, value }: { label: string; value: ReactNode }) {
+export function StackRow({ label, value, copy }: { label: string; value: ReactNode; copy?: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '10px 16px', fontSize: 15 }}>
+    <div
+      style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '10px 16px', fontSize: 15 }}
+      onContextMenu={copy != null ? onCopyMenu(copy, tNow('menu.copyValue')) : undefined}
+    >
       <span style={{ color: C.label }}>{label}</span>
       <span style={{ fontFamily: FONT.mono, fontSize: 13, color: C.label2, overflowWrap: 'anywhere', userSelect: 'text' }}>{value}</span>
     </div>

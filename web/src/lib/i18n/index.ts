@@ -15,6 +15,7 @@ import { session } from './session'
 import { core } from './core'
 import { handoff } from './handoff'
 import { setup } from './setup'
+import { menu } from './menu'
 
 export type { Locale, Entry, Dict } from './types'
 export const LOCALES: Locale[] = ['ko', 'en']
@@ -32,6 +33,7 @@ const dict: Dict = {
   ...core,
   ...handoff,
   ...setup,
+  ...menu,
 }
 
 // 파라미터 값은 undefined도 허용(호출부의 optional 필드 그대로 전달 가능) — 치환 시 빈 문자열로.

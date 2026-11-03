@@ -4,6 +4,8 @@ import { C, R } from '../../design/tokens'
 import { useCopy } from '../../lib/hooks'
 import { codeLabel, type CodeBlock } from '../../lib/composerBlocks'
 import { ComposerTextarea, MAX_CODE_HEIGHT } from './ComposerTextarea'
+import { MenuItem } from '../WorkMenu'
+import { copyItem, menuOf, onContextMenuFor } from '../contextMenuFor'
 
 // 입력창 안의 코드 상자. ``` 또는 ~~~ 줄에서 Shift+Enter로 생긴다.
 //   왼쪽은 언어 이름(없으면 plain). 오른쪽은 접기와 복사. 본문은 그 아래에서 고친다.
@@ -38,6 +40,11 @@ export const ComposerCodeBox = memo(function ComposerCodeBox({
   return (
     <div
       className="composer-code"
+      // 안의 글칸은 입력칸이라 기본 메뉴가 뜬다. 이 메뉴는 머리와 테두리 쪽에서 쓰인다.
+      onContextMenu={onContextMenuFor(() => menuOf(
+        copyItem(block.value, copyLabel),
+        <MenuItem onClick={() => onToggle(block.id)}>{fold}</MenuItem>,
+      ))}
       style={{
         border: `1px solid ${C.sep}`,
         background: C.cell,

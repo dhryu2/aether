@@ -9,7 +9,7 @@ import { actions, chromeSessionId, getState, isSplit, sessionTurn, useStore } fr
 import { inboxRows } from '../lib/activityInbox'
 import { ConnectionIndicator } from './ConnectionIndicator'
 import { HandChip } from './TopBar'
-import type { SessionListItem, TurnState, WorkspaceRoom } from '../lib/types'
+import type { TurnState, WorkspaceRoom } from '../lib/types'
 import { MOD, relTime, waitAgeText } from '../lib/format'
 import { besideVictimIndex, focusedSessionId, paneNumberOf, visibleCapacity, visibleSessionIds } from '../lib/splitPane'
 import { cardPreviewLine } from '../lib/attention'
@@ -20,32 +20,11 @@ import { sessionRowModel } from '../lib/modelLabel'
 import { t, useT } from '../lib/i18n'
 import chamdingUrl from '../assets/chamding-idle.webp'
 import { Collapse, EmptyState, IconButton, Skeleton } from './ui'
-import { WorkMenu } from './WorkMenu'
+import { MenuItem, WorkMenu } from './WorkMenu'
+import { sessionContextMenu, sessionMenuProps } from './sessionMenu'
+import { onContextMenuFor, menuOf, copyItem } from './contextMenuFor'
 import { WaitAge } from './WaitAge'
 import { C, R, alpha } from '../design/tokens'
-
-function roomAsListItem(room: WorkspaceRoom): SessionListItem {
-  return {
-    id: room.id,
-    cwd: room.cwd ?? '',
-    displayName: room.title,
-    provider: room.provider ?? '',
-    model: '',
-    permissionMode: 'manual',
-    status: room.status,
-    createdAt: 0,
-    lastActivityAt: room.lastActivityAt,
-    preview: room.preview,
-    attention: room.attention,
-    attentionKind: room.attentionKind,
-    attentionPreview: room.attentionPreview,
-    attentionSince: room.attentionSince,
-    backgroundTasks: room.backgroundTasks,
-    backgroundCanStop: room.backgroundCanStop,
-    lastViewedAt: room.lastViewedAt,
-    archivedAt: room.archivedAt,
-  }
-}
 
 function statusPhrase(room: WorkspaceRoom, live: boolean, turn: TurnState): string {
   if (room.status === 'corrupted') return t('nav.session.status.unreachable')
@@ -149,6 +128,7 @@ function RoomRow({ room, archived }: { room: WorkspaceRoom; archived?: boolean }
   const phrase = statusPhrase(room, live, turn)
   const tone = rowTone(room, live, turn)
   const Icon = toneIcon(tone, room.attentionKind)
+  const archiveBlocked = tone === 'attn' || tone === 'run' || tone === 'bg'
   const attention = room.attention ?? 'idle'
   // 기다림·실패는 무엇을 기다리는지(권한·질문 문구)가 더 쓸모 있다. 일함·끝남은 짧은 상태말.
   //   나머지는 마지막 말(미리보기)을 보여 주고, 그것도 없으면 상태말.
@@ -182,6 +162,7 @@ function RoomRow({ room, archived }: { room: WorkspaceRoom; archived?: boolean }
       data-room-id={room.id}
       data-room-kind={room.kind}
       data-attention={attention}
+      onContextMenu={sessionContextMenu(room, archiveBlocked)}
       // 오른쪽 8 = 작업 메뉴(28)의 폰 누름 범위(44)가 줄 밖으로 새지 않는 여백((44-28)/2).
       style={{ gap: 4, minHeight: archived ? 56 : 68, padding: '8px 8px 8px 10px', borderRadius: R.field }}
       onKeyDown={(e) => {
@@ -253,32 +234,7 @@ function RoomRow({ room, archived }: { room: WorkspaceRoom; archived?: boolean }
           </IconButton>
         </span>
       )}
-      <WorkMenu
-        session={roomAsListItem(room)}
-        size={st.coarsePointer ? 36 : 28}
-        onExport={exec ? () => void actions.exportTranscript(exec) : undefined}
-        onArchive={exec && room.status !== 'corrupted' ? () => void (room.archivedAt ? actions.unarchiveSession(exec) : actions.archiveSession(exec)) : undefined}
-        archiveBlocked={tone === 'attn' || tone === 'run' || tone === 'bg'}
-        onRename={(e) => {
-          e.stopPropagation()
-        }}
-        onReset={(e) => {
-          e.stopPropagation()
-          const sid = room.sourceSessionId
-          if (sid) {
-            const sess = st.sessions.find((x) => x.id === sid)
-            if (sess) actions.requestReset(sess)
-          }
-        }}
-        onDelete={(e) => {
-          e.stopPropagation()
-          const sid = room.sourceSessionId
-          if (sid) {
-            const sess = st.sessions.find((x) => x.id === sid)
-            if (sess) actions.requestDelete(sess)
-          }
-        }}
-      />
+      <WorkMenu size={st.coarsePointer ? 36 : 28} {...sessionMenuProps(room, archiveBlocked)} />
     </button>
   )
 }
@@ -304,6 +260,7 @@ function RailChip({ room }: { room: WorkspaceRoom }) {
       title={label}
       aria-label={label}
       onClick={(e) => actions.selectSession(room.id, { beside: e.metaKey || e.ctrlKey })}
+      onContextMenu={sessionContextMenu(room, waiting || room.attention === 'running' || room.attention === 'background')}
       className="press hit-44 relative inline-flex items-center justify-center"
       style={{ width: 36, height: 36, flexShrink: 0, border: 'none', borderRadius: R.full, background: waiting ? alpha.attn(0.16) : C.fill, color: waiting ? C.attn : C.label2, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}
     >
@@ -612,6 +569,10 @@ export function Sidebar() {
                   aria-controls={panelId}
                   title={group.key || t('nav.sidebar.unknownProject')}
                   onClick={() => toggleProject(group.key)}
+                  onContextMenu={onContextMenuFor(() => menuOf(
+                    <MenuItem onClick={() => toggleProject(group.key)}>{open ? t('composer.code.collapse') : t('composer.code.expand')}</MenuItem>,
+                    copyItem(group.key, t('menu.copyFolderPath')),
+                  ))}
                   className="flex w-full items-center text-left"
                   style={{
                     gap: 6,

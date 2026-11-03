@@ -16,6 +16,8 @@ import { NewSessionModal } from '../NewSessionModal'
 import { DeleteConfirmModal } from '../DeleteConfirmModal'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { UpdateProgress } from '../UpdateProgress'
+import { RenameModal } from '../RenameModal'
+import { ContextMenu } from './ContextMenu'
 import { Toasts } from './Toasts'
 
 /**
@@ -55,6 +57,7 @@ export function Overlays() {
       <FindBar />
       <NewSessionModal />
       <DeleteConfirmModal />
+      <RenameModal />
       <BrainOverlay />
       {s.handoffSheet && <HandoffSheet />}
       {s.settingsOpen && <SettingsModal />}
@@ -62,6 +65,7 @@ export function Overlays() {
       {s.shortcutsOpen && <ShortcutsHelp />}
       <ConfirmDialog />
       <UpdateProgress />
+      <ContextMenu />
       <Toasts />
     </>
   )

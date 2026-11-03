@@ -24,6 +24,8 @@ function overlayOpen(s: State): boolean {
     s.deleteTarget ||
     s.handoffSheet ||
     s.dialog ||
+    s.contextMenu || // Esc는 메뉴가 window 캡처 단계에서 먼저 삼킨다(ContextMenu.tsx). 여기는 칸 이동 같은 다른 단축키를 막기 위한 것.
+    s.renameTarget ||
     s.updateProgress
   )
 }

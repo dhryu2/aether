@@ -7,13 +7,24 @@ import { getState } from '../../lib/store'
 import { useT } from '../../lib/i18n'
 import { C, R } from '../../design/tokens'
 import { Collapse } from '../ui'
+import { MenuItem } from '../WorkMenu'
+import { copyItem, menuOf, onContextMenuFor } from '../contextMenuFor'
 
 export function HandoffCard({ text, fromId }: { text: string; fromId: string }) {
   const t = useT()
   const [open, setOpen] = useState(false)
   const bodyId = useId()
+  const openPrev = () => actions.selectSession(roomIdForExecution(getState().rooms, fromId))
   return (
-    <div className="flex flex-col" data-handoff-card style={{ width: '100%', minWidth: 0, background: C.cell, borderRadius: R.card, overflow: 'hidden' }}>
+    <div
+      className="flex flex-col"
+      data-handoff-card
+      style={{ width: '100%', minWidth: 0, background: C.cell, borderRadius: R.card, overflow: 'hidden' }}
+      onContextMenu={onContextMenuFor(() => menuOf(
+        copyItem(text, t('menu.copyHandoff')),
+        <MenuItem onClick={openPrev}>{t('handoff.card.open')}</MenuItem>,
+      ))}
+    >
       <button
         type="button"
         className="press hit-44 flex items-center"
@@ -31,7 +42,7 @@ export function HandoffCard({ text, fromId }: { text: string; fromId: string }) 
           <button
             type="button"
             className="press hit-44"
-            onClick={() => actions.selectSession(roomIdForExecution(getState().rooms, fromId))}
+            onClick={openPrev}
             style={{ marginTop: 8, height: 28, padding: '0 12px', border: 'none', borderRadius: R.full, background: C.fill, color: C.label, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
           >
             {t('handoff.card.open')}

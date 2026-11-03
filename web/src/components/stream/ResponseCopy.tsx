@@ -1,19 +1,38 @@
 // 끝난 답변 아래의 전체 복사. 코드 블록 오른쪽 위의 복사는 그 칸만 옮긴다.
 //   이 버튼은 답에 적힌 글을 통째로 옮긴다. 화면에 그려진 결과가 아니라 원문을 넣는다.
 //   그래서 코드 울타리와 표식이 빠지지 않고, 다른 곳에 붙여도 같은 글로 남는다.
-//   길게 누르거나 우클릭하면 표식을 걷어 낸 보통 글로 옮긴다. 한때 이것이 따로 된 T 아이콘이었는데,
+//   길게 누르면 표식을 걷어 낸 보통 글로 옮긴다. 마우스 우클릭은 답변 메뉴(answerContextMenu)를 띄운다. 한때 이것이 따로 된 T 아이콘이었는데,
 //   아이콘만으로는 뜻이 안 읽혀서 버튼 하나로 합쳤다(2026-10-06 사용자 판단). 길게 누르기는 보내기 버튼과 같은 방식이다.
 //   클립보드를 못 쓰는 환경(보안이 아닌 주소)에서는 버튼을 그리지 않는다. 눌러도 안 되는 버튼은 함정이다.
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react'
 import { Check, Copy } from 'lucide-react'
+import { actions, getState } from '../../lib/store'
 import { useCopy } from '../../lib/hooks'
 import { markdownToPlain } from '../../lib/plainText'
-import { useT } from '../../lib/i18n'
+import { t as tNow, useT } from '../../lib/i18n'
+import { MenuItem } from '../WorkMenu'
+import { copyItem, menuOf, onContextMenuFor } from '../contextMenuFor'
+import { readyHandoffExecId } from './ResponseHandoff'
 
 /** 보내기 버튼(SendButton)의 길게 누르기와 같은 시간. */
 const LONG_PRESS_MS = 450
 
-export function ResponseCopy({ text, children }: { text: string; children?: ReactNode }) {
+/**
+ * 끝난 답변의 우클릭 메뉴 — 답변 본문과 아래 복사 단추가 같은 메뉴를 쓴다(마우스에서만. 터치는 단추의 길게 누르기).
+ * lastAnswer = 넘기기 단추가 붙는 마지막 답변. 지금 넘길 수 있을 때만 「다음 작업으로 넘기기」가 든다.
+ */
+export function answerContextMenu(text: string, sessionId: string, lastAnswer: boolean) {
+  return onContextMenuFor(() => {
+    const exec = lastAnswer ? readyHandoffExecId(getState().rooms, sessionId) : null
+    return menuOf(
+      copyItem(text, tNow('menu.copyAnswer')),
+      copyItem(markdownToPlain(text), tNow('menu.copyAnswerPlain')),
+      exec && <MenuItem onClick={() => actions.openHandoff(exec)}>{tNow('handoff.menu.item')}</MenuItem>,
+    )
+  })
+}
+
+export function ResponseCopy({ text, menu, children }: { text: string; menu?: (e: MouseEvent<HTMLElement>) => void; children?: ReactNode }) {
   const t = useT()
   const raw = useCopy()
   const plain = useCopy()
@@ -58,6 +77,8 @@ export function ResponseCopy({ text, children }: { text: string; children?: Reac
         onPointerCancel={clearTimer}
         onPointerLeave={clearTimer}
         onContextMenu={(e) => {
+          // 마우스는 답변 메뉴를 띄운다(흐르는 중에는 menu가 없어 기본 메뉴). 터치의 길게 누르기는 아래 그대로다.
+          if (!getState().coarsePointer) return menu?.(e)
           e.preventDefault()
           // 안드로이드는 길게 누르면 이 이벤트도 온다. 타이머가 이미 보통 글을 옮겼으면 두 번 옮기지 않는다.
           if (longFired.current) return

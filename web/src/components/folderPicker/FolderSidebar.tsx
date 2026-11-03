@@ -8,6 +8,8 @@ import type { FsPlaces } from '../../lib/types'
 import { Group, GroupTitle } from '../settings/parts'
 import { FolderGlyph, FolderLabel, FolderSep, type PlaceKind } from './FolderChoices'
 import { sidebarRowStyle } from './rowStyle'
+import { MenuItem } from '../WorkMenu'
+import { copyItem, menuOf, onContextMenuFor } from '../contextMenuFor'
 
 type Row = { key: string; path: string; label: string; kind?: PlaceKind }
 
@@ -94,6 +96,10 @@ export function FolderSidebar({
             tabIndex={narrow || myIndex === tabStop ? 0 : -1}
             title={r.path}
             onClick={() => onOpen(r.path)}
+            onContextMenu={onContextMenuFor(() => menuOf(
+              <MenuItem onClick={() => onOpen(r.path)}>{t('menu.open')}</MenuItem>,
+              copyItem(r.path, t('menu.copyPath')),
+            ))}
             className="press"
             style={sidebarRowStyle(narrow)}
           >

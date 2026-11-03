@@ -8,6 +8,8 @@ import { actions } from '../../lib/store'
 import { sessionWorkTitle } from '../../lib/workTitle'
 import { Group, RowLine } from './Bits'
 import { projName } from './helpers'
+import { MenuItem } from '../WorkMenu'
+import { copyItem, menuOf, onContextMenuFor } from '../contextMenuFor'
 
 /** onOpenDeleted: 지운 세션 결과를 누르면 세션을 여는 대신 읽기 전용 글로 본다. */
 export function SearchHits({ groups, onOpenDeleted }: { groups: ReadonlyArray<readonly [string, SearchHit[]]>; onOpenDeleted: (hit: SearchHit) => void }) {
@@ -55,12 +57,17 @@ export function DeletedBadge() {
 function HitRow({ hit, onOpenDeleted }: { hit: SearchHit; onOpenDeleted: (hit: SearchHit) => void }) {
   const t = useT()
   const tool = hit.role === 'tool'
+  const open = () => (hit.deleted ? onOpenDeleted(hit) : actions.openSessionAt(hit.sessionId, hit.seq, hit))
   const who = t(hit.role === 'user' ? 'brain.role.user' : hit.role === 'tool' ? 'brain.role.tool' : 'brain.role.assistant')
   return (
     <button
       type="button"
       className="press"
-      onClick={() => (hit.deleted ? onOpenDeleted(hit) : actions.openSessionAt(hit.sessionId, hit.seq, hit))}
+      onClick={open}
+      onContextMenu={onContextMenuFor(() => menuOf(
+        <MenuItem onClick={open}>{t('menu.openHere')}</MenuItem>,
+        copyItem(splitHighlight(hit.snippet).map((seg) => seg.text).join(''), t('menu.copyPreview')),
+      ))}
       style={{ display: 'flex', alignItems: 'flex-start', gap: 8, width: '100%', minHeight: 44, padding: '10px 12px 12px 16px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>

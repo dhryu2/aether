@@ -6,7 +6,8 @@ import { Check, ChevronDown, SquareTerminal, X } from 'lucide-react'
 import { toolPath, toolResultMeta } from '../../lib/format'
 import type { ToolResultView } from '../../lib/agentEvents'
 import { useExitAnim } from '../../lib/hooks'
-import { useT } from '../../lib/i18n'
+import { t as tNow, useT } from '../../lib/i18n'
+import { onCopyMenu } from '../contextMenuFor'
 import { C, MS, R } from '../../design/tokens'
 
 /** 도구 런에 담기는 호출 하나. `key`는 리스트 렌더용 안정 식별자다. */
@@ -42,6 +43,7 @@ export function ToolChip({
     <div
       className={['self-start tool-chip flex items-center', className].filter(Boolean).join(' ')}
       style={{ width: '100%', maxWidth: '88%', padding: '10px 12px', gap: 8, ...style }}
+      onContextMenu={onCopyMenu(path, tNow('menu.copy'))}
     >
       <span className="font-mono" style={{ fontSize: 12, fontWeight: 600, color: col.c, background: col.bg, borderRadius: 6, padding: '2px 7px', flexShrink: 0 }}>
         {name}
@@ -114,7 +116,7 @@ function LiveRun({ tools, errCount }: { tools: ToolEntry[]; errCount: number }) 
   const last = tools[tools.length - 1]
   const lastPath = toolPath(last.input)
   return (
-    <div className="self-start font-mono inline-flex items-center" style={{ fontSize: 12, color: C.label3, gap: 7, padding: '2px 2px' }}>
+    <div className="self-start font-mono inline-flex items-center" style={{ fontSize: 12, color: C.label3, gap: 7, padding: '2px 2px' }} onContextMenu={onCopyMenu(lastPath, tNow('menu.copy'))}>
       <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.tintFill, flexShrink: 0 }} />
       <span style={{ color: C.label2, fontWeight: 600, flexShrink: 0 }}>{last.name}</span>
       {lastPath && (

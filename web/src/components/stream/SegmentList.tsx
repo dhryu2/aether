@@ -12,7 +12,7 @@ import { QuestionCard } from '../QuestionCard'
 import { QuestionnaireCard, QuestionnairePendingCard } from '../QuestionnaireCard'
 import { AuthExpiredBanner, CommandOperationBanner, NoticeBanner } from './Banners'
 import { AssistantBubble, ChoiceBubble, UserBubble } from './Bubbles'
-import { ResponseCopy } from './ResponseCopy'
+import { ResponseCopy, answerContextMenu } from './ResponseCopy'
 import { ResponseHandoff } from './ResponseHandoff'
 import { lastAnswerIndex } from '../../lib/handoff'
 import { PlanNote } from './PlanNote'
@@ -127,15 +127,18 @@ export function SegmentList({
         const sq = seg.seq
         const flash = flashSeq === sq ? ' seg-flash' : ''
         const enter = sq > base.seq && !base.keys.has(seg.key) ? 'msg-in ' : ''
-        if (seg.kind === 'text')
+        if (seg.kind === 'text') {
+          // 답이 흘러나오는 중(마지막 조각이 쓰이는 동안)에는 우클릭 메뉴를 만들지 않는다.
+          const menu = running && i === segs.length - 1 ? undefined : answerContextMenu(seg.text, sessionId, i === handoffAt)
           return (
             <div key={seg.key} data-seq={sq} data-seg="text" className={enter + 'self-start' + flash} style={{ display: 'contents' }}>
-              <AssistantBubble>
+              <AssistantBubble onContextMenu={menu}>
                 <Markdown size={15.5}>{seg.text}</Markdown>
-                <ResponseCopy text={seg.text}>{i === handoffAt && <ResponseHandoff sessionId={sessionId} />}</ResponseCopy>
+                <ResponseCopy text={seg.text} menu={menu}>{i === handoffAt && <ResponseHandoff sessionId={sessionId} />}</ResponseCopy>
               </AssistantBubble>
             </div>
           )
+        }
         if (seg.kind === 'tools')
           return (
             <div key={seg.key} data-seq={sq} data-seg="tools" className={enter + 'flex flex-col self-stretch' + flash} style={{ gap: 14 }}>

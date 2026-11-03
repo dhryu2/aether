@@ -2,6 +2,7 @@
 //   두 칩은 모양이 사실상 같았다(같은 여백·모서리·배경, 테두리 색과 글자 크기만 다름) → AttachChip 하나로 모았다.
 import type { ImageAttachment, DocAttachment } from '../../lib/types'
 import { useT } from '../../lib/i18n'
+import { onCopyMenu } from '../contextMenuFor'
 import { C, R } from '../../design/tokens'
 import { ImageOff, FileText } from 'lucide-react'
 
@@ -18,7 +19,8 @@ function AttachRow({ children }: { children: React.ReactNode }) {
 }
 
 /** 첨부 한 개를 나타내는 칩. 비영속(stub)이면 테두리가 점선이다. */
-function AttachChip({ dashed, borderColor, fontSize, color, title, fill, children }: {
+function AttachChip({ dashed, borderColor, fontSize, color, title, fill, onContextMenu, children }: {
+  onContextMenu?: (e: React.MouseEvent<HTMLElement>) => void
   dashed?: boolean
   borderColor: string
   fontSize: number
@@ -42,6 +44,7 @@ function AttachChip({ dashed, borderColor, fontSize, color, title, fill, childre
         color,
       }}
       title={title}
+      onContextMenu={onContextMenu}
     >
       {children}
     </div>
@@ -87,6 +90,7 @@ export function DocChips({ documents }: { documents: DocAttachment[] }) {
             fontSize={12}
             color={C.label2}
             title={stub ? t('stream.attachment.docEphemeral') : d.name}
+            onContextMenu={onCopyMenu(d.name, t('menu.copyFileName'))}
           >
             <FileText size={14} style={{ color: C.del, flexShrink: 0 }} />
             <span className="truncate" style={{ fontWeight: 600 }}>{d.name}</span>

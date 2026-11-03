@@ -15,7 +15,8 @@ import { FindBar } from '../FindBar'
 import { Tag } from '../TopBar'
 import { TodoChip } from '../TodoChip'
 import { AutoResumeChip } from '../AutoResumeChip'
-import { PaneMenu } from './PaneMenu'
+import { PaneMenu, PaneMenuItems } from './PaneMenu'
+import { onContextMenuFor } from '../contextMenuFor'
 import { C, R } from '../../design/tokens'
 
 export function ConversationPane({
@@ -110,6 +111,10 @@ export function ConversationPane({
       {showHead && (
         <div
           className="flex min-w-0 items-center"
+          // 칸 머리에만 건다(본문 전체가 아니다). 칸 메뉴와 같은 항목이다.
+          onContextMenu={onContextMenuFor(() => (
+            <PaneMenuItems sessionId={sessionId} visibleIds={visibleIds} zoomed={zoomed} onClose={onClose} close={actions.closeContextMenu} />
+          ))}
           style={{
             flexShrink: 0,
             gap: 8,

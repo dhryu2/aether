@@ -8,6 +8,7 @@ import { actions, useStore } from '../../lib/store'
 import { useT } from '../../lib/i18n'
 import { IconButton } from '../ui'
 import { topBarInset } from '../topBarInset'
+import { onCopyMenu } from '../contextMenuFor'
 import { C, MS, Z } from '../../design/tokens'
 
 const SHOW_MS = { notice: 6_000, error: 30_000 } as const
@@ -71,6 +72,8 @@ function Toast({ kind, seq, icon, iconColor, title, message, action, onDone }: {
   onDone: () => void
 }) {
   const t = useT()
+  // 우클릭 메뉴(문구 복사)가 떠 있는 동안은 저절로 사라지지 않는다. 메뉴를 닫으면 남은 시간부터 다시 센다.
+  const menuOpen = useStore().contextMenu != null
   const [hover, setHover] = useState(false)
   const [focus, setFocus] = useState(false)
   const [leaving, setLeaving] = useState(false)
@@ -87,14 +90,14 @@ function Toast({ kind, seq, icon, iconColor, title, message, action, onDone }: {
   }
 
   useEffect(() => {
-    if (hover || focus || leaving) return
+    if (hover || focus || leaving || menuOpen) return
     const started = Date.now()
     const id = window.setTimeout(() => setLeaving(true), remaining.current)
     return () => {
       window.clearTimeout(id)
       remaining.current = Math.max(0, remaining.current - (Date.now() - started))
     }
-  }, [hover, focus, leaving])
+  }, [hover, focus, leaving, menuOpen])
 
   useEffect(() => {
     if (!leaving) return
@@ -111,6 +114,7 @@ function Toast({ kind, seq, icon, iconColor, title, message, action, onDone }: {
       // 오류는 곧바로 읽어 주고, 일반 알림은 하던 말을 끝낸 뒤 읽어 준다.
       role={kind === 'error' ? 'alert' : 'status'}
       className={`popover-surface ${leaving ? 'toast-out' : 'toast-in'}`}
+      onContextMenu={onCopyMenu(message ? `${title}\n${message}` : title, t('menu.copyText'))}
       onPointerEnter={() => setHover(true)}
       onPointerLeave={() => setHover(false)}
       onFocus={() => setFocus(true)}

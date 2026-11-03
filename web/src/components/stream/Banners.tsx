@@ -4,7 +4,8 @@
 import { memo, type ReactNode } from 'react'
 import { ArrowLeftRight, Check, History, KeyRound, Square, TriangleAlert, X } from 'lucide-react'
 import type { BannerVariant } from '../../lib/streamSegments'
-import { useT } from '../../lib/i18n'
+import { t as tNow, useT } from '../../lib/i18n'
+import { onCopyMenu } from '../contextMenuFor'
 import { C } from '../../design/tokens'
 import { RecordLine, Spinner } from '../ui'
 
@@ -14,7 +15,11 @@ import { RecordLine, Spinner } from '../ui'
  */
 function NoticeLine({ icon, iconColor, strong, children, action }: { icon: ReactNode; iconColor: string; strong?: boolean; children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex items-start" style={{ alignSelf: 'stretch', gap: 8, fontSize: 13.5, lineHeight: 1.5, color: strong ? C.label : C.label2 }}>
+    <div
+      className="flex items-start"
+      style={{ alignSelf: 'stretch', gap: 8, fontSize: 13.5, lineHeight: 1.5, color: strong ? C.label : C.label2 }}
+      onContextMenu={typeof children === 'string' ? onCopyMenu(children, tNow('menu.copyText')) : undefined}
+    >
       <span className="inline-flex" style={{ color: iconColor, flexShrink: 0, marginTop: 3 }}>
         {icon}
       </span>
@@ -60,7 +65,7 @@ const NOTICE: Record<BannerVariant, NoticeLook> = {
 
 export const NoticeBanner = memo(function NoticeBanner({ variant, text }: { variant: BannerVariant; text: string }) {
   const n = NOTICE[variant]
-  if (n.kind === 'record') return <RecordLine icon={<History size={12} style={{ flexShrink: 0 }} />}>{text}</RecordLine>
+  if (n.kind === 'record') return <RecordLine icon={<History size={12} style={{ flexShrink: 0 }} />} onContextMenu={onCopyMenu(text, tNow('menu.copyText'))}>{text}</RecordLine>
   return (
     <NoticeLine icon={n.icon} iconColor={n.iconColor} strong={n.strong}>
       {text}

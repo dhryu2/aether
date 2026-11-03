@@ -12,6 +12,8 @@
 import { useState, type CSSProperties, type ReactNode, type Ref } from 'react'
 import { C, R, alpha } from '../../design/tokens'
 import { useStore } from '../../lib/store'
+import { t as tNow } from '../../lib/i18n'
+import { onCopyMenu } from '../contextMenuFor'
 import { IconTile } from '../ui'
 
 /**
@@ -79,7 +81,13 @@ export function ActionCardTitle({ title, sub, subMono, subTitle }: { title: Reac
     <div className="min-w-0 flex-1">
       <div style={{ fontSize: 16, fontWeight: 600, color: C.label, letterSpacing: '-0.01em' }}>{title}</div>
       {sub != null && sub !== '' && (
-        <div className={subMono ? 'font-mono truncate' : 'truncate'} style={{ fontSize: subMono ? 12 : 12.5, color: C.label2, marginTop: 1 }} title={subTitle}>
+        <div
+          className={subMono ? 'font-mono truncate' : 'truncate'}
+          style={{ fontSize: subMono ? 12 : 12.5, color: C.label2, marginTop: 1 }}
+          title={subTitle}
+          // 경로·명령 같은 기계 문자열 줄만 복사 메뉴가 있다. 허용·거부는 메뉴에 넣지 않는다(실수로 승인하지 않게).
+          onContextMenu={subMono ? onCopyMenu(subTitle ?? (typeof sub === 'string' ? sub : null), tNow('menu.copy')) : undefined}
+        >
           {sub}
         </div>
       )}

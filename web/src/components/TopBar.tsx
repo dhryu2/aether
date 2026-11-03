@@ -25,6 +25,9 @@ import { ModelPicker } from './ModelPicker'
 import { EffortPicker } from './EffortPicker'
 import { PermissionPicker } from './PermissionPicker'
 import { AttentionDot, IconButton, PopoverSurface } from './ui'
+import { MenuItem } from './WorkMenu'
+import { sessionContextMenu } from './sessionMenu'
+import { copyItem, menuOf, onContextMenuFor } from './contextMenuFor'
 import { C, R, Z } from '../design/tokens'
 import type { WorkspaceRoom } from '../lib/types'
 
@@ -72,6 +75,7 @@ export function HandChip({ inSidebar }: { inSidebar?: boolean }) {
         <div
           key={row.id}
           className="flex w-full items-start"
+          onContextMenu={sessionContextMenu(row, row.attention === 'waiting' || row.attention === 'running' || row.attention === 'background')}
           style={{
             gap: 8,
             padding: '10px 12px',
@@ -178,6 +182,8 @@ export function TopBar() {
   const narrow = s.isNarrow
   const hiddenPanes = s.isWide ? hiddenPaneIds(s.activeId, s.sideIds, visibleCapacity(s.isWide, s.paneW, s.paneH)) : []
   const hasTitle = !!(activeRoom || a)
+  const title = activeRoom?.title || sessionWorkTitle(active ?? { displayName: '' }, t('nav.session.untitled'))
+  const cwd = a?.cwd ?? activeRoom?.cwd ?? ''
   const hand = s.presenceLive && inboxRows(s.rooms).length > 0
   const convo = chromeId ? s.convos[chromeId] : undefined
   const loading = convoLoading(s)
@@ -220,9 +226,15 @@ export function TopBar() {
                 padding: narrow ? '0 16px 0 14px' : '0 20px 0 18px',
                 maxWidth: narrow ? undefined : 520,
               }}
+              onContextMenu={onContextMenuFor(() => menuOf(
+                copyItem(title, t('menu.copyTitle')),
+                copyItem(cwd, t('menu.copyFolderPath')),
+                <MenuItem onClick={() => actions.toggleFind()}>{t('nav.topbar.findInSession')}</MenuItem>,
+                chromeId && <MenuItem onClick={() => void actions.exportTranscript(chromeId)}>{t('nav.topbar.export')}</MenuItem>,
+              ))}
             >
               <div className="truncate" style={{ fontSize: narrow ? 14.5 : 15, fontWeight: 600, letterSpacing: '-0.01em', color: C.label, lineHeight: 1.3 }}>
-                {activeRoom?.title || sessionWorkTitle(active ?? { displayName: '' }, t('nav.session.untitled'))}
+                {title}
               </div>
               <div className="flex min-w-0 items-center" style={{ gap: 8, fontSize: 12, color: C.label2, lineHeight: 1.35, whiteSpace: 'nowrap', overflow: 'hidden' }}>
                 <ConnectionIndicator state={s.conn} compact={narrow} />

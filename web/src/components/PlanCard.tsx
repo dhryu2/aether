@@ -8,6 +8,7 @@ import { C, R } from '../design/tokens'
 import { Button } from './ui'
 import { ActionCard, ActionCardActions, ActionCardFooter, ActionCardHeader, ActionCardTitle } from './stream/ActionCard'
 import { Markdown } from './Markdown'
+import { onCopyMenu } from './contextMenuFor'
 
 export function PlanCard({ req, resolved }: { req: PlanRequest; resolved?: 'approve' | 'revise' | 'cancel' }) {
   const t = useT()
@@ -26,6 +27,7 @@ export function PlanCard({ req, resolved }: { req: PlanRequest; resolved?: 'appr
 
       <div
         className="scroll-area"
+        onContextMenu={onCopyMenu(req.text.trim() ? req.text : null, t('menu.copyPlan'))}
         style={{
           fontSize: 14,
           color: C.label,

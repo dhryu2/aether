@@ -1,9 +1,10 @@
 // 새 작업 창의 묶음. 설정 창과 같은 제목, 면, 구분선, 스위치 줄.
-import { useRef, type KeyboardEvent } from 'react'
-import { Check } from 'lucide-react'
-import type { ProviderInfo } from '../../lib/types'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { Check, ChevronsUpDown } from 'lucide-react'
+import type { ModelInfo, ProviderInfo } from '../../lib/types'
 import { C } from '../../design/tokens'
-import { Switch } from '../ui'
+import { useDismiss } from '../../lib/hooks'
+import { PopoverSurface, Switch } from '../ui'
 import { Group, Sep } from '../settings/parts'
 import { rowMin, useNarrow } from '../settings/settingsLayout'
 
@@ -160,6 +161,150 @@ export function ServiceBlock({
         sessionOpt="fanout-start"
       />
     </Group>
+  )
+}
+
+// 고르면 값이 줄에 남는 팝업 단추. 목록은 세션 안 모델 칩과 같은 떠 있는 면에 그린다.
+// 저장된 목록이 없어도 잠그지 않고, 열어서 기본 모델과 왜 목록이 없는지를 보여 준다.
+export function ModelBlock({
+  label,
+  defaultLabel,
+  emptyNote,
+  rows,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string
+  defaultLabel: string
+  emptyNote: string
+  rows: ModelInfo[]
+  /** 고른 모델. 빈 값은 기본 모델이다. */
+  value: string
+  disabled: boolean
+  onChange: (value: string) => void
+}) {
+  const narrow = useNarrow()
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  useDismiss(wrapRef, () => setOpen(false), open)
+  const options = [{ value: '', displayName: defaultLabel }, ...rows]
+  const picked = options.find((o) => o.value === value) ?? options[0]
+
+  // 열면 고른 줄로 초점을 옮기고, 창 스크롤 안에 목록이 다 보이게 한다.
+  useEffect(() => {
+    if (!open) return
+    listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus({ preventScroll: true })
+    listRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [open])
+
+  function close() {
+    setOpen(false)
+    triggerRef.current?.focus()
+  }
+
+  function onKey(e: KeyboardEvent<HTMLDivElement>) {
+    if (!open) return
+    if (e.key === 'Escape') {
+      // 뒤의 새 세션 창까지 닫히지 않게 여기서 멈춘다.
+      e.stopPropagation()
+      close()
+      return
+    }
+    if (e.key === 'Tab') {
+      setOpen(false)
+      return
+    }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    e.preventDefault()
+    const items = [...(listRef.current?.querySelectorAll<HTMLElement>('[role="option"]') ?? [])]
+    const at = items.indexOf(document.activeElement as HTMLElement)
+    items[(at + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus()
+  }
+
+  return (
+    <div ref={wrapRef} onKeyDown={onKey} style={{ position: 'relative', background: C.cell, borderRadius: 12 }}>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={disabled}
+        data-session-opt="new-session-model"
+        onClick={() => setOpen((o) => !o)}
+        className="press"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          width: '100%',
+          minHeight: rowMin(narrow),
+          padding: '0 16px',
+          border: 'none',
+          borderRadius: 12,
+          background: 'transparent',
+          cursor: disabled ? 'default' : 'pointer',
+          textAlign: 'left',
+          font: 'inherit',
+          fontSize: 15,
+          color: C.label,
+        }}
+      >
+        <span style={{ flexShrink: 0 }}>{label}</span>
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', color: C.label2 }}>{picked.displayName}</span>
+        <ChevronsUpDown aria-hidden size={14} style={{ flexShrink: 0, color: C.label3 }} />
+      </button>
+      {open && (
+        <PopoverSurface
+          align="right"
+          style={{ width: narrow ? '100%' : 300, maxWidth: '100%', maxHeight: 300, overflowY: 'auto', scrollMarginBlock: 88 }}
+        >
+          <div ref={listRef} role="listbox" aria-label={label}>
+            {options.map((o) => {
+              const on = o.value === picked.value
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  role="option"
+                  aria-selected={on}
+                  data-model-value={o.value}
+                  onClick={() => { onChange(o.value); close() }}
+                  className="press"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    width: '100%',
+                    minHeight: narrow ? rowMin(narrow) : 40,
+                    padding: '0 16px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    font: 'inherit',
+                    fontSize: 15,
+                    color: C.label,
+                  }}
+                >
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.displayName}</span>
+                  {on && (
+                    <span aria-hidden style={{ color: C.tint, display: 'inline-flex', flexShrink: 0 }}>
+                      <Check size={16} />
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+            {rows.length === 0 && (
+              <p style={{ fontSize: 13, color: C.label2, lineHeight: 1.45, margin: 0, padding: '4px 16px 12px' }}>{emptyNote}</p>
+            )}
+          </div>
+        </PopoverSurface>
+      )}
+    </div>
   )
 }
 

@@ -286,6 +286,7 @@ a,
   color: var(--c-label4);
 }
 /* 새 작업 창의 폴더 줄. 묶음 면 안에서 초점 테두리를 안쪽에 긋고, 마우스를 올리면 옅은 회색 면이 생긴다. */
+[data-model-value]:focus-visible,
 [data-folder-rel]:focus-visible,
 [data-folder-place]:focus-visible,
 [data-folder-browse]:focus-visible {

@@ -38,10 +38,9 @@ export const session: Dict = {
   },
   'session.newSession.modelLabel': { ko: '모델', en: 'Model' },
   'session.newSession.modelDefault': { ko: '기본 모델', en: 'Default model' },
-  'session.newSession.modelHint': { ko: '세션 안에서도 모델 칩으로 바꿀 수 있어요.', en: 'You can also change it from the model chip inside the session.' },
-  'session.newSession.modelHintEmpty': {
-    ko: '이 서비스는 아직 저장된 모델 목록이 없어요. 기본 모델로 시작한 뒤 세션 안에서 고를 수 있어요.',
-    en: 'No saved model list for this service yet. Start with the default model and choose one inside the session.',
+  'session.newSession.modelEmpty': {
+    ko: '이 서비스로 세션을 한 번 시작하면 고를 수 있는 모델이 여기에 나타나요.',
+    en: 'Models you can choose appear here after you start a session with this service once.',
   },
   'session.newSession.creating': { ko: '만드는 중', en: 'Creating' },
   'session.newSession.start': { ko: '세션 시작', en: 'Start work' },

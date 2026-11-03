@@ -2,7 +2,6 @@
 // 모델 목록은 창을 열 때 저장본을 한 번 받는다. 서비스를 바꿔 눌러도 요청이나 프로그램 실행이 늘지 않는다.
 // 폴더는 최근 폴더를 바로 고르고, 다른 폴더는 같은 창 안의 탐색 화면으로 넘어가 고른다.
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { actions, defaultNewSessionProvider, getState, newSessionFolderCandidates, useStore } from '../lib/store'
 import { recentFolders } from '../lib/sessionGroups'
@@ -18,7 +17,7 @@ import { FolderChoices } from './folderPicker/FolderChoices'
 import { FolderExplorer } from './folderPicker/FolderExplorer'
 import { isWideFolder, seedFolder } from './folderPicker/explorerModel'
 import { useFolderBrowser } from './folderPicker/useFolderBrowser'
-import { SafetyBlock, ServiceBlock } from './newSession/blocks'
+import { ModelBlock, SafetyBlock, ServiceBlock } from './newSession/blocks'
 import { fieldStyle } from './newSession/fieldStyle'
 
 const RECENT_FOLDERS = 4
@@ -148,6 +147,19 @@ function NewSessionWindow() {
   const modelRows = (chosen && rememberedModels[chosen.id]) || []
   // 고른 서비스가 쓸 수 없게 바뀌어 다른 서비스로 넘어가면 그 목록에 없는 값은 기본 모델로 돌아간다.
   const pickedModel = modelRows.some((m) => m.value === model) ? model : ''
+
+  // 여러 AI로 동시에 시작하면 각자 기본 모델로 시작하므로 고를 칸이 없다.
+  const modelBlock = !fanout && chosen ? (
+    <ModelBlock
+      label={t('session.newSession.modelLabel')}
+      defaultLabel={t('session.newSession.modelDefault')}
+      emptyNote={t('session.newSession.modelEmpty')}
+      rows={modelRows}
+      value={pickedModel}
+      disabled={creating}
+      onChange={setModel}
+    />
+  ) : null
 
   const onProvider = (id: string) => (fanout ? pickedProviders.includes(id) : id === chosen?.id)
   const rootFailed = browser.placesFailed
@@ -314,11 +326,14 @@ function NewSessionWindow() {
                   onFanout={setFanoutMode}
                   unavailable={unavailable}
                 />
+                {modelBlock && <div style={{ marginTop: 8 }}>{modelBlock}</div>}
                 <p style={{ fontSize: 13, color: C.label2, lineHeight: 1.45, margin: '8px 0 0', padding: '0 16px' }}>
                   {t('session.newSession.providerHint')}
                 </p>
               </section>
             )}
+
+            {providers.length <= 1 && modelBlock && <section>{modelBlock}</section>}
 
             {view.notice === 'noProvider' && (
               <p role="status" data-session-opt="no-provider" style={{ fontSize: 13, color: C.del, lineHeight: 1.45, margin: 0, padding: '0 16px' }}>
@@ -354,30 +369,6 @@ function NewSessionWindow() {
                   rows={3}
                   style={{ ...fieldStyle(), minHeight: 88, padding: '12px 16px', resize: 'vertical', lineHeight: 1.45 }}
                 />
-              </section>
-            )}
-
-            {!fanout && chosen && (
-              <section>
-                <GroupTitle>{t('session.newSession.modelLabel')}</GroupTitle>
-                <span style={{ position: 'relative', display: 'block' }}>
-                  <select
-                    className="sheet-field"
-                    aria-label={t('session.newSession.modelLabel')}
-                    data-session-opt="new-session-model"
-                    value={pickedModel}
-                    onChange={(e) => setModel(e.target.value)}
-                    disabled={creating || modelRows.length === 0}
-                    style={{ ...fieldStyle(), height: narrow ? 50 : 44, padding: '0 40px 0 16px', appearance: 'none', cursor: modelRows.length ? 'pointer' : 'default' }}
-                  >
-                    <option value="">{t('session.newSession.modelDefault')}</option>
-                    {modelRows.map((m) => <option key={m.value} value={m.value}>{m.displayName}</option>)}
-                  </select>
-                  {modelRows.length > 0 && <ChevronDown aria-hidden size={16} style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: C.label3 }} />}
-                </span>
-                <p style={{ fontSize: 13, color: C.label2, lineHeight: 1.45, margin: '8px 0 0', padding: '0 16px' }}>
-                  {t(modelRows.length ? 'session.newSession.modelHint' : 'session.newSession.modelHintEmpty')}
-                </p>
               </section>
             )}
 

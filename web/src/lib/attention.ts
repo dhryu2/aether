@@ -70,6 +70,7 @@ export function parsePresenceSession(raw: unknown): PresenceSession | null {
   if (typeof o.preview === 'string') out.preview = o.preview
   if (typeof o.lastViewedAt === 'number') out.lastViewedAt = o.lastViewedAt
   if (typeof o.archivedAt === 'number') out.archivedAt = o.archivedAt
+  if (typeof o.observedEffort === 'string' && o.observedEffort) out.observedEffort = o.observedEffort
   const tasks = parseBackgroundTasks(o.backgroundTasks)
   if (tasks) out.backgroundTasks = tasks
   if (typeof o.backgroundCanStop === 'boolean') out.backgroundCanStop = o.backgroundCanStop

@@ -1424,6 +1424,7 @@ class SessionManager {
       preview: item.preview,
       status: item.status,
       lastViewedAt: item.lastViewedAt,
+      observedEffort: item.observedEffort,
       archivedAt: item.archivedAt,
       ...autoResumeField(item.autoResume),
       ...handoffField(item),

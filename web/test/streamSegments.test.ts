@@ -138,8 +138,8 @@ eq('인증 만료 안내에 이 세션의 서비스 이름이 들어간다', seg
 const banners = built.segs.filter((s) => s.kind === 'banner') as Extract<StreamSeg, { kind: 'banner' }>[]
 const bannerTexts = banners.map((b) => b.text)
 check(
-  '한도 경고 배너에 종류·사용률·리셋이 들어간다',
-  bannerTexts.some((x) => x.includes('stream.rateLimit.warning') && x.includes('weekly 87%') && x.includes('stream.reset')),
+  '한도 임박 경고는 대화 배너로 내지 않는다',
+  !bannerTexts.some((x) => x.includes('weekly 87%')),
   bannerTexts,
 )
 check('자동 압축은 배너로 알린다', bannerTexts.filter((x) => x === 'stream.notice.compacted').length === 1, bannerTexts)
@@ -310,11 +310,12 @@ eq('찾기 대상은 사람 입력·작업 중 알림·최종 답변', done.sear
 eq('진행 중에도 화면에 보이는 말은 전부 찾힌다', running.searchable.map((x) => x.text), ['고쳐줘', '2번 파일도', '다 고쳤습니다'])
 check('찾기 대상은 조각의 점프 좌표를 그대로 쓴다', done.searchable.every((x) => done.segs.some((s) => s.seq === x.seq)))
 
-// ── 한도 경고 스팸 억제: 같은 심각도는 마지막 1건만 ──
+// ── 한도 배너: 경고와 정보성은 없고, 막힘은 마지막 1건만 ──
 const spam = buildStreamSegments({
   items: [
-    foreign([{ type: 'provider_notice', kind: 'rate_limit', severity: 'warn', utilization: 0.5 }]),
+    foreign([{ type: 'provider_notice', kind: 'rate_limit', severity: 'blocked', utilization: 0.5 }]),
     foreign([{ type: 'provider_notice', kind: 'rate_limit', severity: 'warn', utilization: 0.9 }]),
+    foreign([{ type: 'provider_notice', kind: 'rate_limit', severity: 'blocked', utilization: 1 }]),
     foreign([{ type: 'provider_notice', kind: 'rate_limit' }]), // severity 없음 = 정보성
   ],
   turn: 'idle',
@@ -322,8 +323,9 @@ const spam = buildStreamSegments({
   answers: {},
   t,
 })
-eq('같은 심각도 경고는 마지막 1건만 + 정보성은 배너 없음', spam.segs.map((s) => (s.kind === 'banner' ? s.text : s.kind)).filter((x) => String(x).includes('90%')).length, 1)
-eq('경고 배너 총 1개', spam.segs.filter((s) => s.kind === 'banner').length, 1)
+eq('경고·정보성은 배너 없음, 막힘은 마지막 1건만', spam.segs.map((s) => (s.kind === 'banner' ? s.text : s.kind)).filter((x) => String(x).includes('stream.rateLimit.rejected')).length, 1)
+check('남은 배너는 마지막 막힘의 사용률이다', spam.segs.some((s) => s.kind === 'banner' && s.text.includes('100%')))
+eq('한도 배너 총 1개', spam.segs.filter((s) => s.kind === 'banner').length, 1)
 
 // ── 빈 세션 판정: 배너만 있으면 대화 없음 ──
 const bannerOnly = buildStreamSegments({ items: [own({ kind: 'notice', notice: 'resumed' }), own({ kind: 'status', status: 'crashed' })], turn: 'idle', providerName: 'MockProvider', answers: {}, t })

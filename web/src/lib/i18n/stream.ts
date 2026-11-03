@@ -20,10 +20,6 @@ export const stream: Dict = {
     ko: '사용 한도 도달 ({meta}). 잠시 후 다시 시도하거나 /model로 더 가벼운 모델로 바꾸세요.',
     en: 'Rate limit reached ({meta}). Retry shortly or switch to a lighter model with /model.',
   },
-  'stream.rateLimit.warning': {
-    ko: '사용 한도에 가까워요 ({meta}). 계속 진행되지만 곧 제한될 수 있어요. /model로 더 가벼운 모델을 권장해요.',
-    en: 'Rate limit approaching ({meta}). Still working, but may be limited soon. Consider a lighter model with /model.',
-  },
 
   // 리셋 시각
   'stream.reset.minutes': { ko: '~{min}분 후 초기화', en: 'Resets in ~{min}m' },

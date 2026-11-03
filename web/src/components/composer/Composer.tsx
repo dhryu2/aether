@@ -30,6 +30,7 @@ import { MAX_ATTACH, parseFiles, type Attachment } from '../../lib/attachments'
 import { buildSlashCmds, parseSlashCommand, withBriefAlias, type SlashCmd } from '../../lib/slashCommands'
 import { ctxOf } from '../ctxOf'
 import { UsageChip } from '../UsageChip'
+import { LimitChip } from './LimitChip'
 import { ModelPicker } from '../ModelPicker'
 import { EffortPicker } from '../EffortPicker'
 import { PermissionPicker } from '../PermissionPicker'
@@ -668,6 +669,7 @@ export function Composer({ sessionId }: { sessionId: string }) {
                   )}
                 </>
               )}
+              {active && <LimitChip sessionId={execId} busy={busy} hideCalm={split && paneW < USAGE_MIN_W} />}
               <div
                 className="flex-1 self-stretch"
                 style={{ cursor: 'text' }}

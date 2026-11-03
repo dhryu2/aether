@@ -10,7 +10,7 @@
  * ③ **모르면 지어내지 않는다.** 이름도 길이도 모르면 받은 이름을 그대로 보여준다 — 표에 없다는 이유로
  *    화면에서 정보가 사라지면 새 창이 생겼을 때 아무도 모르게 된다.
  */
-import { rateLimitLabel } from '../src/lib/usageLabels'
+import { fullestWindow, rateLimitLabel } from '../src/lib/usageLabels'
 
 let pass = 0
 let fail = 0
@@ -39,6 +39,12 @@ eq('딱 안 떨어지면 시간으로 반올림', rateLimitLabel('codex_primary'
 eq('길이를 모르면 받은 이름 그대로', rateLimitLabel('brand_new_window', t), 'brand_new_window')
 eq('이름도 없으면 일반 문구', rateLimitLabel(undefined, t), 'stream.rateLimit.default')
 eq('길이가 0이면 지어내지 않는다', rateLimitLabel('brand_new_window', t, 0), 'brand_new_window')
+
+// 입력창 표시는 가장 많이 찬 창 하나만 고른다
+eq('창이 없으면 null', fullestWindow([]), null)
+eq('사용률을 모르는 창뿐이면 null', fullestWindow([{ utilization: null }]), null)
+eq('가장 많이 찬 창', fullestWindow([{ key: 'a', utilization: 38 }, { key: 'b', utilization: null }, { key: 'c', utilization: 81 }])?.key, 'c')
+eq('0%도 값이다', fullestWindow([{ key: 'a', utilization: 0 }])?.key, 'a')
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} usageLabels: ${pass} PASS / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

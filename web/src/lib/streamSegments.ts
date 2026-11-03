@@ -174,9 +174,8 @@ export function buildStreamSegments({ items, turn, providerName, answers, t, vie
     }
   }
 
-  // 레이트리밋 배너 스팸 방지: 같은 심각도는 *마지막 1건만* 렌더. 매 행동마다 경고가 와서 배너가 수십 개
-  //   쌓이던 것을 막는다 — 최신 사용률만 보이면 충분. 사전 스캔으로 마지막 seq를 구해 그 이벤트에서만 push.
-  let lastWarnSeq = -1
+  // 막힘 배너는 *마지막 1건만* 렌더. 사전 스캔으로 마지막 seq를 구해 그 이벤트에서만 push.
+  //   한도 임박 경고는 대화에 넣지 않는다. 사용률은 입력창의 LimitChip이 계속 보여 준다.
   let lastBlockedSeq = -1
   // 참딩 "놀람" 몸짓의 트리거 — provider가 모델을 강제로 바꾼 사건의 마지막 seq.
   let lastModelFallbackSeq = -1
@@ -184,8 +183,7 @@ export function buildStreamSegments({ items, turn, providerName, answers, t, vie
     for (const ae of agentEventsOf(it) ?? []) {
       if (ae.type === 'provider_notice' && ae.kind === 'model_fallback') lastModelFallbackSeq = it.seq
       if (ae.type !== 'provider_notice' || ae.kind !== 'rate_limit') continue
-      if (ae.severity === 'warn') lastWarnSeq = it.seq
-      else if (ae.severity === 'blocked') lastBlockedSeq = it.seq
+      if (ae.severity === 'blocked') lastBlockedSeq = it.seq
     }
   }
 
@@ -489,14 +487,10 @@ export function buildStreamSegments({ items, turn, providerName, answers, t, vie
         retry = null
       } else if (ae.type === 'provider_notice') {
         if (ae.kind === 'rate_limit') {
-          if (!ae.severity) continue // 정보성 — 배너 없음
+          if (ae.severity !== 'blocked' || it.seq !== lastBlockedSeq) continue
           const pct = ae.utilization != null ? ` ${Math.round(ae.utilization * 100)}%` : ''
           const meta = [`${rateLimitLabel(ae.limitType, t)}${pct}`, formatReset(ae.resetsAt, t, now)].filter(Boolean).join(' · ')
-          if (ae.severity === 'blocked' && it.seq === lastBlockedSeq) {
-            segs.push({ kind: 'banner', key: `rl-${it.seq}-${ae.part}`, seq: it.seq, convo: true, variant: 'stop', text: t('stream.rateLimit.rejected', { meta }) })
-          } else if (ae.severity === 'warn' && it.seq === lastWarnSeq) {
-            segs.push({ kind: 'banner', key: `rl-${it.seq}-${ae.part}`, seq: it.seq, convo: true, variant: 'warn', text: t('stream.rateLimit.warning', { meta }) })
-          }
+          segs.push({ kind: 'banner', key: `rl-${it.seq}-${ae.part}`, seq: it.seq, convo: true, variant: 'stop', text: t('stream.rateLimit.rejected', { meta }) })
         } else if (ae.kind === 'retry') {
           // segs.push 아님 = 히스토리에 안 쌓인다. 진행 중일 때만 꼬리에 표시.
           retry = { attempt: ae.attempt, max: ae.max, error: ae.detail }

@@ -44,3 +44,12 @@ export function rateLimitLabel(limitType: string | undefined, t: Translate, wind
       return limitType || t('stream.rateLimit.default')
   }
 }
+
+/** 가장 많이 찬 한도 창. 사용률을 아는 창이 없으면 null이다. */
+export function fullestWindow<W extends { utilization: number | null }>(windows: readonly W[]): W | null {
+  let top: W | null = null
+  for (const w of windows) {
+    if (w.utilization != null && (top?.utilization == null || w.utilization > top.utilization)) top = w
+  }
+  return top
+}

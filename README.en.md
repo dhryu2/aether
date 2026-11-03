@@ -30,7 +30,7 @@ Aether is an app you install on your own computer. Instead of watching a termina
 
 - **A chat window, not a terminal** — Files the AI read and commands it ran appear as cards.
 - **No account, on your own computer** — There is nothing to sign up for. Conversations are stored on your computer, and you can back them up and restore them in Settings.
-- **See what is waiting, at a glance** — The list shows which work is waiting for you and for how long.
+- **See how long work has waited** — The list shows which work is waiting for you and for how long.
 - **Several AIs, one window** — Choose the AI for each piece of work and keep several open side by side.
 
 ## <img src="web/src/assets/chamding-inspect.webp" alt="" height="30" align="top"> Screenshots

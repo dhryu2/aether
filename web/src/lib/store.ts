@@ -42,6 +42,7 @@ import {
   visibleSessionIds,
   zoomAfterChange,
 } from './splitPane'
+import { modelRowLabel } from './modelLabel'
 import { t } from './i18n'
 import { recoverAppViewport } from './appViewport'
 import { runUpdateNotice, UPDATE_SEEN_KEY } from './updateNotice'
@@ -728,7 +729,7 @@ export function currentModelRaw(s: State): string {
  */
 export function currentModel(s: State): string {
   const info = currentModelInfo(s)
-  if (info) return info.displayName
+  if (info) return modelRowLabel(info, s.availableModels ?? [])
   return currentModelRaw(s) || '—'
 }
 

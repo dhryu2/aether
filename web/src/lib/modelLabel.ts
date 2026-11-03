@@ -29,6 +29,13 @@ export function modelChipLabel(raw: string | undefined | null, models?: readonly
   return (hit?.displayName || name).trim()
 }
 
+/** 칩에 쓸 줄 이름. 계정 기본 줄은 같은 모델을 직접 가리키는 줄의 이름을 빌려 실제로 도는 모델을 보인다. */
+export function modelRowLabel(row: ModelNameRow, models: readonly ModelNameRow[]): string {
+  const resolved = row.isDefault ? row.resolvedModel?.toLowerCase() : undefined
+  const same = resolved && models.find((m) => !m.isDefault && m.resolvedModel?.toLowerCase() === resolved)
+  return (same || row).displayName
+}
+
 type SessionModelSource = {
   observedModel?: string
   model?: string

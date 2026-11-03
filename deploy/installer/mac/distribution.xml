@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Aether 설치 패키지 배포 정의. 버전 자리표시자는 빌드 스크립트가 채운다.
+     enable_currentUserHome과 auth="none": 관리자 암호 없이 사용자 홈(~/Applications/Aether) 아래에 설치한다. -->
+<installer-gui-script minSpecVersion="2">
+  <title>Aether</title>
+  <allowed-os-versions><os-version min="13.5"/></allowed-os-versions>
+  <options customize="never" require-scripts="false" hostArchitectures="arm64"/>
+  <domains enable_anywhere="false" enable_currentUserHome="true" enable_localSystem="false"/>
+  <choices-outline>
+    <line choice="default">
+      <line choice="com.aether.app"/>
+    </line>
+  </choices-outline>
+  <choice id="default"/>
+  <choice id="com.aether.app" visible="false">
+    <pkg-ref id="com.aether.app"/>
+  </choice>
+  <pkg-ref id="com.aether.app" version="__VERSION__" onConclusion="none" auth="none">Aether-component.pkg</pkg-ref>
+</installer-gui-script>

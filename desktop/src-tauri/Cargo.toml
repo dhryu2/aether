@@ -1,0 +1,28 @@
+[package]
+name = "aether-desktop"
+version = "0.1.0"
+description = "Aether macOS/Windows desktop shell"
+authors = ["aether"]
+edition = "2021"
+
+[lib]
+name = "aether_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-notification = "2"
+tauri-plugin-global-shortcut = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target.'cfg(windows)'.dependencies]
+# 3c2가 네이티브 MSI·맥 서버 연결. 여기 칸만 둔다.
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true

@@ -1,0 +1,301 @@
+{
+  "proceeded": [
+    {
+      "seq": 1,
+      "ts": 1,
+      "kind": "brief_opened",
+      "briefId": "11111111-1111-4111-8111-111111111111",
+      "version": 1,
+      "text": "진행된 원문",
+      "state": {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "sessionId": "legacy-session",
+        "version": 1,
+        "raw": "진행된 원문",
+        "text": "진행된 정리",
+        "requestedAt": "2026-01-02T00:00:00.000Z",
+        "timeZone": "UTC",
+        "slots": [
+          {
+            "slotId": "errorList",
+            "name": "오류 리스트",
+            "question": "오류 리스트가 어디 있나요",
+            "kind": "input",
+            "skipped": false,
+            "required": true,
+            "shape": "name",
+            "dependsOn": [],
+            "origin": "past",
+            "value": "진행전값",
+            "instant": null,
+            "evidence": [
+              {
+                "validFrom": "2026-01-02T00:00:00.000Z",
+                "sessionId": "src-session",
+                "seq": 4,
+                "part": 0,
+                "role": "user",
+                "quote": "진행 전 근거"
+              }
+            ],
+            "options": [
+              {
+                "rank": 1,
+                "value": "진행전후보",
+                "validFrom": "2026-01-02T00:00:00.000Z",
+                "evidence": [],
+                "origin": "past"
+              }
+            ],
+            "reason": null,
+            "conflict": false,
+            "human": "pending",
+            "searchTerms": ["오류목록"],
+            "autoFilled": true
+          }
+        ],
+        "images": [
+          {
+            "name": "note.txt",
+            "mediaType": "text/plain",
+            "bytes": 12,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "file": "stored-note.bin"
+          }
+        ],
+        "documents": [],
+        "executed": false,
+        "analysis": { "status": "done", "attemptId": "attempt-proceeded" },
+        "combos": []
+      }
+    },
+    {
+      "seq": 2,
+      "ts": 2,
+      "kind": "brief_updated",
+      "briefId": "11111111-1111-4111-8111-111111111111",
+      "version": 2,
+      "state": {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "sessionId": "legacy-session",
+        "version": 2,
+        "raw": "진행된 원문",
+        "text": "진행된 정리",
+        "requestedAt": "2026-01-02T00:00:00.000Z",
+        "timeZone": "UTC",
+        "slots": [
+          {
+            "slotId": "errorList",
+            "name": "오류 리스트",
+            "question": "오류 리스트가 어디 있나요",
+            "kind": "input",
+            "skipped": false,
+            "required": true,
+            "shape": "name",
+            "dependsOn": [],
+            "origin": "past",
+            "value": "확정오류목록",
+            "instant": null,
+            "evidence": [
+              {
+                "validFrom": "2026-01-02T00:00:00.000Z",
+                "sessionId": "src-session",
+                "seq": 4,
+                "part": 0,
+                "role": "user",
+                "quote": "확정한 주문 목록"
+              }
+            ],
+            "options": [
+              {
+                "rank": 1,
+                "value": "확정후보",
+                "validFrom": "2026-01-02T00:00:00.000Z",
+                "evidence": [],
+                "origin": "past"
+              }
+            ],
+            "reason": null,
+            "conflict": false,
+            "human": "confirmed",
+            "searchTerms": ["오류목록"]
+          }
+        ],
+        "images": [
+          {
+            "name": "note.txt",
+            "mediaType": "text/plain",
+            "bytes": 12,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "file": "stored-note.bin"
+          }
+        ],
+        "documents": [],
+        "executed": true,
+        "analysis": { "status": "done", "attemptId": "attempt-proceeded" },
+        "combos": [],
+        "delivery": {
+          "status": "delivered",
+          "attempt": 1,
+          "deliveryId": "delivery-token-1",
+          "workText": "고정지시문본문"
+        }
+      }
+    },
+    {
+      "seq": 3,
+      "ts": 3,
+      "kind": "user_msg",
+      "text": "진행된 원문",
+      "briefId": "11111111-1111-4111-8111-111111111111"
+    }
+  ],
+  "unproceeded": [
+    {
+      "seq": 1,
+      "ts": 1,
+      "kind": "brief_opened",
+      "briefId": "22222222-2222-4222-8222-222222222222",
+      "version": 1,
+      "text": "진행되지 않은 원문",
+      "state": {
+        "id": "22222222-2222-4222-8222-222222222222",
+        "sessionId": "legacy-session",
+        "version": 1,
+        "raw": "진행되지 않은 원문",
+        "text": "진행되지 않은 정리",
+        "requestedAt": "2026-01-03T00:00:00.000Z",
+        "timeZone": "UTC",
+        "slots": [
+          {
+            "slotId": "errorList",
+            "name": "오류 리스트",
+            "question": "어느 목록을 볼까요",
+            "kind": "input",
+            "skipped": false,
+            "required": true,
+            "shape": "name",
+            "dependsOn": [],
+            "origin": "undecided",
+            "value": "처음오류목록",
+            "instant": null,
+            "evidence": [
+              {
+                "validFrom": "2026-01-03T00:00:00.000Z",
+                "sessionId": "src-session",
+                "seq": 8,
+                "part": 0,
+                "role": "user",
+                "quote": "처음 근거"
+              }
+            ],
+            "options": [
+              {
+                "rank": 1,
+                "value": "처음후보",
+                "validFrom": null,
+                "evidence": [],
+                "origin": "written"
+              }
+            ],
+            "reason": "needs_choice",
+            "conflict": false,
+            "human": "pending",
+            "searchTerms": ["오류목록"]
+          }
+        ],
+        "images": [
+          {
+            "name": "note.txt",
+            "mediaType": "text/plain",
+            "bytes": 12,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "file": "stored-note.bin"
+          }
+        ],
+        "documents": [],
+        "executed": false,
+        "analysis": { "status": "done", "attemptId": "attempt-open" },
+        "combos": []
+      }
+    },
+    {
+      "seq": 2,
+      "ts": 2,
+      "kind": "brief_updated",
+      "briefId": "22222222-2222-4222-8222-222222222222",
+      "version": 2,
+      "state": {
+        "id": "22222222-2222-4222-8222-222222222222",
+        "sessionId": "legacy-session",
+        "version": 2,
+        "raw": "진행되지 않은 원문",
+        "text": "진행되지 않은 정리",
+        "requestedAt": "2026-01-03T00:00:00.000Z",
+        "timeZone": "UTC",
+        "slots": [
+          {
+            "slotId": "errorList",
+            "name": "오류 리스트",
+            "question": "어느 목록을 볼까요",
+            "kind": "input",
+            "skipped": false,
+            "required": true,
+            "shape": "name",
+            "dependsOn": [],
+            "origin": "undecided",
+            "value": "최신오류목록",
+            "instant": null,
+            "evidence": [
+              {
+                "validFrom": "2026-01-03T00:00:00.000Z",
+                "sessionId": "src-session",
+                "seq": 8,
+                "part": 0,
+                "role": "user",
+                "quote": "아직 고르지 않은 목록"
+              }
+            ],
+            "options": [
+              {
+                "rank": 1,
+                "value": "최신후보",
+                "validFrom": null,
+                "evidence": [],
+                "origin": "written"
+              }
+            ],
+            "reason": "needs_choice",
+            "conflict": false,
+            "human": "pending",
+            "searchTerms": ["오류목록"]
+          }
+        ],
+        "images": [
+          {
+            "name": "note.txt",
+            "mediaType": "text/plain",
+            "bytes": 12,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "file": "stored-note.bin"
+          }
+        ],
+        "documents": [],
+        "executed": false,
+        "analysis": { "status": "done", "attemptId": "attempt-open" },
+        "combos": []
+      }
+    }
+  ],
+  "broken": [
+    {
+      "seq": 1,
+      "ts": 1,
+      "kind": "brief_opened",
+      "briefId": "33333333-3333-4333-8333-333333333333",
+      "version": 1,
+      "text": "깨진 원문",
+      "state": { "broken": true }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-show-desktop-notification"
+description = "웹이 제목·본문만 넘겨 네이티브 알림을 띄운다"
+commands.allow = ["show_desktop_notification"]
+
+[[permission]]
+identifier = "allow-smoke-report-rooms"
+description = "스모크가 방 DOM 개수를 보고한다"
+commands.allow = ["smoke_report_rooms"]

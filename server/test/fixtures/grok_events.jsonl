@@ -1,0 +1,13 @@
+{"seq":1,"ts":1,"kind":"grok","msg":{"method":"session/prompt_started","params":{"sessionId":"s-1"}}}
+{"seq":2,"ts":2,"kind":"grok","msg":{"method":"session/update","params":{"sessionId":"s-1","update":{"sessionUpdate":"agent_thought_chunk","content":{"type":"text","text":"먼저 읽자"}}}}}
+{"seq":3,"ts":3,"kind":"grok","msg":{"method":"session/update","params":{"sessionId":"s-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"확인"}}}}}
+{"seq":4,"ts":4,"kind":"grok","msg":{"method":"session/update","params":{"sessionId":"s-1","update":{"sessionUpdate":"agent_message","content":{"type":"text","text":"파일을 확인했습니다"}}}}}
+{"seq":5,"ts":5,"kind":"grok","msg":{"method":"session/update","params":{"sessionId":"s-1","update":{"sessionUpdate":"tool_call","toolCallId":"tc-1","title":"run_terminal_command","kind":"execute","rawInput":{"command":"ls deploy/"}}}}}
+{"seq":6,"ts":6,"kind":"grok","msg":{"method":"session/update","params":{"sessionId":"s-1","update":{"sessionUpdate":"tool_call_update","toolCallId":"tc-1","status":"completed","content":{"type":"text","text":"deploy.sh"}}}}}
+{"seq":7,"ts":7,"kind":"grok","msg":{"method":"session/update","params":{"sessionId":"s-1","update":{"sessionUpdate":"usage_update","used":1000,"size":272000}}}}
+{"seq":8,"ts":8,"kind":"grok","msg":{"method":"session/prompt_result","params":{"stopReason":"end_turn"}}}
+{"seq":9,"ts":9,"kind":"grok","msg":{"method":"session/prompt_result","params":{"stopReason":"cancelled"}}}
+{"seq":10,"ts":10,"kind":"grok","msg":{"method":"session/prompt_result","params":{"stopReason":"failed","error":"모델 오류"}}}
+{"seq":11,"ts":11,"kind":"grok","msg":{"method":"session/update","params":{"sessionId":"s-1","update":{"sessionUpdate":"plan","entries":[{"content":"확인","priority":"high","status":"completed"},{"content":"수정","priority":"medium","status":"in_progress"},{"content":"배포","priority":"low","status":"pending"}]}}}}
+{"seq":12,"ts":12,"kind":"grok","msg":{"method":"session/update","params":{"sessionId":"s-1","update":{"sessionUpdate":"current_mode_update","mode":"plan"}}}}
+{"seq":13,"ts":13,"kind":"grok","msg":{"method":"session/update","params":{"sessionId":"s-1","update":{"sessionUpdate":"plan","entries":[{"content":"알 수 없는 상태","priority":"low","status":"blocked"},{"content":"  ","priority":"low","status":"pending"}]}}}}

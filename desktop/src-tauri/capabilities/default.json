@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.tauri.app/config/2/capability",
+  "identifier": "default",
+  "description": "창 보이기/숨기기, 알림, 전역 단축키. FS·shell·sql 없음.",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["http://127.0.0.1:*", "https://*.ts.net:*"]
+  },
+  "permissions": [
+    "core:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-unminimize",
+    "core:webview:allow-set-webview-focus",
+    "notification:default",
+    "global-shortcut:allow-is-registered",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "allow-show-desktop-notification",
+    "allow-smoke-report-rooms"
+  ]
+}

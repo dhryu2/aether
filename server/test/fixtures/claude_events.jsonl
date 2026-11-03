@@ -1,0 +1,35 @@
+{"seq":1,"ts":1000,"kind":"user_msg","text":"  A.py 빌드해줘  "}
+{"seq":2,"ts":1001,"kind":"sdk","msg":{"type":"assistant","message":{"content":[{"type":"text","text":"실행해볼게요"}]}}}
+{"seq":3,"ts":1002,"kind":"sdk","msg":{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"먼저 의존성부터 확인하자"}]}}}
+{"seq":4,"ts":1003,"kind":"sdk","msg":{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_01AA","name":"Bash","input":{"command":"python A.py"}}]}}}
+{"seq":5,"ts":1004,"kind":"sdk","msg":{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_01AA","content":"ImportError: No module named torch"}]}}}
+{"seq":6,"ts":1005,"kind":"sdk","msg":{"type":"assistant","message":{"content":[{"type":"text","text":"line 12 타입오류를 고칩니다"},{"type":"tool_use","id":"toolu_01BB","name":"Edit","input":{"file_path":"/p/A.py"}}]}}}
+{"seq":7,"ts":1006,"kind":"sdk","msg":{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_01CC","content":"parallel result ALPHA"},{"type":"tool_result","tool_use_id":"toolu_01DD","content":"parallel result BETA"}]}}}
+{"seq":8,"ts":1007,"kind":"sdk","msg":{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_01EE","name":"mcp__aether__session_search","input":{"query":"배포 설정"}}]}}}
+{"seq":9,"ts":1008,"kind":"sdk","msg":{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_01EE","content":"","is_error":true}]}}}
+{"seq":10,"ts":1009,"kind":"sdk","msg":{"type":"user","message":{"content":[{"type":"text","text":"이건 사람 입력 echo라 색인 제외"}]}}}
+{"seq":11,"ts":1010,"kind":"permission_request","req":{"id":"perm-1","toolName":"Bash","input":{"command":"rm -rf build"},"displayName":"Bash","toolUseID":"toolu_01FF","createdAt":1010}}
+{"seq":12,"ts":1011,"kind":"permission_resolved","id":"perm-1","decision":"deny"}
+{"seq":13,"ts":1012,"kind":"question_request","req":{"id":"q-1","toolUseID":"toolu_01GG","questions":[{"question":"어떤 방식으로 진행할까요?","header":"방식","multiSelect":false,"options":[{"label":"A 방식","description":"빠름"},{"label":"B 방식"}]}],"createdAt":1012}}
+{"seq":14,"ts":1013,"kind":"question_resolved","id":"q-1","answered":true}
+{"seq":15,"ts":1014,"kind":"sdk","msg":{"type":"conversation_reset","new_conversation_id":"conv-new","session_id":"sess-1"}}
+{"seq":16,"ts":1015,"kind":"sdk","msg":{"type":"system","subtype":"compact_boundary"}}
+{"seq":17,"ts":1016,"kind":"sdk","msg":{"type":"system","subtype":"model_refusal_fallback","original_model":"claude-fable-5","fallback_model":"claude-opus-4-8","api_refusal_category":"cyber"}}
+{"seq":18,"ts":1017,"kind":"sdk","msg":{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","rateLimitType":"five_hour"}}}
+{"seq":19,"ts":1018,"kind":"sdk","msg":{"type":"system","subtype":"api_retry","attempt":1,"max_retries":3,"retry_delay_ms":2000,"error_status":529,"error":"overloaded"}}
+{"seq":20,"ts":1019,"kind":"sdk","msg":{"type":"result","subtype":"error_during_execution","is_error":true,"duration_ms":500,"num_turns":2,"result":"실행 중 오류가 발생했습니다"}}
+{"seq":21,"ts":1020,"kind":"sdk","msg":{"type":"result","subtype":"success","is_error":false,"duration_ms":486345,"num_turns":23,"result":"빌드 완료"}}
+{"seq":22,"ts":1021,"kind":"ctx","totalTokens":50000,"maxTokens":200000}
+{"seq":23,"ts":1022,"kind":"notice","notice":"resumed","detail":"이전 대화 맥락을 복원해 이어갑니다"}
+{"seq":24,"ts":1023,"kind":"sdk","msg":{"type":"system","subtype":"init","model":"claude-opus-4-8","tools":["Bash","Edit"],"mcp_servers":[],"apiKeySource":"none"}}
+{"seq":25,"ts":1024,"kind":"sdk","msg":{"type":"assistant","message":{"content":[{"type":"fallback","from":{"model":"claude-fable-5"},"to":{"model":"claude-opus-4-8"}}]}}}
+{"seq":26,"ts":1025,"kind":"status","status":"completed"}
+{"seq":27,"ts":1026,"kind":"sdk","msg":{"type":"assistant","message":{"model":"claude-haiku-4-5","content":[{"type":"text","text":"모델 이름이 실린 답변"}]}}}
+{"seq":28,"ts":1027,"kind":"sdk","msg":{"type":"assistant","message":{"model":"<synthetic>","content":[{"type":"text","text":"슬래시 명령 합성 답변"}]}}}
+{"seq":29,"ts":1028,"kind":"sdk","msg":{"type":"system","subtype":"local_command_output","content":"context: 12k/200k\nusage: 3%"}}
+{"seq":30,"ts":1029,"kind":"sdk","msg":{"type":"system","subtype":"commands_changed","commands":[{"name":"review","description":"리뷰"},{"name":"verify"}]}}
+{"seq":31,"ts":1030,"kind":"sdk","msg":{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","rateLimitType":"seven_day_opus","utilization":0.87,"resetsAt":4102444800}}}
+{"seq":32,"ts":1031,"kind":"sdk","msg":{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","rateLimitType":"five_hour","utilization":1}}}
+{"seq":33,"ts":1032,"kind":"sdk","msg":{"type":"result","subtype":"error_during_execution","is_error":true,"duration_ms":900,"num_turns":1,"usage":{"output_tokens":128},"errors":["529 overloaded_error","upstream timeout"],"result":"실패"}}
+{"seq":34,"ts":1033,"kind":"sdk","msg":{"type":"system","subtype":"background_tasks_changed","tasks":[{"task_id":"bg1","task_type":"local_agent","description":"  코드 조사  "},{"task_id":"bg2","task_type":"local_bash","description":"sleep 20"},{"task_id":"bg3","task_type":"monitor","description":"x"}]}}
+{"seq":35,"ts":1034,"kind":"sdk","msg":{"type":"system","subtype":"background_tasks_changed","tasks":[]}}

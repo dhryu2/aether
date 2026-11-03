@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    },
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "../shared/**/*.ts"],
+  "exclude": ["node_modules", "test/visual/_diag2a.ts"]
+}

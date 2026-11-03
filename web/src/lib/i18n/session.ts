@@ -1,0 +1,361 @@
+// 세션 모달·카드·피커 문자열 — NewSessionModal, 폴더 고르기(folderPicker/), SessionStatus, EffortPicker, ModelPicker,
+//   ProviderAuthModal, ShortcutsHelp, DeleteConfirmModal, ConfirmDialog, QuestionCard, PermissionCard.
+import type { Dict } from './types'
+
+export const session: Dict = {
+  // NewSessionModal
+  'session.newSession.title': { ko: '새 세션', en: 'New work' },
+  'session.newSession.nameLabel': { ko: '이름', en: 'Name' },
+  'session.newSession.namePlaceholder': { ko: '비워 두면 첫 메시지로 정해져요', en: 'Leave empty and the first message names it' },
+  'session.newSession.folderLabel': { ko: '작업 폴더', en: 'Work folder' },
+  'session.newSession.providerLabel': { ko: 'AI 서비스', en: 'Service' },
+  'session.newSession.providerHint': {
+    ko: '만든 뒤에는 AI 서비스를 바꿀 수 없어요. 대화, 기억, 스킬은 어느 AI 서비스든 같은 곳에 쌓여요.',
+    en: 'You cannot change the service after you start. Conversations, memory, and skills stay in the same place for every service.',
+  },
+  'session.newSession.providerUnavailable.not_installed': { ko: '설치 안 됨', en: 'Not installed' },
+  'session.newSession.providerUnavailable.logged_out': { ko: '로그인 필요', en: 'Log in first' },
+  'session.newSession.providerUnavailable.unreachable': { ko: '서버 응답 없음', en: 'Server not responding' },
+  'session.newSession.providerUnavailable.no_models': { ko: '모델 없음', en: 'No models' },
+  'session.newSession.providerUnavailable.check_failed': { ko: '확인 실패', en: 'Check failed' },
+  'session.newSession.providerUnavailable.sdk_unavailable': { ko: '구성 요소를 불러오지 못함', en: 'Components failed to load' },
+  'session.newSession.providerUnavailable.requires': { ko: '{requires} 필요', en: '{requires} required' },
+  'session.newSession.availabilityFailed': {
+    ko: 'AI 서비스 상태를 확인하지 못했어요. 시작하면 서버가 다시 확인해요.',
+    en: 'Could not check the services. The server checks again when you start.',
+  },
+  'session.newSession.providerListLoading': {
+    ko: 'AI 서비스 목록을 받는 중이에요.',
+    en: 'Loading the service list.',
+  },
+  'session.newSession.noProviderList': {
+    ko: 'AI 서비스 목록을 받지 못했어요. 잠시 뒤 창을 다시 열어 보세요.',
+    en: 'Could not load the service list. Reopen this window in a moment.',
+  },
+  'session.newSession.noProvider': {
+    ko: '지금 쓸 수 있는 AI 서비스가 없어요. 설정에서 로그인하거나 AI 서비스를 설치하면 세션을 시작할 수 있어요.',
+    en: 'No service is available right now. Log in from Settings or install a service to start work.',
+  },
+  'session.newSession.modelLabel': { ko: '모델', en: 'Model' },
+  'session.newSession.modelPlaceholder': { ko: '비워 두면 계정 기본 모델', en: 'Leave empty for the account default' },
+  'session.newSession.modelNote': {
+    ko: '비워 두면 계정 기본 모델로 시작해요. 없는 모델이면 이 창에서 알려 줘요. 세션 안에서는 /model로 바꿔요.',
+    en: 'Leave it empty to start with the account default. An unknown model is reported in this window. Inside the work, change it with /model.',
+  },
+  'session.newSession.creating': { ko: '만드는 중', en: 'Creating' },
+  'session.newSession.start': { ko: '세션 시작', en: 'Start work' },
+  'session.newSession.safety': { ko: '안전', en: 'Safety' },
+
+  // FolderPicker
+  'session.folderPicker.root': { ko: '위치', en: 'Places' },
+  'session.folderPicker.home': { ko: '홈', en: 'Home' },
+  'session.folderPicker.wide': {
+    ko: '이 위치 전체가 작업 폴더가 돼요. 범위가 넓으니 필요한 하위 폴더를 고르는 것을 권해요.',
+    en: 'The whole place becomes the work folder. That is a wide scope, so choosing a subfolder is safer.',
+  },
+  'session.folderPicker.tree': { ko: '작업 폴더', en: 'Work folder' },
+  'session.folderPicker.error': { ko: '폴더를 불러오지 못했어요.', en: 'Could not load this folder.' },
+  'session.folderPicker.retry': { ko: '다시 시도', en: 'Try again' },
+  'session.folderPicker.other': { ko: '다른 폴더 고르기', en: 'Choose another folder' },
+  'session.folderPicker.browseTitle': { ko: '폴더 고르기', en: 'Choose folder' },
+  'session.folderPicker.back': { ko: '새 세션으로 돌아가기', en: 'Back to new work' },
+  'session.folderPicker.choose': { ko: '이 폴더 선택', en: 'Choose this folder' },
+  'session.folderPicker.empty': { ko: '안에 폴더가 없어요. 이 폴더를 그대로 고를 수 있어요.', en: 'No folders inside. You can choose this folder as it is.' },
+  'session.folderPicker.path': { ko: '지금 위치', en: 'Current location' },
+  'session.folderPicker.inside': { ko: '{name} 안의 폴더', en: 'Folders in {name}' },
+  'session.folderPicker.recent': { ko: '최근 사용', en: 'Recent' },
+  'session.folderPicker.favorites': { ko: '즐겨찾기', en: 'Favorites' },
+  'session.folderPicker.devices': { ko: '장치', en: 'Devices' },
+  'session.folderPicker.place.desktop': { ko: '데스크탑', en: 'Desktop' },
+  'session.folderPicker.place.documents': { ko: '문서', en: 'Documents' },
+  'session.folderPicker.place.downloads': { ko: '다운로드', en: 'Downloads' },
+  'session.folderPicker.drive': { ko: '{name} 드라이브', en: 'Drive {name}' },
+  'session.folderPicker.systemDisk': { ko: '시스템 디스크', en: 'System disk' },
+  'session.folderPicker.target': { ko: '선택할 폴더', en: 'Folder to choose' },
+  'session.folderPicker.navBack': { ko: '뒤로', en: 'Back' },
+  'session.folderPicker.up': { ko: '상위 폴더로', en: 'Up one folder' },
+  'session.folderPicker.typePath': { ko: '경로 직접 입력', en: 'Type a path' },
+  'session.folderPicker.search': { ko: '이 폴더에서 이름으로 찾기', en: 'Find by name in this folder' },
+  'session.folderPicker.searchPlaceholder': { ko: '이름으로 찾기', en: 'Find by name' },
+  'session.folderPicker.showHidden': { ko: '숨김 폴더 보기', en: 'Show hidden folders' },
+  'session.folderPicker.noMatch': { ko: '찾는 이름과 맞는 폴더가 없어요.', en: 'No folder matches that name.' },
+  'session.folderPicker.denied': { ko: '이 폴더는 열 수 없어요. 권한이 없거나 보호된 폴더예요.', en: 'This folder cannot be opened. You may not have permission, or it is protected.' },
+  'session.folderPicker.notFound': { ko: '폴더를 찾을 수 없어요. 옮겨졌거나 지워졌을 수 있어요.', en: 'Folder not found. It may have been moved or deleted.' },
+  'session.folderPicker.invalidPath': {
+    ko: '폴더 경로가 아니에요. ‘/’나 ‘C:\\’처럼 맨 앞부터 적은 전체 경로를 넣어 주세요.',
+    en: 'That is not a folder path. Enter the full path from the start, like “/” or “C:\\”.',
+  },
+  'session.folderPicker.truncated': {
+    ko: '폴더가 너무 많아 앞의 5,000개만 보여요. 경로를 직접 적어 이동할 수 있어요.',
+    en: 'There are too many folders, so only the first 5,000 are shown. You can type a path to go further.',
+  },
+  'session.folderPicker.placesFailed': { ko: '위치 목록을 불러오지 못했어요.', en: 'Could not load the places list.' },
+  'session.folderPicker.count': { ko: '{name}, 폴더 {n}개', en: '{name}, {n} folders' },
+
+  // SessionStatus
+  'session.status.title': { ko: '현재 세션 사용량', en: 'Usage for this work' },
+  'session.status.loading': { ko: '사용량 불러오는 중', en: 'Loading usage' },
+  'session.status.noActive': { ko: '세션을 열면 사용량이 보여요', en: 'Open a work item to see usage' },
+  'session.status.liveOnly': {
+    ko: '세션이 실행 중일 때만 사용량을 볼 수 있어요. 메시지를 보내면 다시 실행돼요',
+    en: 'Usage shows after this work is awake. Send one message to wake it.',
+  },
+  'session.status.notSupported': {
+    ko: '이 AI 서비스는 사용량을 알려주지 않아요.',
+    en: 'This service does not report usage.',
+  },
+  // 한도 창 이름은 대화 중 배너와 같은 표를 쓴다.
+  'session.status.noRateLimit': { ko: '구독 한도 정보가 없어요.', en: 'No subscription limit to show.' },
+  'session.status.context': { ko: '컨텍스트', en: 'Context window' },
+  'session.status.contextTokens': { ko: '{used} / {size} 토큰', en: '{used} / {size} tokens' },
+  'session.status.sessionCost': { ko: '세션 누적 비용 {amount}.', en: 'Session cost so far {amount}.' },
+  'session.status.storageStats': { ko: '저장소 {bytes}, 세션 {count}개.', en: 'Storage {bytes}, {count} sessions.' },
+  'session.status.resetAt': { ko: '{date}에 초기화돼요', en: 'Refills {date}' },
+
+  // EffortPicker
+  //   단계별 설명(빠른 응답·균형…)은 여기 없다 — 그건 provider 어휘라 어댑터가 소유하고 모델 목록에
+  //   실려 온다(8i). 아래 문구들은 강도 이름과 무관한 화면 자체의 말이라 여기 남는다.
+  'session.effort.default': { ko: '기본', en: 'Default' },
+  'session.effort.title': {
+    ko: 'Effort: {level} — 클릭하여 선택 ({count}단계)',
+    en: 'Thinking effort: {level} — click to choose ({count} levels)',
+  },
+  'session.effort.checking': { ko: 'Effort 확인 중', en: 'Checking effort' },
+  'session.effort.compactLabel': { ko: 'Effort {label}', en: 'Thinking {label}' },
+  // 단계 목록은 모델 목록 응답에 실려 오므로, 그 응답을 못 받으면 지금 값만 알고 고를 수는 없다.
+  'session.effort.lockedTitle': { ko: '지금은 바꿀 수 없어요', en: 'Cannot change right now' },
+  'session.effort.asleepMsg': {
+    ko: '세션이 실행 중이 아니라 고를 수 있는 단계를 가져올 수 없어요.\n메시지를 보내면 세션이 다시 실행되고, 그때 고를 수 있어요.',
+    en: 'The session is asleep, so the available levels cannot be fetched.\nSend one message to wake it up and you will be able to choose.',
+  },
+  'session.effort.failedMsg': {
+    ko: '고를 수 있는 단계를 가져오지 못했어요. 지금 설정은 그대로 동작해요.\n바꾸려면 대화창에 /effort 뒤에 단계 이름을 적어 보내세요.',
+    en: 'Could not fetch the available levels. The current setting still works.\nTo change it, send /effort followed by a level name in the message box.',
+  },
+  // 단계 목록은 모델 목록의 각 줄에 딸려 온다 — 지금 쓰는 모델이 그 목록의 어느 줄인지 못 찾으면 단계도 모른다.
+  'session.effort.unmatchedMsg': {
+    ko: '지금 쓰는 모델을 모델 목록에서 찾지 못해 고를 수 있는 단계를 알 수 없어요. 지금 설정은 그대로 동작해요.\n바꾸려면 대화창에 /effort 뒤에 단계 이름을 적어 보내세요.',
+    en: 'The current model was not found in the model list, so the available levels are unknown. The current setting still works.\nTo change it, send /effort followed by a level name in the message box.',
+  },
+
+  // ModelPicker — 목록을 못 받았을 때 왜 없는지 말해 주는 문구가 절반이다.
+  'session.model.title': { ko: '모델 선택 ({count}개 이용 가능)', en: 'Select model ({count} available)' },
+  'session.model.checking': { ko: '모델 확인 중', en: 'Checking model' },
+  'session.model.asleepTitle': { ko: '세션이 실행 중이 아니에요', en: 'This session is asleep' },
+  'session.model.asleepMsg': {
+    ko: '세션이 실행 중이 아니라 고를 수 있는 모델 목록을 가져올 수 없어요.\n메시지를 보내면 세션이 다시 실행되고, 그때 고를 수 있어요.',
+    en: 'The session is asleep, so the list of available models cannot be fetched.\nSend one message to wake it up and the list will fill in.',
+  },
+  'session.model.failedTitle': { ko: '모델 목록을 가져오지 못했어요', en: 'Could not fetch the model list' },
+  'session.model.failedHintPre': { ko: '지금 쓰는 모델은 그대로 동작해요. 바꾸려면 대화창에 ', en: 'The current model still works. To change it, send ' },
+  'session.model.failedHintPost': { ko: ' 뒤에 모델 이름을 적어 보내세요.', en: ' followed by a model name in the message box.' },
+  'session.model.failedRestart': {
+    ko: '계속 안 되면 세션을 다시 시작해 보세요.',
+    en: 'If it keeps failing, try starting the session again.',
+  },
+  'session.model.retry': { ko: '다시 시도', en: 'Try again' },
+
+  // 세션 자동 깨우기 — 세션을 열 때 조용히 도는 일이라, 실패했을 때만 화면 아래 토스트로 한 줄 알린다.
+  'session.wake.failed': {
+    ko: '세션을 시작하지 못했어요 ({detail}). 메시지를 보내면 다시 시도해요.',
+    en: 'Could not start the session ({detail}). Sending a message will try again.',
+  },
+  'session.slash.renameNeeded': {
+    ko: '이름을 함께 적어 주세요. 예: /rename 로그인 수정',
+    en: 'Add a name. Example: /rename login-fix',
+  },
+  'session.send.timeout': {
+    ko: '전송이 중간에 끊겼어요. 입력은 그대로 돌려뒀으니 다시 보내 주세요.',
+    en: 'The send was interrupted. Your message is back in the input — try again.',
+  },
+
+  // 다시 로그인 창. 서비스 이름은 서버가 준 표시 이름을 받는다.
+  'session.auth.idleDesc': {
+    ko: '{provider} 로그인이 만료되면 여기서 다시 로그인해요. 로그인 페이지와 코드를 보여 드려요.',
+    en: 'If the {provider} login ends, sign in again here. Starting shows the login page and a code.',
+  },
+  'session.auth.start': { ko: '로그인 시작', en: 'Start login' },
+  'session.auth.preparing': { ko: '로그인 준비 중', en: 'Preparing login' },
+  'session.auth.processing': { ko: '로그인 처리 중', en: 'Finishing login' },
+  'session.auth.step1': { ko: '로그인 페이지를 열어요', en: 'Open the login page' },
+  'session.auth.step2': { ko: '화면에 나온 코드를 복사해요', en: 'Copy the code shown there' },
+  'session.auth.step3': { ko: '아래에 붙여넣고 보내요', en: 'Paste it below and send it' },
+  'session.auth.openLogin': { ko: '로그인 페이지 열기', en: 'Open login page' },
+  'session.auth.copyUrl': { ko: '주소 복사', en: 'Copy address' },
+  'session.auth.copied': { ko: '복사됨', en: 'Copied' },
+  'session.auth.codeLabel': { ko: '받은 코드', en: 'Code you received' },
+  'session.auth.submitCode': { ko: '코드 보내기', en: 'Send code' },
+  'session.auth.device.step1': { ko: '로그인 페이지를 열어요', en: 'Open the login page' },
+  'session.auth.device.step2': { ko: '아래 코드를 입력해요', en: 'Enter the code below' },
+  'session.auth.device.step3': { ko: '끝나면 자동으로 넘어가요', en: 'This window moves on by itself when it finishes' },
+  'session.auth.device.copy': { ko: '복사', en: 'Copy' },
+  'session.auth.device.waiting': { ko: '로그인이 끝나기를 기다리는 중', en: 'Waiting for login to finish' },
+  'session.auth.successTitle': { ko: '다시 로그인했어요', en: 'You are logged in again' },
+  'session.auth.successDesc': { ko: '이제 이 세션을 이어서 쓸 수 있어요.', en: 'You can continue this work now.' },
+  'session.auth.done': { ko: '완료', en: 'Done' },
+  'session.auth.errorFallback': { ko: '다시 로그인하지 못했어요.', en: 'Could not log in again.' },
+  'session.auth.retry': { ko: '다시 시도', en: 'Try again' },
+
+  // ShortcutsHelp
+  'session.shortcuts.title': { ko: '단축키', en: 'Shortcuts' },
+  'session.shortcuts.find': { ko: '세션 안에서 찾기', en: 'Find in this work' },
+  'session.shortcuts.brain': { ko: 'Agent Brain 열기, 닫기', en: 'Open or close Agent Brain' },
+  'session.shortcuts.settings': { ko: '설정 열기', en: 'Open settings' },
+  'session.shortcuts.send': { ko: '메시지 전송 (Shift+Enter 줄바꿈)', en: 'Send message (Shift+Enter for newline)' },
+  'session.shortcuts.history': { ko: '빈 입력창에서 이전 메시지 불러오기', en: 'Recall a previous message from an empty box' },
+  'session.shortcuts.sendNow': { ko: '대기 메시지를 지금 보내기', en: 'Send queued messages now' },
+  'session.shortcuts.jumpUser': { ko: '내 메시지 사이로 이동', en: 'Jump between your messages' },
+  'session.shortcuts.codeBox': { ko: '코드 블록 넣기', en: 'Insert a code box' },
+  'session.rewind.title': { ko: '이 메시지까지 되돌릴까요?', en: 'Rewind to this message?' },
+  'session.rewind.confirm': { ko: '되돌리기', en: 'Rewind' },
+  'session.rewind.busy': { ko: '작업 중에는 되돌릴 수 없어요.', en: 'You cannot rewind while a turn is still running.' },
+  'session.rewind.skippedTitle': { ko: '일부 파일은 그대로 두었어요', en: 'Some files were left as they are' },
+  'session.rewind.message': {
+    ko: '이 메시지는 남고 이후 대화는 사라져요. 승인 때 백업한 파일은 그 시점으로 돌아가요. 백업이 없거나 승인 없이 바뀐 파일은 되돌릴 수 없어요. 다음 메시지를 보내면 AI가 남은 대화를 읽고 이어서 답해요',
+    en: 'This message stays. Later messages disappear. Files with a saved copy return to that copy. Files without a copy stay as they are. Changes made without approval cannot be restored. The next message gives the model the kept chat once, then it continues.',
+  },
+  'session.shortcuts.escape': { ko: '두 번 눌러 응답 중단 · 열린 창 닫기', en: 'Press twice to stop the running turn · close open dialog' },
+  'session.shortcuts.help': { ko: '이 도움말 열기/닫기', en: 'Open/close this help' },
+
+  // DeleteConfirmModal
+  // deleteTitle·discardTitle은 대상을 못 찾았을 때 스토어가 오류 문장으로 쓴다. 질문으로 바꾸지 않는다.
+  'session.delete.deleteTitle': { ko: '세션 삭제', en: 'Delete work' },
+  'session.delete.discardTitle': { ko: '복사본 버리기', en: 'Discard copy' },
+  'session.delete.askDelete': { ko: "'{name}' 세션을 삭제할까요?", en: "Delete the work '{name}'?" },
+  'session.delete.askReset': { ko: "'{name}' 세션을 초기화할까요?", en: "Reset the work '{name}'?" },
+  'session.delete.askDiscard': { ko: "'{name}' 세션의 복사본을 버릴까요?", en: "Discard the copy of the work '{name}'?" },
+  'session.delete.deleteMsg': { ko: '되돌릴 수 없어요.', en: 'This cannot be undone.' },
+  'session.delete.resetMsg': {
+    ko: '대화는 지워지고, 폴더와 모델과 설정은 그대로 남아요.',
+    en: 'The chat is cleared. The folder, model, and settings stay.',
+  },
+  'session.delete.discardMsg': {
+    ko: '대화는 남고, 복사본의 파일은 사라져요.',
+    en: 'The chat stays, and the files in the copy go away.',
+  },
+  'session.delete.keepRecordConfirm': { ko: '기록만 남기고 삭제', en: 'Delete, keep history' },
+  'session.delete.purgeConfirm': { ko: '완전 삭제', en: 'Delete everything' },
+  'session.delete.keepRecordHint': {
+    ko: '기록만 남기고 삭제: 목록에서 지우지만 대화는 과거 검색에 남습니다.',
+    en: 'Delete, keep history: removes it from the list, but the conversation stays in past search.',
+  },
+  'session.delete.purgeHint': {
+    ko: '완전 삭제: 대화 기록까지 지워 과거 검색에서도 사라집니다. 되돌릴 수 없습니다.',
+    en: 'Delete everything: also erases the conversation, so it disappears from past search. This cannot be undone.',
+  },
+  'session.delete.discardConfirm': { ko: '버리기', en: 'Discard' },
+  'session.delete.copyDirty': {
+    ko: '복사본에 반영하지 않은 변경이 사라져요.',
+    en: 'Changes not applied from the copy will be lost.',
+  },
+  'session.delete.activityAgo': { ko: '마지막 활동 {rel}.', en: 'Last active {rel}.' },
+  'session.delete.deleteFailed': { ko: '삭제하지 못했어요: {error}', en: 'Could not delete: {error}' },
+  'session.delete.resetFailed': { ko: '초기화하지 못했어요: {error}', en: 'Could not reset: {error}' },
+  'session.delete.discardFailed': { ko: '버리지 못했어요: {error}', en: 'Could not discard: {error}' },
+  'session.delete.resetConfirm': { ko: '초기화', en: 'Reset' },
+
+  // QuestionCard
+  'session.question.otherPlaceholder': { ko: '기타: 직접 입력…', en: 'Other: type your own…' },
+  'session.question.fallbackHeader': { ko: '질문', en: 'Question' },
+  'session.question.multiTag': { ko: '복수 선택', en: 'Multiple choice · Select multiple' },
+  'session.question.singleTag': { ko: '하나 선택', en: 'Multiple choice · Select one' },
+  'session.question.multiHint': { ko: '복수 선택 가능', en: 'Multiple selections allowed' },
+  'session.question.singleHint': { ko: '하나를 선택하세요', en: 'Choose one' },
+  'session.question.submit': { ko: '답변 보내기', en: 'Send answer' },
+  'session.question.answered': { ko: '✓ 답변함', en: '✓ Answered' },
+  'session.question.skipped': { ko: '건너뜀', en: 'Moved on' },
+  'session.question.choiceEcho': { ko: '선택한 답: {answer}', en: 'Chose: {answer}' },
+
+  // QuestionnaireCard — 브리프 질문지(추천이 채워진 검토지)
+  'session.questionnaire.title': { ko: '질문 {n}개', en: '{n} to confirm' },
+  'session.questionnaire.progress': { ko: '답변 {done}/{total}', en: '{done}/{total} answered' },
+  'session.questionnaire.tagRecommended': { ko: '추천', en: 'Suggested' },
+  'session.questionnaire.tagChanged': { ko: '변경됨', en: 'Changed' },
+  'session.questionnaire.tagNeeded': { ko: '답변 필요', en: 'Needs answer' },
+  'session.questionnaire.note': { ko: '추가 의견', en: 'Add a note' },
+  'session.questionnaire.customPlaceholder': { ko: '직접 입력…', en: 'Type your own…' },
+  'session.questionnaire.textPlaceholder': { ko: '답을 입력하세요', en: 'Type your answer' },
+  'session.questionnaire.skip': { ko: '건너뛰기', en: 'Skip' },
+  'session.questionnaire.skipped': { ko: '건너뜀', en: 'No answer' },
+  'session.questionnaire.sendRecommended': { ko: '추천대로 보내기', en: 'Send as suggested' },
+  'session.questionnaire.sendAsIs': { ko: '이대로 보내기', en: 'Send as is' },
+  'session.questionnaire.sending': { ko: '보내는 중…', en: 'Sending…' },
+  'session.questionnaire.allRecommended': { ko: '모두 추천대로', en: 'All as suggested' },
+  'session.questionnaire.changedCount': { ko: '{n}개 변경', en: '{n} changed' },
+  'session.questionnaire.unansweredCount': { ko: '{n}개 건너뜀', en: '{n} unanswered' },
+  'session.questionnaire.sent': { ko: '전송됨', en: 'Sent' },
+  'session.questionnaire.continued': { ko: '채팅으로 계속함', en: 'Continued in chat' },
+  'session.questionnaire.pending': { ko: '질문지 만드는 중…', en: 'Preparing the questions…' },
+  'session.questionnaire.sendFailed': { ko: '보내지 못했어요. 다시 보내 주세요.', en: 'Could not send. Please send again.' },
+
+  // 보기 모드
+  'session.view.normal': { ko: '보통', en: 'Normal' },
+  'session.view.verbose': { ko: '자세히', en: 'Verbose' },
+  'session.view.summary': { ko: '요약', en: 'Summary' },
+
+  // PermissionPicker — 권한 칩. 네 모드 이름은 provider와 무관한 Aether의 말이다.
+  //   어느 모드를 고를 수 있는지와 실제 적용 수단은 서버 어댑터가 정한다.
+  'session.permission.mode.auto': { ko: '자동', en: 'Auto' },
+  'session.permission.mode.autoHint': { ko: '안전한 작업은 AI 서비스가 판단해 바로 실행해요', en: 'The AI service decides and runs safe work on its own' },
+  'session.permission.mode.manual': { ko: '수동', en: 'Manual' },
+  'session.permission.mode.manualHint': { ko: '파일 수정과 명령 실행 전에 물어요', en: 'Asks before file edits and commands' },
+  'session.permission.mode.edits': { ko: '편집 자동 수락', en: 'Accept edits' },
+  'session.permission.mode.editsHint': { ko: '파일 편집은 바로 하고 명령 실행은 물어요', en: 'Applies file edits and asks before commands' },
+  'session.permission.mode.full': { ko: '권한 무시', en: 'Bypass permissions' },
+  'session.permission.mode.fullHint': { ko: '묻지 않고 모두 실행해요. 믿을 수 있는 폴더에서만 쓰세요', en: 'Runs everything without asking. Use only in trusted folders' },
+  'session.permission.title': { ko: '권한: {level} — 눌러서 바꾸기', en: 'Permissions: {level} — click to change' },
+  'session.permission.checking': { ko: '권한 확인 중', en: 'Checking permissions' },
+  'session.shortcuts.view': { ko: '대화 보기 방식 전환', en: 'Cycle transcript view' },
+  'session.shortcuts.panes': { ko: '1~4번 패널로 이동', en: 'Focus pane 1 to 4' },
+  'session.shortcuts.zoom': { ko: '지금 패널 확대, 원래대로', en: 'Zoom the focused pane or restore' },
+  'session.shortcuts.movePane': { ko: '지금 패널을 왼쪽·오른쪽으로 옮기기', en: 'Move the focused pane left or right' },
+  'session.shortcuts.openBeside': { ko: '목록에서 고른 세션을 옆에 열기', en: 'Open the selected session beside' },
+  'session.shortcuts.sidebar': { ko: '세션 목록 접기, 펼치기', en: 'Collapse or expand the session list' },
+
+  // PermissionCard
+  'session.permission.createTitle': { ko: '파일 생성 승인', en: 'Approve file creation' },
+  'session.permission.writeTitle': { ko: '파일 작성 승인', en: 'Approve file write' },
+  'session.permission.editTitle': { ko: '파일 수정 승인', en: 'Approve file edit' },
+  'session.permission.notebookTitle': { ko: '노트북 편집 승인', en: 'Approve notebook edit' },
+  'session.permission.runTitle': { ko: '{tool} 실행 승인', en: 'Approve running {tool}' },
+  'session.permission.deny': { ko: '거부', en: 'Deny' },
+  'session.permission.allow': { ko: '승인', en: 'Allow' },
+  'session.permission.allowedStatus': { ko: '✓ 승인됨 · 변경 적용 완료', en: '✓ Approved · Changes applied' },
+  'session.permission.deniedStatus': { ko: '✕ 거부됨 · 적용하지 않음', en: '✕ Denied · Not applied' },
+
+  'session.newSession.isolate.title': { ko: '복사본에서 작업', en: 'Work in a copy' },
+  'session.newSession.isolate.desc': {
+    ko: '원본 폴더의 복사본에서 작업해요. 끄면 원본 폴더를 직접 수정해요',
+    en: 'Work happens in a copy, away from the original folder. Turn it off to edit the original folder directly.',
+  },
+  'session.newSession.isolate.unavailable': {
+    ko: '복사본은 git 저장소인 폴더에서, git이 설치돼 있을 때만 쓸 수 있어요. 원본 폴더에서 시작해요.',
+    en: 'A copy works only in a git repository folder, and only when git is installed. Work starts in the original folder.',
+  },
+  'session.newSession.fanout.title': { ko: '여러 AI로 동시에 시작', en: 'Start the same work on several services' },
+  'session.newSession.fanout.promptLabel': { ko: '첫 메시지', en: 'First message' },
+  'session.newSession.fanout.promptPlaceholder': {
+    ko: '모든 세션에 같은 메시지를 보내요',
+    en: 'Every item starts with the same text',
+  },
+  'session.newSession.fanout.needProvider': { ko: 'AI 서비스를 하나 이상 고르세요.', en: 'Pick at least one service.' },
+  'session.newSession.fanout.allFailed': { ko: '세션을 만들지 못했어요.', en: 'Could not create any work items.' },
+  'session.newSession.fanout.sendFailed': { ko: '메시지를 보내지 못했어요.', en: 'Could not send the message.' },
+  'session.newSession.fanout.partial': {
+    ko: '세션 {n}개는 만들지 못했어요. {detail}',
+    en: '{n} item(s) failed. {detail}',
+  },
+  'session.newSession.fanout.partialNoDetail': { ko: '세션 {n}개는 만들지 못했어요.', en: '{n} item(s) failed.' },
+  'session.newSession.fanout.start': { ko: '세션 {count}개 시작', en: 'Start {count} items' },
+  'session.plan.title': { ko: '계획 검토', en: 'Plan review' },
+  'session.plan.hint': { ko: '승인한 뒤에만 구현이 시작돼요', en: 'Implementation starts only after you approve' },
+  'session.plan.empty': { ko: '아직 계획이 없어요.', en: 'No plan text yet.' },
+  'session.plan.approve': { ko: '승인하고 진행', en: 'Approve and continue' },
+  'session.plan.revise': { ko: '수정 요청', en: 'Request changes' },
+  'session.plan.revisePlaceholder': { ko: '바꾸고 싶은 점을 적어 주세요', en: 'Write what you want changed' },
+  'session.plan.reviseSend': { ko: '수정 요청 보내기', en: 'Send revision' },
+  'session.plan.cancel': { ko: '취소', en: 'Cancel' },
+  'session.plan.approvedStatus': { ko: '✓ 승인됨 · 구현을 시작해요', en: '✓ Approved · Implementation starts' },
+  'session.plan.revisedStatus': { ko: '↩ 수정 요청을 보냈어요', en: '↩ Revision requested' },
+  'session.plan.cancelledStatus': { ko: '✕ 계획을 취소했어요', en: '✕ Plan cancelled' },
+}

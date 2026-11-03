@@ -1,0 +1,4 @@
+#!/bin/sh
+# 비밀값, 개인정보 검사. node가 없으면 검사 없이 통과시키지 않고 막는다. 설치: git config core.hooksPath <저장소 절대 경로>/.githooks
+command -v node >/dev/null 2>&1 || { echo "secret-scan: node를 찾지 못해 막았습니다" >&2; exit 1; }
+exec node "$(dirname "$0")/../scripts/secret-scan.mjs" --staged

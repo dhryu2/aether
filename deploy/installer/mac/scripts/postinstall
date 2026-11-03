@@ -1,0 +1,45 @@
+#!/bin/bash
+# 설치 직후: LaunchAgent를 만들고 등록하고, 바탕화면 링크를 시도한다. 첫 실행이면 서버(설정 서버)가 브라우저를 직접 연다.
+# 등록·링크가 실패해도 설치는 멈추지 않는다(다음 로그인 때 다시 뜬다). 설정·데이터 폴더에는 쓰지 않는다.
+set -u
+. "$(dirname "$0")/lib.sh"
+TEMPLATE="$(dirname "$0")/$LABEL.plist.template"
+
+xml_esc() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g'; }
+
+if [ ! -f "$APP/server/index.mjs" ]; then
+  echo "Aether: 프로그램 폴더를 찾지 못했습니다: $APP" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$PLIST")"
+tpl="$(cat "$TEMPLATE")"
+tpl="${tpl//__APP__/$(xml_esc "$APP")}"
+tpl="${tpl//__HOME__/$(xml_esc "$HOME_DIR")}"
+tpl="${tpl//__TMP__/$(xml_esc "$TMP_DIR")}"
+mkdir -p "$TMP_DIR" && chmod 700 "$TMP_DIR" && own "$CONFIG_DIR" "$TMP_DIR"
+printf '%s\n' "$tpl" > "$PLIST.tmp"
+if ! plutil -lint "$PLIST.tmp" >/dev/null 2>&1; then
+  echo "Aether: 서비스 설정 파일 검사에 실패해 등록하지 않았습니다." >&2
+  rm -f "$PLIST.tmp"
+  exit 0
+fi
+mv -f "$PLIST.tmp" "$PLIST"
+own "$PLIST"
+
+# 재설치면 preinstall이 이미 멈췄지만, 안전하게 한 번 더 확인한다.
+stop_service
+if ! launchctl bootstrap "gui/$TARGET_UID" "$PLIST" >/dev/null 2>&1; then
+  launchctl load -w "$PLIST" >/dev/null 2>&1 || echo "Aether: 서비스 등록에 실패했습니다. 다음 로그인 때 시작됩니다." >&2
+fi
+
+# 바탕화면 링크: 없을 때만 만든다. 이미 있는 파일은 우리 설정 폴더를 가리키는 링크가 아니면 건드리지 않는다. 권한 때문에 실패해도 무시한다.
+DESK="$HOME_DIR/Desktop/Aether.webloc"
+if [ -d "$HOME_DIR/Desktop" ]; then
+  if [ -L "$DESK" ]; then
+    [ "$(readlink "$DESK")" = "$CONFIG_DIR/Aether.webloc" ] && ln -sfn "$CONFIG_DIR/Aether.webloc" "$DESK" 2>/dev/null
+  elif [ ! -e "$DESK" ]; then
+    ln -s "$CONFIG_DIR/Aether.webloc" "$DESK" 2>/dev/null
+  fi
+fi
+exit 0

@@ -1,0 +1,14 @@
+{
+  "name": "Aether",
+  "short_name": "Aether",
+  "description": "내 컴퓨터에 설치해 채팅으로 AI 에이전트를 다루는 앱",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f7",
+  "theme_color": "#f5f5f7",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

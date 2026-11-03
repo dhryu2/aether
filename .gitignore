@@ -1,0 +1,67 @@
+# 의존성
+node_modules
+
+# 시크릿 (절대규칙: 평문 금지 — .env에만 보관)
+.env
+.env.*
+!.env.example
+
+# 빌드 산출물
+dist/
+build/
+*.tsbuildinfo
+
+# 런타임/영속 데이터 (이벤트 버퍼·세션·seq 카운터)
+server/data/
+*.jsonl
+# 단, 골든 테스트 픽스처(normalize 계약 회귀 코퍼스)는 커밋한다(Phase 8b).
+!server/test/fixtures/
+!server/test/fixtures/*.jsonl
+
+# 로그
+*.log
+npm-debug.log*
+
+# OS / 에디터
+.DS_Store
+.vscode/
+.idea/
+
+# Claude Code 로컬 설정
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# oh-my-claudecode 런타임 상태(세션 로그·hud 캐시 등) — .omc/skills/**만 커밋 대상이나 현재 비어있음
+.omc/
+server/.omc/
+web/.omc/
+web/src/.omc/
+
+# 업로드 원본 zip / 디버그 스크린샷— 비커밋
+*.zip
+defect*.png
+
+# graphify 지식그래프 — 재생성 가능하고 이 PC 절대 경로가 들어 있어 로컬에만 둔다
+graphify-out/
+
+# 파이썬 바이트코드 — graphify-out/rebuild.py 실행 시 생긴다(재생성 가능)
+__pycache__/
+*.pyc
+
+# Tauri 빌드 산출
+desktop/src-tauri/target/
+desktop/src-tauri/gen/schemas/
+
+# 서버 켜질 때 자동 빌드의 임시 폴더
+web/.dist-build-*
+
+# 공개하지 않는 내부 문서와 운영 파일
+.private/
+docs/
+CLAUDE.md
+AGENTS.md
+.graphifyignore
+.claude/agents
+.claude/skills
+.grok
+deploy/dev-postgres/

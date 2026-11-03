@@ -143,15 +143,15 @@ async function main(): Promise<void> {
   check(ok300.ok === true, "text 300자는 된다", ok300);
   mustFail(
     parseQuestionnaire(JSON.stringify({
-      questions: [{ id: "q1", text: "고르기", kind: "single", options: [{ label: "가".repeat(81) }, { label: "짧음" }] }],
+      questions: [{ id: "q1", text: "고르기", kind: "single", options: [{ label: "가".repeat(201) }, { label: "짧음" }] }],
     })),
-    "label 81자",
-    "80자",
+    "label 201자",
+    "200자",
   );
-  const ok80 = parseQuestionnaire(JSON.stringify({
-    questions: [{ id: "q1", text: "고르기", kind: "single", options: [{ label: "가".repeat(80) }, { label: "짧음" }], recommended: "짧음" }],
+  const okLabelMax = parseQuestionnaire(JSON.stringify({
+    questions: [{ id: "q1", text: "고르기", kind: "single", options: [{ label: "가".repeat(200) }, { label: "짧음" }], recommended: "짧음" }],
   })) as Parsed;
-  check(ok80.ok === true, "label 80자는 된다", ok80);
+  check(okLabelMax.ok === true, "label 200자는 된다", okLabelMax);
 
   const mismatched = parseQuestionnaire(JSON.stringify({
     questions: [{ id: "q1", text: "고르기", kind: "single", options: [{ label: "A" }, { label: "B" }], recommended: "없는 답" }],
@@ -271,7 +271,7 @@ async function main(): Promise<void> {
     "  - id: 영문, 숫자, _, - 로 32자 이하. 질문마다 다르게 쓴다.",
     "  - text: 질문 한 문장. 300자 이하.",
     "  - kind: single(하나 고르기), multi(여럿 고르기), text(직접 쓰기).",
-    "  - single과 multi는 선택지 2~6개다. label은 80자 이하이고 서로 다르다. description은 200자 이하다. recommended는 선택지 label 중 하나다(multi는 배열).",
+    "  - single과 multi는 선택지 2~6개다. label은 200자 이하이고 서로 다르다. description은 200자 이하다. recommended는 선택지 label 중 하나다(multi는 배열).",
     "  - text는 options 없이 recommended에 추천 문장을 쓴다.",
     "- 답은 「브리프 질문지 답」으로 시작하는 번호 목록으로 온다. 사람이 채팅으로 직접 답해도 같은 답이다. 「답 안 함」인 질문은 사람의 답이 아니다.",
     "- 시간 초과, 자동 선택, 「알아서 진행하라」는 도구 결과는 사람의 답이 아니다.",

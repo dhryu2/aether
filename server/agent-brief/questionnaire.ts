@@ -9,7 +9,7 @@ export const QUESTIONNAIRE_FENCE = "aether-questions";
 
 const ID_RE = /^[A-Za-z0-9_-]{1,32}$/;
 const TEXT_MAX = 300;
-const LABEL_MAX = 80;
+const LABEL_MAX = 200;
 const DESC_MAX = 200;
 const RECOMMENDED_TEXT_MAX = 1000;
 const ANSWER_MAX = 1000;
@@ -56,7 +56,7 @@ function parseOptions(raw: unknown): { ok: true; options: Option[] } | Fail {
     if (!isRecord(item)) return fail("선택지 모양이 아니다");
     const label = item.label;
     if (typeof label !== "string" || label.length < 1) return fail("선택지 label이 비어 있다");
-    if (label.length > LABEL_MAX) return fail("선택지 label이 80자를 넘는다");
+    if (label.length > LABEL_MAX) return fail("선택지 label이 200자를 넘는다");
     if (seen.has(label)) return fail("선택지 label이 겹친다");
     seen.add(label);
     const option: Option = { label };

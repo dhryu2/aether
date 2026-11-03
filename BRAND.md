@@ -10,6 +10,7 @@ Aether의 코드는 Apache License 2.0으로 제공합니다. 다만 아래 브�
   - `web/src/assets/` 안의 `chamding-*`, `aether-chamding-mark.png`, `aether-mark.svg`
   - `web/public/` 안의 `favicon*`, `icon-*`, `apple-touch-icon.png`
   - `desktop/src-tauri/icons/`
+  - `deploy/readme/` 안의 화면 그림
 
 ## 허용
 

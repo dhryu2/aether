@@ -96,7 +96,11 @@ function load(provider: ProviderId): CatalogMemory {
       console.error(`[aether] 모델 목록 기억(${provider})의 모양이 맞지 않아 비우고 시작한다`);
     }
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") void reportError(e, { component: "providers", operation: "model_catalog.memory.load" }); console.error(`[aether] 모델 목록 기억(${provider})을 읽지 못해 비우고 시작한다:`, e);
+    // 아직 세션을 띄운 적 없는 provider는 파일이 없는 것이 정상이다.
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
+      void reportError(e, { component: "providers", operation: "model_catalog.memory.load" });
+      console.error(`[aether] 모델 목록 기억(${provider})을 읽지 못해 비우고 시작한다:`, e);
+    }
   }
   memory.set(provider, m);
   return m;

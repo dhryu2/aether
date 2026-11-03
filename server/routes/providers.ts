@@ -2,15 +2,16 @@
  * provider 목록 라우트.
  *   GET /api/providers  → 등록된 provider의 식별자·표시 이름·원격 재인증 지원 여부
  *
- * 모델·effort 목록은 여기 없다. 그 목록은 세션이 실제로 뜬 뒤 provider가 주는 것이 유일한 정본이라
- * (`GET /api/sessions/:id/models`), 세션 밖에서 미리 알려줄 방법이 없다.
+ * 모델·effort의 정본은 세션이 실제로 뜬 뒤 provider가 주는 목록이다(`GET /api/sessions/:id/models`).
+ * 세션 밖에서는 그 목록을 저장해 둔 것만 읽어 준다(`GET /remembered-models`). 없으면 비어 있다.
  *
  * 인증 게이트 뒤에 mount한다 — 목록 자체는 민감하지 않지만 다른 조회 API와 노출 정책을 맞춘다.
  */
 import { Router, type Request, type Response } from "express";
 import { config } from "../config";
 import { listProviders, providerAvailability } from "../providers/registry";
-import type { ProviderAvailabilityResponse } from "../../shared/http";
+import { mergeModelList } from "../providers/modelCatalogMemory";
+import type { ProviderAvailabilityResponse, RememberedModelsResponse } from "../../shared/http";
 
 export const providersRouter = Router();
 
@@ -28,6 +29,12 @@ providersRouter.get("/", (_req: Request, res: Response) => {
     //   프론트가 이걸 몰라서 꺼져 있어도 버튼을 그리고 403을 받던 것을 없앤다.
     reloginEnabled: config.enableProviderRelogin,
   });
+});
+
+// 새 세션 창이 열릴 때 한 번 묻는다. 저장본만 읽으므로 provider 프로그램을 띄우지 않는다.
+providersRouter.get("/remembered-models", (_req: Request, res: Response) => {
+  const body: RememberedModelsResponse = { models: Object.fromEntries(listProviders().map((entry) => [entry.id, mergeModelList(entry.id, [])])) };
+  res.json(body);
 });
 
 // 새 세션 창이 열릴 때 묻는다. 확인에 프로그램 실행이 들어가 느릴 수 있어 목록(`GET /`)과 나눴다.

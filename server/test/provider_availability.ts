@@ -35,6 +35,7 @@ const express = (await import("express")).default;
 const { isCommandInstalled, cliAvailability } = await import("../providers/installed");
 const { ollamaAvailability } = await import("../providers/ollama/models");
 const { __registerProviderForTest, providerAvailability } = await import("../providers/registry");
+const { rememberModelList } = await import("../providers/modelCatalogMemory");
 const { sessionsRouter } = await import("../routes/sessions");
 const { providersRouter } = await import("../routes/providers");
 const { sessionManager } = await import("../sessions/SessionManager");
@@ -165,6 +166,16 @@ try {
   const made = (await ok.json()) as { id?: string };
   check(ok.status === 201 && !!made.id, "쓸 수 있으면 그대로 만든다", ok.status);
   if (made.id) sessionManager.delete(made.id);
+
+  // 저장해 둔 모델 목록: 처음엔 비어 있고, 저장 뒤에는 기본값 선택지 없이 실제 모델만 나온다.
+  const remembered = async () => ((await (await fetch(`${base}/api/providers/remembered-models`)).json()) as { models: Record<string, { value: string }[]> }).models;
+  check((await remembered())[mock.MOCK_PROVIDER]?.length === 0, "저장된 목록이 없으면 빈 목록", await remembered());
+  rememberModelList(mock.MOCK_PROVIDER, [
+    { value: "default", displayName: "기본", followsAccountDefault: true },
+    { value: "mock-a", displayName: "Mock A", isDefault: true },
+  ]);
+  const saved = (await remembered())[mock.MOCK_PROVIDER];
+  check(saved?.length === 1 && saved[0].value === "mock-a", "저장된 실제 모델만 돌려준다", saved);
 
   const unknown = await create("no-such-provider");
   check(unknown.status === 400, "등록되지 않은 이름은 예전처럼 400", unknown.status);

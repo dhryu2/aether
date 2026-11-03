@@ -8,6 +8,7 @@ import type {
   PermissionPolicy,
   ProvidersResponse,
   ProviderAvailabilityResponse,
+  RememberedModelsResponse,
   QuestionnaireAnswerValue,
   WorkspaceListResponse,
   SlashCommandInfo,
@@ -215,6 +216,8 @@ export const api = {
   listProviders: () => req<ProvidersResponse>('/api/providers'),
   // 지금 고를 수 있는 서비스인지(프로그램 설치, 로그인, 모델 서버). 새 세션 창이 열릴 때마다 묻는다.
   providerAvailability: () => req<ProviderAvailabilityResponse>('/api/providers/availability'),
+  // 세션이 뜰 때 저장해 둔 모델 목록. 서버가 provider 프로그램을 띄우지 않는다.
+  rememberedModels: () => req<RememberedModelsResponse>('/api/providers/remembered-models'),
 
   listSessions: () => req<WorkspaceListResponse>('/api/sessions'),
 

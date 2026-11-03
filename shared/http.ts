@@ -62,6 +62,8 @@ export type ProviderAvailability =
       requires?: string;
     };
 export type ProviderAvailabilityResponse = { availability: Record<string, ProviderAvailability> };
+/** 세션이 뜰 때 받아 저장해 둔 provider별 모델 목록. 프로그램을 띄우지 않고 저장본만 읽는다. */
+export type RememberedModelsResponse = { models: Record<string, ModelInfo[]> };
 export type ProvidersResponse = { providers: ProviderList; reloginEnabled: boolean };
 
 export type UsageWindow = {

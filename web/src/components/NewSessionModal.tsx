@@ -1,12 +1,14 @@
-// 새 작업 창. 이름, 폴더, 서비스, 안전을 묶음으로 고르고 발을 눌러 만든다.
-// 모델은 여기서 고르지 않는다. 계정 기본 모델로 만들고, 세션 안의 모델 칩에서 바꾼다.
+// 새 작업 창. 이름, 폴더, 서비스, 모델, 안전을 묶음으로 고르고 발을 눌러 만든다.
+// 모델 목록은 창을 열 때 저장본을 한 번 받는다. 서비스를 바꿔 눌러도 요청이나 프로그램 실행이 늘지 않는다.
 // 폴더는 최근 폴더를 바로 고르고, 다른 폴더는 같은 창 안의 탐색 화면으로 넘어가 고른다.
 import { useEffect, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { actions, defaultNewSessionProvider, getState, newSessionFolderCandidates, useStore } from '../lib/store'
 import { recentFolders } from '../lib/sessionGroups'
 import { useT } from '../lib/i18n'
 import { api } from '../lib/api'
+import type { ModelInfo } from '../lib/types'
 import { reportClientError } from '../lib/errorReporting'
 import { newSessionProviderView, type AvailabilityState, type ProviderListState } from '../lib/newSessionProviders'
 import { C, Z } from '../design/tokens'
@@ -53,6 +55,8 @@ function NewSessionWindow() {
   const [name, setName] = useState('')
   // 복사본에서 작업은 끈 채로 시작한다(사용자 결정). 켜면 원 폴더와 떨어진 복사본에서 일한다.
   const [isolate, setIsolate] = useState(false)
+  const [model, setModel] = useState('')
+  const [rememberedModels, setRememberedModels] = useState<Record<string, ModelInfo[]>>({})
   const [provider, setProvider] = useState(() => defaultNewSessionProvider(getState()))
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
@@ -94,6 +98,21 @@ function NewSessionWindow() {
     }
   }, [])
 
+  useEffect(() => {
+    let alive = true
+    api.rememberedModels()
+      .then((r) => {
+        if (alive) setRememberedModels(r.models)
+      })
+      .catch((error) => {
+        // 못 받아도 기본 모델로 시작할 수 있으므로 막지 않는다.
+        reportClientError(error, { component: 'session', operation: 'web.new_session.models', severity: 'warning' })
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
   const places = browser.places
   const seeded = places !== undefined
   const picked = folderChoice ?? (places ? seedFolder(folderSeed, places.home) : '')
@@ -125,6 +144,10 @@ function NewSessionWindow() {
   const selectedIds = fanout
     ? usable.filter((p) => pickedProviders.includes(p.id)).map((p) => p.id)
     : (chosen ? [chosen.id] : [])
+
+  const modelRows = (chosen && rememberedModels[chosen.id]) || []
+  // 고른 서비스가 쓸 수 없게 바뀌어 다른 서비스로 넘어가면 그 목록에 없는 값은 기본 모델로 돌아간다.
+  const pickedModel = modelRows.some((m) => m.value === model) ? model : ''
 
   const onProvider = (id: string) => (fanout ? pickedProviders.includes(id) : id === chosen?.id)
   const rootFailed = browser.placesFailed
@@ -167,6 +190,7 @@ function NewSessionWindow() {
     if (creating || unavailable(id)) return
     if (!fanout) {
       setProvider(id)
+      if (id !== chosen?.id) setModel('')
       return
     }
     setPickedProviders((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -176,6 +200,7 @@ function NewSessionWindow() {
     if (creating) return
     if (!next) {
       if (pickedProviders[0]) setProvider(pickedProviders[0])
+      setModel('')
       setPrompt('')
       setFanout(false)
       return
@@ -199,9 +224,12 @@ function NewSessionWindow() {
     const opts = { isolateWorkspace: useCopy, name: name.trim() || undefined }
     const r = fanout
       ? await actions.startSameWork(picked || undefined, { ...opts, providers: selectedIds, prompt })
-      : await actions.createSession(picked || undefined, { ...opts, provider: soloId ?? '' })
+      : await actions.createSession(picked || undefined, { ...opts, provider: soloId ?? '', model: pickedModel || undefined })
     setCreating(false)
-    if (!r.ok) setError(r.error)
+    if (!r.ok) {
+      setError(r.error)
+      setModel('')
+    }
   }
 
   return (
@@ -326,6 +354,30 @@ function NewSessionWindow() {
                   rows={3}
                   style={{ ...fieldStyle(), minHeight: 88, padding: '12px 16px', resize: 'vertical', lineHeight: 1.45 }}
                 />
+              </section>
+            )}
+
+            {!fanout && chosen && (
+              <section>
+                <GroupTitle>{t('session.newSession.modelLabel')}</GroupTitle>
+                <span style={{ position: 'relative', display: 'block' }}>
+                  <select
+                    className="sheet-field"
+                    aria-label={t('session.newSession.modelLabel')}
+                    data-session-opt="new-session-model"
+                    value={pickedModel}
+                    onChange={(e) => setModel(e.target.value)}
+                    disabled={creating || modelRows.length === 0}
+                    style={{ ...fieldStyle(), height: narrow ? 50 : 44, padding: '0 40px 0 16px', appearance: 'none', cursor: modelRows.length ? 'pointer' : 'default' }}
+                  >
+                    <option value="">{t('session.newSession.modelDefault')}</option>
+                    {modelRows.map((m) => <option key={m.value} value={m.value}>{m.displayName}</option>)}
+                  </select>
+                  {modelRows.length > 0 && <ChevronDown aria-hidden size={16} style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: C.label3 }} />}
+                </span>
+                <p style={{ fontSize: 13, color: C.label2, lineHeight: 1.45, margin: '8px 0 0', padding: '0 16px' }}>
+                  {t(modelRows.length ? 'session.newSession.modelHint' : 'session.newSession.modelHintEmpty')}
+                </p>
               </section>
             )}
 

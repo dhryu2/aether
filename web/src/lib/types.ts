@@ -17,6 +17,7 @@ export type {
   ProvidersResponse,
   ProviderAvailability,
   ProviderAvailabilityResponse,
+  RememberedModelsResponse,
   UsageWindow,
   UsageResponse,
   LocalizedText,

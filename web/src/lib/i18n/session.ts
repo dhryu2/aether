@@ -36,6 +36,13 @@ export const session: Dict = {
     ko: '지금 쓸 수 있는 AI 서비스가 없어요. 설정에서 로그인하거나 AI 서비스를 설치하면 세션을 시작할 수 있어요.',
     en: 'No service is available right now. Log in from Settings or install a service to start work.',
   },
+  'session.newSession.modelLabel': { ko: '모델', en: 'Model' },
+  'session.newSession.modelDefault': { ko: '기본 모델', en: 'Default model' },
+  'session.newSession.modelHint': { ko: '세션 안에서도 모델 칩으로 바꿀 수 있어요.', en: 'You can also change it from the model chip inside the session.' },
+  'session.newSession.modelHintEmpty': {
+    ko: '이 서비스는 아직 저장된 모델 목록이 없어요. 기본 모델로 시작한 뒤 세션 안에서 고를 수 있어요.',
+    en: 'No saved model list for this service yet. Start with the default model and choose one inside the session.',
+  },
   'session.newSession.creating': { ko: '만드는 중', en: 'Creating' },
   'session.newSession.start': { ko: '세션 시작', en: 'Start work' },
   'session.newSession.safety': { ko: '안전', en: 'Safety' },

@@ -2588,9 +2588,9 @@ export const actions = {
    * 팝업을 닫고 화면 구석에 알림을 띄우면 사용자는 적었던 이름도 잃고 고칠 자리도 잃는다.
    * 그래서 성공했을 때만 팝업을 닫고, 실패는 부르는 쪽(팝업)이 자기 안에 표시한다.
    */
-  async createSession(cwd: string | undefined, opts: { provider: string; isolateWorkspace?: boolean; name?: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  async createSession(cwd: string | undefined, opts: { provider: string; model?: string; isolateWorkspace?: boolean; name?: string }): Promise<{ ok: true } | { ok: false; error: string }> {
     try {
-      const r = await api.createSession({ cwd, provider: opts.provider, isolateWorkspace: opts.isolateWorkspace, name: opts.name })
+      const r = await api.createSession({ cwd, provider: opts.provider, model: opts.model, isolateWorkspace: opts.isolateWorkspace, name: opts.name })
       set({ modalOpen: false, modalCwd: null })
       await actions.refreshSessions()
       actions.selectSession(`dm:${r.id}`)

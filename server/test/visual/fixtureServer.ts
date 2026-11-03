@@ -494,6 +494,20 @@ app.get("/api/providers", (_q, r) =>
     reloginEnabled: true,
   }),
 );
+// 저장된 목록 예시: Claude는 있고, Codex는 없고(안내 문구), Grok은 긴 이름.
+app.get("/api/providers/remembered-models", (_q, r) =>
+  r.json({
+    models: {
+      claude: [
+        { value: "opus", displayName: "Opus 5.5" },
+        { value: "sonnet", displayName: "Sonnet 5.5" },
+        { value: "haiku", displayName: "Haiku 5.5" },
+      ],
+      codex: [],
+      grok: [{ value: "grok-long", displayName: "Grok 아주 긴 모델 이름이 칸을 넘을 때 어떻게 보이는지 확인하는 줄입니다" }],
+    },
+  }),
+);
 app.get("/api/sessions/stats", (_q, r) => r.json({ dataBytes: 12_345_678, sessions: SESSIONS.length }));
 function presenceOf(s: FixtureSession, i: number) {
   return {

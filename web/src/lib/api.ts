@@ -18,7 +18,7 @@ import type {
   FsPlaces,
 } from './types'
 import type { DeletedSessionRow, SearchHit } from './brain'
-import type { PermissionMode, PermissionModesResponse, AutoResumePlan, AutoResumeSettings, HandoffInfo, HandoffRequestBody, BackupItem, BackupListResponse, ChangePasswordResponse, EventsPageResponse, ServerInfoResponse, ServerLogLevel, ServerLogResponse, UpdateStatusResponse } from '@shared/http'
+import type { PermissionMode, PermissionModesResponse, AutoResumePlan, AutoResumeSettings, HandoffInfo, HandoffRequestBody, BackupItem, BackupListResponse, ChangePasswordResponse, EventsPageResponse, ServerInfoResponse, ServerLogLevel, RemoteAccessResponse, ServerLogResponse, UpdateStatusResponse } from '@shared/http'
 import type { ErrorGroupDetailResponse, ErrorGroupListResponse, ErrorLogPeriod, ErrorLogSource } from '@shared/errors'
 import { authHeaders } from './clientAuth'
 
@@ -188,6 +188,9 @@ export const api = {
 
   systemInfo: () => req<ServerInfoResponse>('/api/system/info'),
   systemUpdate: () => req<UpdateStatusResponse>('/api/system/update'),
+  remoteAccess: () => req<RemoteAccessResponse>('/api/system/remote-access'),
+  enableRemoteAccess: () => req<RemoteAccessResponse>('/api/system/remote-access', { method: 'POST' }),
+  disableRemoteAccess: () => req<RemoteAccessResponse>('/api/system/remote-access', { method: 'DELETE' }),
   // 앱 안 원클릭 업데이트. 설치는 202로 시작만 알리고, 진행은 상태 조회로 본다.
   checkUpdateNow: () => req<UpdateStatusResponse>('/api/system/update/check', { method: 'POST' }),
   installUpdate: () => req<unknown>('/api/system/update/install', { method: 'POST' }),

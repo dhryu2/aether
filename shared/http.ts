@@ -511,6 +511,16 @@ export type EventsPageResponse = {
 };
 
 /** 서버 정보(읽기 전용). 비밀값은 싣지 않는다. */
+/** 설정 > 서버 정보의 「폰에서 쓰기」 상태. unsupported면 화면에 보이지 않는다. */
+export type RemoteAccessResponse = {
+  state: "unsupported" | "noTailscale" | "offline" | "off" | "consent" | "on" | "conflict";
+  /** 직접 실행할 때 쓰는 명령. */
+  command: string;
+  url?: string;
+  consentUrl?: string;
+  error?: string;
+};
+
 export type ServerInfoResponse = {
   version: string;
   dataDir: string;

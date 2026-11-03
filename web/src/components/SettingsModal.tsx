@@ -13,6 +13,7 @@ import { useErrorTodayCount } from './settings/useErrorTodayCount'
 import { Group, GroupTitle, Sep, TextRow } from './settings/parts'
 import { PasswordSection } from './settings/PasswordSection'
 import { LlmSection, ServerInfoSection } from './settings/ServerInfoSection'
+import { RemoteAccessSection } from './settings/RemoteAccessSection'
 import { ServerLogView } from './settings/ServerLogView'
 import { rowMin } from './settings/settingsLayout'
 import { AccountSection, AutoResumeSection, GeneralSection, PushSection, TroubleSection } from './settings/sections'
@@ -49,7 +50,7 @@ function PaneBody({ pane }: { pane: Pane }) {
     case 'autoResume': return <AutoResumeSection hideTitle />
     case 'account': return <><AccountSection /><PasswordSection /></>
     case 'usage': return <SessionStatus />
-    case 'info': return <ServerInfoSection hideTitle />
+    case 'info': return <><ServerInfoSection hideTitle /><RemoteAccessSection /></>
     case 'llm': return <LlmSection hideTitle />
     case 'errors': return <ErrorLogView />
     case 'logs': return <ServerLogView />

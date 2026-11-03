@@ -5,6 +5,9 @@
  *   POST /api/system/update/check    지금 새 버전 확인
  *   POST /api/system/update/install  앱 안 업데이트 시작(설치할 수 없거나 새 버전이 없으면 400, 진행 중이면 409)
  *   POST /api/system/update/cancel   설치 시작 전까지 취소
+ *   GET  /api/system/remote-access  폰에서 쓰기(tailscale serve) 상태
+ *   POST /api/system/remote-access  폰에서 쓰기 켜기
+ *   DELETE /api/system/remote-access  폰에서 쓰기 끄기, 허용 대기 취소
  *   GET  /api/system/logs      서버 로그 마지막 N줄
  *   GET  /api/system/backups   DB 백업 목록과 복원 예약·지난 결과
  *   POST /api/system/backups   DB 수동 백업(이미 진행 중이면 409)
@@ -23,6 +26,7 @@ import type { BackupListResponse, ServerInfoResponse, ServerLogLevel, ServerLogR
 import { BACKUP_NAME, BackupBusyError, backupRunning, createBackup, listBackups } from "../db/backups";
 import { cancelRestore, RestoreNotFoundError, restoreStatus, scheduleRestore } from "../db/restore";
 import { database } from "../db/sqlite";
+import { disableRemoteAccess, enableRemoteAccess, remoteAccessStatus } from "../remote/tailscaleServe";
 import { reportError } from "../observability/report";
 import { readServerLog, serverLogDir } from "../observability/serverLog";
 import { st } from "../i18n";
@@ -68,6 +72,18 @@ systemRouter.post("/update/install", (_req: Request, res: Response) => {
 systemRouter.post("/update/cancel", (_req: Request, res: Response) => {
   updateInstaller.cancel();
   res.json(updateStatus());
+});
+
+systemRouter.get("/remote-access", async (_req: Request, res: Response) => {
+  res.json(await remoteAccessStatus());
+});
+
+systemRouter.post("/remote-access", async (_req: Request, res: Response) => {
+  res.json(await enableRemoteAccess());
+});
+
+systemRouter.delete("/remote-access", async (_req: Request, res: Response) => {
+  res.json(await disableRemoteAccess());
 });
 
 systemRouter.get("/logs", (req: Request, res: Response) => {

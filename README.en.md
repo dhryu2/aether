@@ -1,26 +1,26 @@
 <p align="center">
-  <img src="../../web/src/assets/chamding-idle.webp" alt="" width="110">
+  <img src="web/src/assets/chamding-idle.webp" alt="" width="110">
 </p>
 
 <h1 align="center">Aether</h1>
 
 <p align="center">
-  <strong>A chat window for AI agents, not a terminal</strong>
+  <strong>A self-hosted chat window for AI coding agents</strong>
 </p>
 
 <p align="center">
-  <a href="../../README.md">한국어</a> · English
+  <a href="README.md">한국어</a> · English
 </p>
 
 <p align="center">
-  <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-0068d1" alt="Apache 2.0 license"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-0068d1" alt="Apache 2.0 license"></a>
   <img src="https://img.shields.io/badge/Node.js-24-0068d1" alt="Node.js 24">
 </p>
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="hero-en-dark.png">
-    <img src="hero-en-light.png" alt="The Aether window. The list on the left shows work awaiting approval, and the conversation on the right shows a file edit approval card." width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="deploy/readme/hero-en-dark.png">
+    <img src="deploy/readme/hero-en-light.png" alt="The Aether window. The list on the left shows work awaiting approval, and the conversation on the right shows a file edit approval card." width="100%">
   </picture>
 </p>
 
@@ -39,7 +39,7 @@ Aether is an app you install on your own computer. Instead of watching a termina
 - **See what is waiting, at a glance** — The list shows which work is waiting for you and for how long.
 - **Several AIs, one window** — Choose the AI for each piece of work and keep several open side by side.
 
-## <img src="../../web/src/assets/chamding-inspect.webp" alt="" height="30" align="top"> A look around
+## <img src="web/src/assets/chamding-inspect.webp" alt="" height="30" align="top"> A look around
 
 <table>
 <tr>
@@ -50,7 +50,7 @@ Aether is an app you install on your own computer. Instead of watching a termina
 When the AI asks a question or needs approval, a card appears in the conversation. Pick an option or type your own answer.
 
 </td>
-<td width="58%"><picture><source media="(prefers-color-scheme: dark)" srcset="question-en-dark.png"><img src="question-en-light.png" alt="A question card asking how much to test" width="100%"></picture></td>
+<td width="58%"><picture><source media="(prefers-color-scheme: dark)" srcset="deploy/readme/question-en-dark.png"><img src="deploy/readme/question-en-light.png" alt="A question card asking how much to test" width="100%"></picture></td>
 </tr>
 <tr>
 <td colspan="2">
@@ -59,12 +59,12 @@ When the AI asks a question or needs approval, a card appears in the conversatio
 
 Choose the AI for each piece of work, and keep several open side by side.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="split-en-dark.png"><img src="split-en-light.png" alt="Two pieces of work open side by side. One is awaiting approval and the other is working." width="100%"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="deploy/readme/split-en-dark.png"><img src="deploy/readme/split-en-light.png" alt="Two pieces of work open side by side. One is awaiting approval and the other is working." width="100%"></picture>
 
 </td>
 </tr>
 <tr>
-<td width="42%" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="phone-en-dark.png"><img src="phone-en-light.png" alt="An approval card in a phone browser" width="280"></picture></td>
+<td width="42%" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="deploy/readme/phone-en-dark.png"><img src="deploy/readme/phone-en-light.png" alt="An approval card in a phone browser" width="280"></picture></td>
 <td width="58%" valign="middle">
 
 ### The same screen on your phone
@@ -86,7 +86,7 @@ Aether does not include any AI tool. Install and sign in to the ones you want to
 - Grok
 - Ollama
 
-## <img src="../../web/src/assets/chamding-idle.webp" alt="" height="30" align="top"> Getting started
+## <img src="web/src/assets/chamding-idle.webp" alt="" height="30" align="top"> Getting started
 
 Node.js 24 is required. From the repository root, run it from source:
 
@@ -97,7 +97,7 @@ npm --prefix server ci --include=dev
 npm --prefix server start
 ```
 
-Open <http://127.0.0.1:8787> in your browser. To change settings, copy [`server/.env.example`](../../server/.env.example) to `server/.env` and edit it.
+Open <http://127.0.0.1:8787> in your browser. To change settings, copy [`server/.env.example`](server/.env.example) to `server/.env` and edit it.
 
 Run the tests with:
 
@@ -108,11 +108,11 @@ npm --prefix server test
 ## Access and security
 
 - **By default:** Aether is reachable only from the computer it is installed on, and sign-in is off.
-- **From other devices:** Do not expose it directly to the internet. Use a VPN such as Tailscale, and turn on authentication with `AETHER_AUTH_MODE` in `server/.env`. See [`server/.env.example`](../../server/.env.example) for the options.
+- **From other devices:** Do not expose it directly to the internet. Use a VPN such as Tailscale, and turn on authentication with `AETHER_AUTH_MODE` in `server/.env`. See [`server/.env.example`](server/.env.example) for the options.
 - **Be careful:** AI agents can edit files and run commands on this computer. Check your approval settings before you use it.
 
 ## License
 
-Code is licensed under the [Apache License 2.0](../../LICENSE). Third-party notices are in [`NOTICE`](../../NOTICE).
+Code is licensed under the [Apache License 2.0](LICENSE). Third-party notices are in [`NOTICE`](NOTICE).
 
-The Chamding mascot and the Aether name and logos are not covered by this license. To distribute a modified version, replace those files and use a different name. See [`BRAND.md`](../../BRAND.md) for details.
+The Chamding mascot and the Aether name and logos are not covered by this license. To distribute a modified version, replace those files and use a different name. See [`BRAND.md`](BRAND.md) for details.

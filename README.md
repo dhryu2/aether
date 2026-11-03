@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  한국어 · <a href="deploy/readme/README.md">English</a>
+  한국어 · <a href="README.en.md">English</a>
 </p>
 
 <p align="center">

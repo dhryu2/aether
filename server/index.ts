@@ -77,24 +77,28 @@ let shuttingDown = false;
 async function shutdown(code = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
-  const sessions = sessionManager.all();
-  // interrupt 병렬화 + 3s 상한(어떤 interrupt가 매달려도 종료 지연 방지). drainPending은 동기·멱등이라 무조건 실행.
-  await Promise.race([
-    Promise.allSettled(sessions.map((s) => s.interrupt())),
-    new Promise<void>((r) => setTimeout(r, 3000)),
-  ]);
-  for (const s of sessions) s.drainPending(st("notice.proto.serverShutdown"));
-  // 진행 중이던 재인증 자식 프로세스 정리(좀비 방지) — 등록된 provider 전부.
-  //   한 provider를 이름으로 집어 쓰면 새 provider가 등록될 때 그쪽 로그인만 조용히 안 정리된다.
-  for (const p of listProviders()) {
-    try {
-      p.services.auth?.disposeAll();
-    } catch (e) {
-      void reportError(e, { component: "server", operation: "auth.cleanup" }); console.error(`[aether] ${p.id} 인증 정리 실패:`, e); // 한 provider 실패가 종료를 막지 않게
+  // 정리 중 무엇이 실패해도 프로세스는 끝나야 한다. shuttingDown 때문에 다시 부를 수 없어, 여기서 못 끝내면 서버가 영구히 남는다.
+  try {
+    const sessions = sessionManager.all();
+    // interrupt 병렬화 + 3s 상한(어떤 interrupt가 매달려도 종료 지연 방지). drainPending은 동기·멱등이라 무조건 실행.
+    await Promise.race([
+      Promise.allSettled(sessions.map((s) => s.interrupt())),
+      new Promise<void>((r) => setTimeout(r, 3000)),
+    ]);
+    for (const s of sessions) s.drainPending(st("notice.proto.serverShutdown"));
+    // 진행 중이던 재인증 자식 프로세스 정리(좀비 방지) — 등록된 provider 전부.
+    //   한 provider를 이름으로 집어 쓰면 새 provider가 등록될 때 그쪽 로그인만 조용히 안 정리된다.
+    for (const p of listProviders()) {
+      try {
+        p.services.auth?.disposeAll();
+      } catch (e) {
+        void reportError(e, { component: "server", operation: "auth.cleanup" }); console.error(`[aether] ${p.id} 인증 정리 실패:`, e); // 한 provider 실패가 종료를 막지 않게
+      }
     }
+    await getErrorJournal()?.close(2000);
+  } finally {
+    process.exit(code);
   }
-  await getErrorJournal()?.close(2000);
-  process.exit(code);
 }
 process.on("SIGTERM", () => void shutdown(0));
 process.on("SIGINT", () => void shutdown(0));

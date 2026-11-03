@@ -51,6 +51,7 @@ export class ErrorJournal {
     await this.initializing;
   }
   private async syncDirectory() {
+    if (process.platform === 'win32') return; // 윈도우는 폴더 핸들의 fsync를 EPERM으로 거절한다. 파일 이름 변경의 내구성은 NTFS 로그가 맡는다.
     const fd = await fs.open(this.options.directory, 'r');
     try { await fd.sync(); } finally { await fd.close(); }
   }

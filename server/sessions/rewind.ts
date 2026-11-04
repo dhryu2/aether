@@ -35,7 +35,7 @@ export type CheckpointNote = {
 };
 
 export class RewindError extends Error {
-  constructor(readonly code: "busy" | "missing" | "tail" | "notfound") {
+  constructor(readonly code: "busy" | "missing" | "notfound") {
     super(code);
     this.name = "RewindError";
   }
@@ -170,8 +170,8 @@ export function rewindTarget(
     if (isHiddenSeq(event.seq, ranges)) continue;
     if (event.seq > until) until = event.seq;
   }
-  if (until <= seq) throw new RewindError("tail");
-  return { after: seq, until };
+  // 고른 말까지 숨긴다. 글은 화면이 입력창으로 돌려놓아, 고쳐 보내면 그 자리에서 대화가 이어진다.
+  return { after: seq - 1, until };
 }
 
 const RESEED_CAP = 16_000;
@@ -210,11 +210,25 @@ export type RewindOutcome = {
   idleSeq?: number;
 };
 
+/** 되돌리기 전에 복원할 수 있는 파일과 없는 파일을 알려 준다. 아무것도 바꾸지 않는다. */
+export function previewRewind(
+  meta: Pick<SessionMeta, "id" | "hiddenRanges">,
+  seq: number,
+): { restore: string[]; skipped: { path: string; reason: SkipReason }[] } {
+  const events = store.readEventsSince(meta.id, 0);
+  const target = rewindTarget(events, seq, parseHiddenRanges(meta.hiddenRanges));
+  let until = target.until;
+  for (const event of events) if (event.seq > until) until = event.seq;
+  const plan = planRewind(loadCheckpoints(meta.id), target.after, until);
+  return { restore: plan.restore.map((note) => note.path), skipped: plan.skipped };
+}
+
 /** 잠든 세션. 실행기를 깨우지 않고 기록과 파일만 되돌린다. */
 export function rewindDisk(
   meta: SessionMeta,
   seq: number,
   normalize: (event: AetherEvent) => readonly { type: string; text?: string }[],
+  restoreFiles = true,
 ): RewindOutcome {
   if (!meta.cwd) throw new RewindError("missing");
   const events = store.readEventsSince(meta.id, 0);
@@ -223,7 +237,7 @@ export function rewindDisk(
   let until = target.until;
   for (const event of events) if (event.seq > until) until = event.seq;
   const plan = planRewind(loadCheckpoints(meta.id), target.after, until);
-  const applied = applyRestore(meta.cwd, plan.restore);
+  const applied = restoreFiles ? applyRestore(meta.cwd, plan.restore) : { restored: [], failed: [] };
   const hiddenRanges = [...ranges, { after: target.after, until }];
   const reseedText = buildReseed(linesForReseed(events, hiddenRanges, normalize));
   // 고른 말 뒤의 완료 사건은 숨는다. 그대로 두면 화면이 그 말을 아직 진행 중인 턴으로 본다.
@@ -233,7 +247,7 @@ export function rewindDisk(
   store.saveMeta({ ...meta, resumeKey: undefined, hiddenRanges, reseedText, rewound: true });
   return {
     restored: applied.restored,
-    skipped: [...plan.skipped, ...applied.failed],
+    skipped: restoreFiles ? [...plan.skipped, ...applied.failed] : [],
     after: target.after,
     until,
     idleSeq,
@@ -257,6 +271,8 @@ export function buildReseed(
   lines: readonly { role: "user" | "assistant"; text: string }[],
   cap = RESEED_CAP,
 ): string {
+  // 첫 말을 되돌리면 남은 대화가 없다. 안내만 심으면 모델이 없는 대화를 찾는다.
+  if (!lines.length) return "";
   const header =
     "이 대화는 중간으로 되돌려졌다. 그 뒤에 오간 말과, 그때 승인했던 파일 변경은 취소됐다. 아래는 남겨 둔 대화다. 이 내용만 이어서 답하라.";
   const body = lines

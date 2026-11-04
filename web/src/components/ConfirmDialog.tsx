@@ -31,6 +31,15 @@ export function ConfirmDialog() {
           onConfirm={runConfirm}
           onCancel={actions.closeDialog}
           safeRef={safeRef}
+          secondary={
+            d.secondary && {
+              label: d.secondary.label,
+              onClick: () => {
+                actions.closeDialog()
+                d.secondary?.onClick()
+              },
+            }
+          }
         />
       </ModalCard>
     </ModalShell>

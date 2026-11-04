@@ -94,6 +94,7 @@ const INPUT_TABLE: Record<string, Record<string, InputClass>> = {
     before: "id", // 이벤트 페이지 커서(seq)
     limit: "id",
     from: "id",
+    restoreFiles: "C", // POST /:id/rewind. 확인 창에서 고른 값이며 true일 때만 파일을 되돌린다
     seq: "id", // POST /:id/rewind. 서버가 매긴 사건 순번을 되돌려 받는다. 모델 입력이 아니다(730339d)
     focus: "A", // 넘기기에서 사람이 직접 적은 다음에 할 일 글(4000자 이하). 모델에게는 사람 글로 전달한다
     copyOnly: "C", // 넘기기 창의 다른 컴퓨터(복사만) 토글. boolean만 받는다

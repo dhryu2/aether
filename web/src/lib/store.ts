@@ -145,6 +145,7 @@ export type DialogState = {
   message: string // \n 지원(pre-line)
   confirmLabel?: string // 위험/확인 버튼 라벨(기본 '확인')
   onConfirm?: () => void // confirm 확인 시 실행(닫힌 뒤 호출)
+  secondary?: { label: string; onClick: () => void } // 실행 옆의 더 강한 선택 하나(닫힌 뒤 호출)
 }
 
 // 일반 알림 — 알리기만 하고 사용자가 할 일은 없는 소식. 화면 위 가운데에 잠깐 떴다 사라진다(shell/Toasts.tsx).
@@ -2822,8 +2823,8 @@ export const actions = {
   },
 
   // 범용 확인 다이얼로그 — 브라우저 confirm() 대체.
-  showConfirm: (opts: { tone?: 'danger' | 'warn' | 'neutral'; icon?: LucideIcon; title: string; message: string; confirmLabel?: string; onConfirm: () => void }) =>
-    set({ dialog: { tone: opts.tone ?? 'danger', icon: opts.icon, title: opts.title, message: opts.message, confirmLabel: opts.confirmLabel, onConfirm: opts.onConfirm } }),
+  showConfirm: (opts: { tone?: 'danger' | 'warn' | 'neutral'; icon?: LucideIcon; title: string; message: string; confirmLabel?: string; onConfirm: () => void; secondary?: DialogState['secondary'] }) =>
+    set({ dialog: { tone: opts.tone ?? 'danger', icon: opts.icon, title: opts.title, message: opts.message, confirmLabel: opts.confirmLabel, onConfirm: opts.onConfirm, secondary: opts.secondary } }),
   closeDialog: () => set({ dialog: null }),
   openUpdateProgress: (p: NonNullable<State['updateProgress']>) => set({ updateProgress: p }),
   closeUpdateProgress: () => set({ updateProgress: null }),
@@ -2950,7 +2951,7 @@ export const actions = {
     }
   },
 
-  requestRewind(execId: string, seq: number) {
+  async requestRewind(execId: string, seq: number, message: { text: string; images?: ImageAttachment[]; documents?: DocAttachment[] }) {
     if (!execId || seq <= 0) return
     const items = state.convos[execId]
     const turn = sessionTurn(state, execId)
@@ -2958,26 +2959,48 @@ export const actions = {
       actions.showNotice({ title: t('session.rewind.busy') })
       return
     }
+    let preview: Awaited<ReturnType<typeof api.rewindPreview>>
+    try {
+      preview = await api.rewindPreview(execId, seq)
+    } catch (e) {
+      set({ error: errMsg(e) })
+      return
+    }
+    const fileList = (paths: string[]) =>
+      paths.length > 5 ? `${paths.slice(0, 5).join(', ')} ${t('session.rewind.moreFiles', { n: paths.length - 5 })}` : paths.join(', ')
+    const notes = [
+      t('session.rewind.message'),
+      drafts.get(execId).trim() ? t('session.rewind.draftNote') : '',
+      preview.restore.length ? t('session.rewind.filesNote', { files: fileList(preview.restore) }) : '',
+      preview.skipped.length ? t('session.rewind.skippedNote', { files: fileList(preview.skipped.map((item) => item.path)) }) : '',
+    ]
+    const run = (restoreFiles: boolean) => {
+      void actions.rewind(execId, seq, restoreFiles, message)
+    }
+    const hasFiles = preview.restore.length > 0
     actions.showConfirm({
       tone: 'warn',
       title: t('session.rewind.title'),
-      message: t('session.rewind.message'),
-      confirmLabel: t('session.rewind.confirm'),
-      onConfirm: () => {
-        void actions.rewind(execId, seq)
-      },
+      message: notes.filter(Boolean).join('\n'),
+      confirmLabel: t(hasFiles ? 'session.rewind.chatOnly' : 'session.rewind.confirm'),
+      onConfirm: () => run(false),
+      secondary: hasFiles ? { label: t('session.rewind.chatAndFiles'), onClick: () => run(true) } : undefined,
     })
   },
 
-  async rewind(execId: string, seq: number) {
+  async rewind(execId: string, seq: number, restoreFiles = false, message?: { text: string; images?: ImageAttachment[]; documents?: DocAttachment[] }) {
     try {
-      const result = await api.rewind(execId, seq)
+      const result = await api.rewind(execId, seq, restoreFiles)
       const ranges = hiddenRanges[execId] ?? (hiddenRanges[execId] = [])
       ranges.push({ after: result.after, until: result.until })
       const kept = (state.convos[execId] ?? []).filter((item) => !hiddenSeq(execId, item.seq))
       // 서버가 숨김 범위 밖에 남긴 완료와 같은 순번이다. 새로고침하면 그 사건이 다시 온다.
       const arr = withRewindIdle(kept, result.idleSeq)
-      set({ convos: { ...state.convos, [execId]: arr } })
+      // 그 사이 다른 세션으로 옮겼어도 글은 되돌린 세션의 입력창으로만 간다.
+      set({
+        convos: { ...state.convos, [execId]: arr },
+        ...(message ? { composerFill: { id: execId, text: message.text, nonce: Date.now(), images: message.images, documents: message.documents } } : {}),
+      })
       if (result.skipped.length) {
         actions.showNotice({
           title: t('session.rewind.skippedTitle'),

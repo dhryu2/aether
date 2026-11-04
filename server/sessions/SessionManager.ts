@@ -32,7 +32,7 @@ import { autoResumeStoppedIntent, waitingFromPending, type NotifyIntent } from "
 import { AUTO_RESUME_MAX_ATTEMPTS, AUTO_RESUME_TEXT_MAX, nextAttemptAt, readAutoResumeSettings, type AutoResumeVerdict } from "./autoResume";
 import { st } from "../i18n";
 import { deriveWorkTitle, resolveWorkTitle } from "../../shared/workTitle";
-import { forgetRewoundLetters, parseHiddenRanges, rewindDisk, RewindError, sessionWasRewound, type HiddenRange, type RewindOutcome } from "./rewind";
+import { forgetRewoundLetters, parseHiddenRanges, previewRewind, rewindDisk, RewindError, sessionWasRewound, type HiddenRange, type RewindOutcome } from "./rewind";
 
 const NAME_MAX = 80;
 /** 일하는 중이라 자동 재개를 미룰 때의 간격. */
@@ -665,23 +665,31 @@ class SessionManager {
     return this.rewindsInFlight.has(id);
   }
 
-  /** 사용자 말 뒤로 대화와 저장해 둔 파일을 되돌린다. 진행 중이면 거절한다. */
-  async rewind(id: string, seq: number): Promise<RewindOutcome> {
+  /** 되돌리기 확인창이 보여 줄 파일 목록. */
+  rewindPreview(id: string, seq: number): ReturnType<typeof previewRewind> {
+    if (!UUID_RE.test(id)) throw new RewindError("missing");
+    const meta = store.loadMeta(id);
+    if (!meta) throw new RewindError("missing");
+    return previewRewind(meta, seq);
+  }
+
+  /** 고른 사용자 말부터 대화를 숨기고, restoreFiles면 저장해 둔 파일도 되돌린다. 진행 중이면 거절한다. */
+  async rewind(id: string, seq: number, restoreFiles = true): Promise<RewindOutcome> {
     if (!UUID_RE.test(id)) throw new RewindError("missing");
     // 먼저 검사해야 두 번째 요청의 finally가 첫 요청의 표시를 지우지 않는다.
     if (this.rewindsInFlight.has(id)) throw new RewindError("busy");
     this.rewindsInFlight.add(id);
     try {
-      return await this.rewindInner(id, seq);
+      return await this.rewindInner(id, seq, restoreFiles);
     } finally {
       this.rewindsInFlight.delete(id);
     }
   }
 
-  private async rewindInner(id: string, seq: number): Promise<RewindOutcome> {
+  private async rewindInner(id: string, seq: number, restoreFiles: boolean): Promise<RewindOutcome> {
     const live = this.sessions.get(id);
     if (live && !live.isDisposed) {
-      const out = await live.rewind(seq);
+      const out = await live.rewind(seq, restoreFiles);
       await forgetRewoundLetters(id, out);
       if (this.handoffMeta(id)?.handoffJob?.state === "asking") this.dropAskingHandoff(id); // 요청이나 질문 카드가 숨겨졌을 수 있다
       return out;
@@ -690,7 +698,7 @@ class SessionManager {
     if (!meta?.cwd) throw new RewindError("missing");
     const codec = providerEntry(storedProviderId(meta.provider)).codec;
     // 디스크 칸은 깨진 세션을 { id }만 담으려고 Partial이다. cwd가 있으면 저장된 메타 전체를 되돌린다.
-    const result = rewindDisk(meta as SessionMeta, seq, (event) => codec.normalize(event));
+    const result = rewindDisk(meta as SessionMeta, seq, (event) => codec.normalize(event), restoreFiles);
     await forgetRewoundLetters(id, result);
     const saved = store.loadMeta(id);
     const entry = this.disk.get(id);

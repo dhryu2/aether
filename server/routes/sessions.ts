@@ -7,7 +7,8 @@ import { reportError } from "../observability/report";
  *   GET    /api/sessions                  세션 목록
  *   POST   /api/sessions/:id/message      턴 입력 {text, brief?}
  *   POST   /api/sessions/:id/wake         잠든 세션 깨우기(대화 없음)
- *   POST   /api/sessions/:id/rewind      고른 사용자 말 뒤로 대화와 저장해 둔 파일 되돌리기 {seq}
+ *   GET    /api/sessions/:id/rewind-preview?seq=  되돌릴 때 복원할 수 있는 파일 목록
+ *   POST   /api/sessions/:id/rewind      고른 사용자 말부터 대화 되돌리기, restoreFiles면 저장해 둔 파일도 {seq, restoreFiles}
  *   POST   /api/sessions/:id/interrupt    진행 중 턴 중단
  *   POST   /api/sessions/:id/background-tasks/:taskId/stop  백그라운드 작업 하나 중지
  *   POST   /api/sessions/:id/model        세션 모델 변경 {model}
@@ -461,13 +462,27 @@ sessionsRouter.post("/:id/wake", async (req: Request, res: Response) => {
   res.json({ ok: true, alreadyAwake: false });
 });
 
+sessionsRouter.get("/:id/rewind-preview", (req: Request, res: Response) => {
+  const seq = Number(req.query.seq);
+  if (!Number.isInteger(seq) || seq <= 0) return res.status(400).json({ error: st("routes.sessions.rewindBadSeq") });
+  try {
+    res.json(sessionManager.rewindPreview(String(req.params.id), seq));
+  } catch (err) {
+    if (err instanceof RewindError) {
+      return res.status(err.code === "missing" ? 404 : 400).json({ error: st(`routes.sessions.rewind.${err.code}`) });
+    }
+    void reportResponseError(res, err, { component: "routes", operation: "session.rewind.preview", session_id: req.params.id as string }); console.error("[aether] 되돌리기 미리보기 실패:", err);
+    return res.status(500).json({ error: st("routes.common.internalError") });
+  }
+});
+
 sessionsRouter.post("/:id/rewind", async (req: Request, res: Response) => {
   const id = String(req.params.id);
   if (sessionManager.isArchived(id)) return res.status(409).json({ error: st("routes.sessions.archivedReadOnly") });
   const seq = Number(req.body?.seq);
   if (!Number.isInteger(seq) || seq <= 0) return res.status(400).json({ error: st("routes.sessions.rewindBadSeq") });
   try {
-    const result = await sessionManager.rewind(id, seq);
+    const result = await sessionManager.rewind(id, seq, req.body?.restoreFiles === true);
     res.json(result);
   } catch (err) {
     if (err instanceof RewindError) {

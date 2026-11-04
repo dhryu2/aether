@@ -1,6 +1,6 @@
 // 대화 말풍선 — 유저(보낸 것·대기 중)와 어시스턴트.
 import { memo, useMemo, type CSSProperties } from 'react'
-import { Copy, Pencil, RotateCw, Send, Undo2, X } from 'lucide-react'
+import { Copy, Pencil, Send, Undo2, X } from 'lucide-react'
 import type { ImageAttachment, DocAttachment } from '../../lib/types'
 import { actions, sessionTurn, useSessionArchived, useStore } from '../../lib/store'
 import { bubbleBlocks } from '../../lib/composerBlocks'
@@ -73,8 +73,7 @@ export const UserBubble = memo(function UserBubble({
               style={USER_TEXT}
               onContextMenu={onContextMenuFor(() => menuOf(
                 copyItem(text, t('stream.userBubble.copy')),
-                <MenuItem onClick={() => actions.editMessage(text, sessionId)}>{t('stream.userBubble.resend')}</MenuItem>,
-                canRewind && <MenuItem onClick={() => actions.requestRewind(sessionId, seq)}>{t('stream.userBubble.rewind')}</MenuItem>,
+                canRewind && <MenuItem onClick={() => void actions.requestRewind(sessionId, seq, { text, images, documents })}>{t('stream.userBubble.rewind')}</MenuItem>,
               ))}
             >
               <UserText text={text} />
@@ -93,20 +92,10 @@ export const UserBubble = memo(function UserBubble({
                 <Copy size={15} />
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => actions.editMessage(text, sessionId)}
-              aria-label={t('stream.userBubble.resend')}
-              title={t('stream.userBubble.resendTitle')}
-              className="msg-action lift hit-44 inline-flex items-center justify-center"
-              style={{ width: 28, height: 28, borderRadius: R.sm, color: C.label3 }}
-            >
-              <RotateCw size={15} />
-            </button>
             {canRewind && (
               <button
                 type="button"
-                onClick={() => actions.requestRewind(sessionId, seq)}
+                onClick={() => void actions.requestRewind(sessionId, seq, { text, images, documents })}
                 aria-label={t('stream.userBubble.rewind')}
                 title={t('stream.userBubble.rewindTitle')}
                 className="msg-action lift hit-44 inline-flex items-center justify-center"

@@ -41,7 +41,7 @@ export function AlertDialogBody({
       <h2 id={titleId} style={{ margin: 0, fontSize: 17, fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1.35, color: C.label }}>
         {title}
       </h2>
-      <p id={descId} style={{ margin: '8px 0 0', fontSize: 15, color: C.label2, lineHeight: 1.5, whiteSpace: 'pre-line' }}>
+      <p id={descId} style={{ margin: '8px 0 0', fontSize: 15, color: C.label2, lineHeight: 1.5, whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>
         {message}
       </p>
       {extra}

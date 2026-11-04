@@ -274,10 +274,13 @@ export const api = {
   stopBackgroundTask: (id: string, taskId: string) =>
     req<{ ok: true }>(`/api/sessions/${id}/background-tasks/${encodeURIComponent(taskId)}/stop`, { method: 'POST' }),
 
-  rewind: (id: string, seq: number) =>
+  rewindPreview: (id: string, seq: number) =>
+    req<{ restore: string[]; skipped: { path: string; reason: string }[] }>(`/api/sessions/${id}/rewind-preview?seq=${seq}`),
+
+  rewind: (id: string, seq: number, restoreFiles = false) =>
     req<{ restored: string[]; skipped: { path: string; reason: string }[]; after: number; until: number; idleSeq?: number }>(
       `/api/sessions/${id}/rewind`,
-      { method: 'POST', body: JSON.stringify({ seq }) },
+      { method: 'POST', body: JSON.stringify({ seq, restoreFiles }) },
     ),
 
   // purge면 검색 글자까지 지운다. 빼면 대화 기록(검색 글자)을 남긴다.

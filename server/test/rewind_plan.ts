@@ -14,6 +14,7 @@ import { buildMutationPreview } from "../providers/claude/mutationPreview";
 import * as store from "../sessions/persistence";
 import {
   appendCheckpoint,
+  previewRewind,
   applyRestore,
   buildReseed,
   checkpointFromMutation,
@@ -46,13 +47,10 @@ const events = [
   { seq: 3, kind: "user_msg" },
 ];
 check(rewindTarget(events, 1, []).until === 3, "첫 말 뒤의 마지막 보이는 순번까지 숨긴다");
-let tail = false;
-try {
-  rewindTarget(events, 3, []);
-} catch (error) {
-  tail = error instanceof RewindError && error.code === "tail";
-}
-check(tail, "뒤에 아무것도 없으면 되돌리지 않는다");
+check(rewindTarget(events, 1, []).after === 0, "고른 말까지 숨긴다");
+const lastTarget = rewindTarget(events, 3, []);
+check(lastTarget.after === 2 && lastTarget.until === 3, "뒤에 아무것도 없는 마지막 말도 그 말만 숨긴다");
+check(buildReseed([]) === "", "남은 대화가 없으면 다시 심을 글도 없다");
 let missing = false;
 try {
   rewindTarget(events, 2, []);
@@ -245,6 +243,26 @@ const diskData = fs.mkdtempSync(path.join(os.tmpdir(), "aether-rewind-data-"));
 config.dataDir = diskData;
 try {
   const id = "rewind-idle-disk";
+  {
+    // 대화만 되돌리면 파일은 그대로고, 미리보기는 아무것도 바꾸지 않는다.
+    const chatId = randomUUID();
+    const chatCwd = fs.mkdtempSync(path.join(os.tmpdir(), "aether-rewind-chat-"));
+    fs.writeFileSync(path.join(chatCwd, "keep.ts"), "now");
+    store.ensureSessionDir(chatId);
+    store.appendEvent(chatId, { seq: 1, ts: 1, kind: "user_msg", text: "고칠 말" });
+    store.appendEvent(chatId, { seq: 2, ts: 2, kind: "status", status: "completed" });
+    appendCheckpoint(chatId, { seq: 2, path: "keep.ts", before: "then", isCreate: false, ok: true, wholeFile: true });
+    appendCheckpoint(chatId, { seq: 2, path: "secret.bin", before: null, isCreate: false, ok: false, skip: "binary" });
+    const chatMeta = { id: chatId, cwd: chatCwd, createdAt: 1 };
+    store.saveMeta(chatMeta);
+    const preview = previewRewind(chatMeta, 1);
+    check(preview.restore.join() === "keep.ts" && preview.skipped[0]?.path === "secret.bin", "미리보기가 복원할 파일과 못 하는 파일을 나눈다", preview);
+    check(fs.readFileSync(path.join(chatCwd, "keep.ts"), "utf8") === "now", "미리보기는 파일을 바꾸지 않는다");
+    const chatOnly = rewindDisk(chatMeta, 1, () => [], false);
+    check(chatOnly.restored.length === 0 && chatOnly.skipped.length === 0, "대화만 되돌리면 파일 결과가 비어 있다", chatOnly);
+    check(fs.readFileSync(path.join(chatCwd, "keep.ts"), "utf8") === "now", "대화만 되돌리면 파일은 그대로다");
+    check(!store.loadMeta(chatId)?.reseedText, "첫 말을 되돌리면 다시 심을 글이 없다");
+  }
   const diskCwd = fs.mkdtempSync(path.join(os.tmpdir(), "aether-rewind-cwd-"));
   store.ensureSessionDir(id);
   store.appendEvent(id, { seq: 1, ts: 1, kind: "user_msg", text: "남겨" });
@@ -253,7 +271,7 @@ try {
   store.saveMeta(meta);
   const outcome = rewindDisk(meta, 1, () => []);
   const visible = store.readEventsSince(id, 0).filter((event) => !isHiddenSeq(event.seq, [{ after: outcome.after, until: outcome.until }]));
-  check(visible.some((event) => event.kind === "user_msg" && event.seq === 1), "고른 사용자 말은 남는다");
+  check(!visible.some((event) => event.kind === "user_msg" && event.seq === 1), "고른 사용자 말도 숨는다");
   check(
     visible.some((event) => isControlEvent(event, "status") && event.status === "completed" && event.seq === outcome.idleSeq),
     "숨김 범위 밖의 완료가 남아 새로고침 뒤에도 쉰 상태로 읽힌다",
@@ -405,9 +423,9 @@ async function checkRewindRejectsInput(
     check(finished && store.loadMeta(id)?.rewound === true, "되돌린 메타를 저장한 뒤 성공으로 답한다");
     const visible = store.readEventsSince(id, 0).filter((event) => !isHiddenSeq(event.seq, session.hiddenRanges));
     check(
-      visible.some((event) => event.kind === "user_msg" && event.seq === userSeq) &&
+      !visible.some((event) => event.kind === "user_msg" && event.seq === userSeq) &&
         visible.some((event) => isControlEvent(event, "status") && event.status === "completed" && event.seq === result.idleSeq),
-      "되돌린 뒤 고른 말과 조용한 완료만 남아 턴이 쉰다",
+      "되돌린 뒤 고른 말은 숨고 조용한 완료가 남아 턴이 쉰다",
     );
     check(!visible.some((event) => isControlEvent(event, "status") && event.status === "interrupted"), "되돌린 목록에 중단 사건은 없다");
   } finally {

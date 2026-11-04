@@ -1905,10 +1905,10 @@ export class LiveSession {
   }
 
   /**
-   * 고른 사용자 말 뒤의 대화와, 그때 승인해 저장해 둔 파일을 되돌린다.
+   * 고른 사용자 말과 그 뒤의 대화를 숨긴다. restoreFiles면 그때 승인해 저장해 둔 파일도 되돌린다.
    * 실행기는 끝내고, 다음 말은 새 프로세스가 남겨 둔 글을 한 번 읽고 잇는다.
    */
-  async rewind(seq: number): Promise<RewindOutcome> {
+  async rewind(seq: number, restoreFiles = true): Promise<RewindOutcome> {
     if (this.disposed) throw new RewindError("missing");
     if (this.rewinding) throw new RewindError("busy");
     if (
@@ -1933,7 +1933,7 @@ export class LiveSession {
       let until = target.until;
       for (const event of events) if (event.seq > until) until = event.seq;
       const plan = planRewind(loadCheckpoints(this.id), target.after, until);
-      const applied = applyRestore(this.cwd, plan.restore);
+      const applied = restoreFiles ? applyRestore(this.cwd, plan.restore) : { restored: [], failed: [] };
       this.hiddenRanges = [...this.hiddenRanges, { after: target.after, until }];
       this.reseedText = buildReseed(linesForReseed(events, this.hiddenRanges, (event) => this.codec.normalize(event)));
       this.rewound = true;
@@ -1954,7 +1954,7 @@ export class LiveSession {
       this.persistMeta("되돌리기");
       return {
         restored: applied.restored,
-        skipped: [...plan.skipped, ...applied.failed],
+        skipped: restoreFiles ? [...plan.skipped, ...applied.failed] : [],
         after: target.after,
         until,
         ...(idleSeq ? { idleSeq } : {}),

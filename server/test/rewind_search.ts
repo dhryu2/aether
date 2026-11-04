@@ -51,7 +51,7 @@ try {
   const a = await mkSession([[1, `${KEEP} one`], [2, `${GONE} two`], [3, `${GONE} three`]]);
   await rebuildSessionLetters();
   check((await hit(GONE)) === 2 && (await hit(KEEP)) === 1, "되돌리기 전에는 모두 찾힌다");
-  await sessionManager.rewind(a, 1);
+  await sessionManager.rewind(a, 2);
   check((await hit(GONE)) === 0, "숨긴 글은 사람 검색에서 0건이다");
   check((await hit(KEEP)) === 1, "남긴 말은 찾힌다");
   check((await letter.searchLettersWithContext({ query: GONE })).length === 0, "문맥 검색에서도 0건이다");
@@ -95,7 +95,7 @@ try {
   letter.__resetSessionLetterForTest();
   let threw = false;
   try {
-    await sessionManager.rewind(d, 1);
+    await sessionManager.rewind(d, 2);
   } catch {
     threw = true;
   }

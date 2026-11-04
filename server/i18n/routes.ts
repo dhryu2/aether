@@ -42,7 +42,6 @@ export const routes: Dict = {
   "routes.sessions.rewindBadSeq": { ko: "되돌릴 메시지의 번호가 올바르지 않아요", en: "That message number cannot be rewound" },
   "routes.sessions.rewind.busy": { ko: "작업 중에는 되돌릴 수 없어요", en: "Wait until the current turn finishes before rewinding" },
   "routes.sessions.rewind.missing": { ko: "세션을 찾을 수 없어요", en: "Session not found" },
-  "routes.sessions.rewind.tail": { ko: "이 메시지 뒤에는 되돌릴 내용이 없어요", en: "Nothing after this message can be rewound" },
   "routes.sessions.rewind.notfound": { ko: "되돌릴 메시지를 찾지 못했어요", en: "Could not find that message to rewind" },
   "routes.sessions.diaryBusy": {
     ko: "대화 저장 방식을 전환하는 중이라 지금은 메시지를 받지 않아요",

@@ -72,11 +72,9 @@ export const stream: Dict = {
   // 유저 버블
   'stream.userBubble.autoSent': { ko: 'Aether가 자동으로 보냄', en: 'Sent automatically by Aether' },
   'stream.userBubble.autoStop': { ko: '중단', en: 'Stop' },
-  'stream.userBubble.resend': { ko: '수정해서 다시 보내기', en: 'Resend · edit' },
-  'stream.userBubble.resendTitle': { ko: '입력창에 불러와 수정한 뒤 다시 보내기', en: 'Load into the composer to edit and resend' },
   'stream.userBubble.copy': { ko: '메시지 복사', en: 'Copy my message' },
-  'stream.userBubble.rewind': { ko: '여기까지 되돌리기', en: 'Rewind to here' },
-  'stream.userBubble.rewindTitle': { ko: '이 메시지 뒤의 대화와, 백업해 둔 파일 변경을 되돌려요', en: 'Rewind the later chat and saved file changes' },
+  'stream.userBubble.rewind': { ko: '여기서 다시 시작', en: 'Restart from here' },
+  'stream.userBubble.rewindTitle': { ko: '이 메시지부터 되돌리고 글을 입력창으로 가져와요', en: 'Rewind from this message and bring its text back to the composer' },
 
   // 대기 큐 버블
   'stream.queued.cancel': { ko: '대기 취소', en: 'Cancel queued message' },

@@ -135,10 +135,10 @@ function main() {
   const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
   /** 한 턴을 알림으로 진행한다: 시작 → (필요하면 승인 요청) → 답변 → 사용량 → 종료. */
-  async function runTurn(turnId: string, text: string) {
+  async function runTurn(turnId: string, text: string, startedAlready = false) {
     const slow = text.includes("@@slow@@");
     if (text.includes("@@subthread@@")) send({ jsonrpc: "2.0", method: "turn/started", params: { threadId: "th-sub", turn: { id: "t-sub", items: [], itemsView: "full", status: "inProgress", error: null } } });
-    send({ jsonrpc: "2.0", method: "turn/started", params: { threadId, turn: { id: turnId, items: [], itemsView: "full", status: "inProgress", error: null, startedAt: 1, completedAt: null, durationMs: null } } });
+    if (!startedAlready) send({ jsonrpc: "2.0", method: "turn/started", params: { threadId, turn: { id: turnId, items: [], itemsView: "full", status: "inProgress", error: null, startedAt: 1, completedAt: null, durationMs: null } } });
     /** 서버 → 클라이언트 요청 한 번. 답을 기록에 남긴다(테스트가 무엇을 답했는지 대조한다). */
     async function askClient(label: string, method: string, params: Json) {
       const rid = nextId++;
@@ -226,6 +226,7 @@ function main() {
       send({ jsonrpc: "2.0", method: "turn/completed", params: { threadId, turn: { id: turnId, items: [], itemsView: "full", status: "interrupted", error: null, startedAt: 1, completedAt: 2, durationMs: 5 } } });
       return;
     }
+    if (text.includes("@@subthread@@")) send({ jsonrpc: "2.0", method: "turn/completed", params: { threadId: "th-sub", turn: { id: "t-sub", items: [], itemsView: "full", status: "completed", error: null, startedAt: 1, completedAt: 2, durationMs: 1 } } });
     send({ jsonrpc: "2.0", method: "item/completed", params: { threadId, turnId, completedAtMs: 2, item: { type: "agentMessage", id: `it-${turnId}`, text: `받음: ${text}`, phase: null, memoryCitation: null } } });
     // 8h에서 실제 계정으로 관측한 sparse 갱신 모양이다. 사용률만 알려 주므로 정보성으로 남고 배너는 뜨지 않는다.
     send({ jsonrpc: "2.0", method: "account/rateLimits/updated", params: { rateLimits: { limitId: null, limitName: null, primary: { usedPercent: 16, windowDurationMins: 10080, resetsAt: 1787617478 }, secondary: null, credits: null, individualLimit: null, spendControlReached: null, planType: "plus", rateLimitReachedType: null } } });
@@ -511,8 +512,19 @@ function main() {
           ok({ turn: { id: turnId, items: [], itemsView: "full", status: "inProgress", error: null, startedAt: 1, completedAt: null, durationMs: null } });
           return;
         }
+        // `@@noack@@`: 턴 시작 알림만 보내고 시작 응답은 끝내 주지 않는다(요청 시간 초과를 재현한다).
+        if (text.includes("@@noack@@")) {
+          send({ jsonrpc: "2.0", method: "turn/started", params: { threadId, turn: { id: turnId, items: [], itemsView: "full", status: "inProgress", error: null, startedAt: 1, completedAt: null, durationMs: null } } });
+          void runTurn(turnId, text, true);
+          return;
+        }
+        // 시작 응답이 늦는 경우 — `@@earlystart@@`는 그 사이에 턴 시작 알림이 먼저 나간다.
+        const slowAck = text.includes("@@slowack@@") || text.includes("@@earlystart@@");
+        const early = text.includes("@@earlystart@@");
+        if (early) send({ jsonrpc: "2.0", method: "turn/started", params: { threadId, turn: { id: turnId, items: [], itemsView: "full", status: "inProgress", error: null, startedAt: 1, completedAt: null, durationMs: null } } });
+        if (slowAck) await wait(300);
         ok({ turn: { id: turnId, items: [], itemsView: "full", status: "inProgress", error: null, startedAt: 1, completedAt: null, durationMs: null } });
-        void runTurn(turnId, text);
+        void runTurn(turnId, text, early);
         return;
       }
 

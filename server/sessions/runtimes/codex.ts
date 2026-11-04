@@ -241,6 +241,8 @@ export class CodexRuntime implements AgentRuntime {
   private preparingTurn = false;
   /** 그 구간에서 중단을 눌렀다 — 준비가 끝나는 자리에서 그 턴을 안 보낸다. */
   private cancelPending = false;
+  /** 메인 대화의 `turn/started`로 본 턴 식별자. 시작 응답보다 먼저 오면 중단을 곧바로 보낼 수 있다. */
+  private startedTurnId: string | null = null;
   /** `/compact`처럼 모델 턴이 아닌 단독 명령 작업. app-server 완료 알림과 짝짓는다. */
   private commandOperation: RuntimeCommandOperation | null = null;
   /**
@@ -599,10 +601,17 @@ export class CodexRuntime implements AgentRuntime {
           resume = true;
         } else {
           this.activeTurnId = ack.turn.id;
+          this.sendPendingInterrupt(ack.turn.id);
         }
       }
     } catch (e) {
       void reportError(e, { component: "session", operation: "session.turn.start", session_id: this.opts.sessionId, model: this.opts.model, provider: this.backend.services.provider });
+      // 응답만 늦어 시간 초과가 났고 턴은 이미 시작했다 — 실패 문구를 내지 않고 그 턴을 이어 받는다.
+      if (this.startingTurn && this.startedTurnId && !this.completedBeforeAck.delete(this.startedTurnId)) {
+        this.activeTurnId = this.startedTurnId;
+        this.sendPendingInterrupt(this.activeTurnId);
+        return;
+      }
       // 턴을 못 보낸 것은 사용자가 알아야 할 사건이다 — 조용히 삼키면 화면이 영원히 "생각 중"에 머문다.
       //   이 메시지는 Codex 쪽 대화에 들어가지 못했으므로 그 사실을 문구로 밝힌다. 같은 입력을 다시 보내
       //   무한히 재시도하지는 않는다(영구적인 실패면 오류만 반복 생산한다).
@@ -613,6 +622,7 @@ export class CodexRuntime implements AgentRuntime {
       this.startingTurn = false;
       this.preparingTurn = false;
       this.pumping = false;
+      if (!this.activeTurnId) this.cancelPending = false; // 낡은 중단 표시가 다음 메시지를 취소하지 않게 한다
     }
     if (resume && !this.disposed) void this.pump();
   }
@@ -674,6 +684,7 @@ export class CodexRuntime implements AgentRuntime {
   /** 진행 중이던 턴을 마감한다 — 보류 카드 정리, 임시 첨부 해제, 기억해 둔 변경 내용 비우기. */
   private finishTurn() {
     this.activeTurnId = null;
+    this.startedTurnId = null;
     this.fileChanges.clear();
     // 이 턴에 대해 아직 답을 못 받은 카드가 있으면 여기서 정리된다(세션이 거부로 마감한다).
     this.turnAbort?.abort();
@@ -705,11 +716,21 @@ export class CodexRuntime implements AgentRuntime {
    * (외부 검토 지적, 2026-08-18).
    */
   async interrupt(): Promise<void> {
-    if (!this.threadId || !this.activeTurnId) {
+    const turnId = this.activeTurnId ?? this.startedTurnId;
+    if (!this.threadId || !turnId) {
       if (this.preparingTurn || this.startingTurn) this.cancelPending = true;
       return;
     }
-    await this.server.request("turn/interrupt", { threadId: this.threadId, turnId: this.activeTurnId });
+    await this.server.request("turn/interrupt", { threadId: this.threadId, turnId });
+  }
+
+  /** 시작 응답을 기다리는 사이에 눌린 중단을 턴 식별자를 안 뒤에 보낸다. */
+  private sendPendingInterrupt(turnId: string) {
+    if (!this.cancelPending || !this.threadId) return;
+    this.cancelPending = false;
+    this.server.request("turn/interrupt", { threadId: this.threadId, turnId }).catch((e) => {
+      void reportError(e, { component: "session", operation: "session.turn.interrupt", session_id: this.opts.sessionId, provider: this.backend.services.provider });
+    });
   }
 
   // ── 설정 변경(다음 턴부터 적용 — §0.2 #8·#9) ──
@@ -848,9 +869,11 @@ export class CodexRuntime implements AgentRuntime {
         return { accepted: true, startsTurn: true };
       }
       this.activeTurnId = ack.turn.id;
+      this.sendPendingInterrupt(ack.turn.id);
       return { accepted: true, startsTurn: true };
     } finally {
       this.startingTurn = false;
+      if (!this.activeTurnId) this.cancelPending = false;
       if (!this.disposed && !this.activeTurnId && this.queue.length) void this.pump();
     }
   }
@@ -933,8 +956,10 @@ export class CodexRuntime implements AgentRuntime {
     }
     if (isSessionIrrelevant(n.method, this.capabilities.usage)) return;
     const notification = { method: n.method, params: n.params } as ServerNotification;
-    // 공통 계층의 턴 시작은 메인 대화의 턴만 뜻한다. 하위 thread의 시작을 내보내면 쉬는 세션이 작업 중으로 바뀐다.
-    if (notification.method === "turn/started" && notification.params.threadId !== this.threadId) return;
+    // 공통 계층의 턴 시작과 끝은 메인 대화의 턴만 뜻한다. 하위 thread의 시작을 내보내면 쉬는 세션이 작업 중으로 바뀌고,
+    //   하위 thread의 끝을 내보내면 메인 턴이 끝난 것으로 읽힌다.
+    if ((notification.method === "turn/started" || notification.method === "turn/completed") && notification.params.threadId !== this.threadId) return;
+    if (notification.method === "turn/started") this.startedTurnId = notification.params.turn.id;
     if (notification.method === "thread/tokenUsage/updated") {
       const u = notification.params.tokenUsage;
       this.lastUsage = { totalTokens: u.last.totalTokens, maxTokens: u.modelContextWindow ?? 0 };
@@ -949,6 +974,8 @@ export class CodexRuntime implements AgentRuntime {
     }
     const id = notification.params.turn?.id;
     if (!id) return;
+    // 끝난 턴의 식별자를 남기지 않는다(/compact처럼 finishTurn을 안 타는 턴도 포함). 시작 응답 대기 중이면 아래 대조에 쓰이므로 둔다.
+    if (id === this.startedTurnId && !this.startingTurn) this.startedTurnId = null;
     if (id === this.activeTurnId) {
       this.finishTurn();
       void this.pump();

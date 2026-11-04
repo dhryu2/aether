@@ -250,6 +250,26 @@ async function main() {
     await h.server.close();
   }
 
+  // ── ⑬ 알림 처리기가 던져도 프로세스와 통신선이 산다 ──
+  {
+    let thrown = 0;
+    const server = new CodexAppServer({
+      env: { ...process.env },
+      onNotification: () => {
+        thrown++;
+        throw new Error("알림 처리기 오류(시험)");
+      },
+      onServerRequest: async () => ({ ok: true }),
+      onExit: () => {},
+    });
+    open.add(server);
+    await server.request("test/notify", { count: 2 });
+    await until(() => thrown >= 2);
+    const echo = (await server.request("test/echo", { after: 1 })) as { echo: { after: number } };
+    check(thrown === 2 && echo.echo.after === 1, "⑬ 알림 처리기 오류가 통신선을 죽이지 않고 후속 요청이 응답한다", { thrown });
+    await server.close();
+  }
+
   // ── ⑫ 종료는 멱등이다 ──
   {
     const h = start();

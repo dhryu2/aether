@@ -245,7 +245,15 @@ export class GrokStdio {
     const isResponse = "result" in msg || "error" in msg;
     if (hasId && isResponse) return this.settle(msg.id as JsonRpcId, msg);
     if (hasId && typeof msg.method === "string") return void this.dispatchServerRequest(msg.method, msg.params, msg.id as JsonRpcId);
-    if (typeof msg.method === "string") return this.opts.onNotification({ method: msg.method, params: msg.params });
+    if (typeof msg.method === "string") {
+      // 알림 처리기의 예외가 표준출력 콜백을 넘어 허브 전체를 끝내지 않게 그 알림 하나만 버린다.
+      try {
+        this.opts.onNotification({ method: msg.method, params: msg.params });
+      } catch (e) {
+        failuresFor(this).report(e, { component: "providers", operation: "provider.notification.dispatch", severity: "error" });
+      }
+      return;
+    }
     this.malformedLines++;
   }
 

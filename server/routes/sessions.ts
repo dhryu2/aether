@@ -406,10 +406,11 @@ sessionsRouter.post("/:id/message", async (req: Request, res: Response) => {
         resendOnDuplicate: true,
       });
       if (!outcome.ok) return res.status(outcome.status).json({ error: outcome.error });
-      return res.json({ ok: true });
+      return res.json("duplicate" in outcome ? { ok: true, duplicate: true } : { ok: true });
     }
+    let pushed;
     if (brief) {
-      await s.push(
+      pushed = await s.push(
         text,
         images.length ? images : undefined,
         documents.length ? documents : undefined,
@@ -417,14 +418,14 @@ sessionsRouter.post("/:id/message", async (req: Request, res: Response) => {
         { modelText, brief: true },
       );
     } else {
-      await s.push(
+      pushed = await s.push(
         text,
         images.length ? images : undefined,
         documents.length ? documents : undefined,
         clientMessageId || undefined,
       );
     }
-    res.json({ ok: true });
+    res.json(pushed === "duplicate" ? { ok: true, duplicate: true } : { ok: true });
   } catch (err) {
     if (err instanceof RewindError) {
       const status = err.code === "busy" ? 409 : err.code === "missing" ? 404 : 400;

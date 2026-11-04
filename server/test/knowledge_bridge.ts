@@ -191,6 +191,12 @@ check(noToken.status === 401, "토큰 없는 요청은 401", noToken.status);
 const badToken = await rpc(a.url, "not-a-real-token", { jsonrpc: "2.0", id: 8, method: "tools/list", params: {} });
 check(badToken.status === 401, "틀린 토큰은 401", badToken.status);
 
+// 도구 이름에 문자열로 바꿀 수 없는 객체가 와도 거부가 새지 않고 500으로 끝나며 창구가 계속 산다
+const weird = await rpc(a.url, a.token, { jsonrpc: "2.0", id: 20, method: "tools/call", params: { name: { toString: 1, valueOf: 1 }, arguments: {} } });
+check(weird.status === 500, "처리 중 예외는 500으로 끝난다(미처리 거부로 새지 않는다)", weird.status);
+const afterWeird = await rpc(a.url, a.token, { jsonrpc: "2.0", id: 21, method: "tools/list", params: {} });
+check(afterWeird.status === 200 && afterWeird.json?.result?.tools?.length === 2, "예외 뒤에도 창구가 정상 응답한다", afterWeird.status);
+
 // ── ③ 승인 규칙 ──
 
 const runsBefore = handlerRuns;

@@ -351,6 +351,12 @@ class SessionManager {
     if (live) {
       live.setArchived(next);
       this.emitPresence(this.toPresenceFromLive(live));
+      // 보관한 세션은 쉬는 시간 설정과 상관없이 실행기를 바로 내린다. 목록을 새로 받는 대기가 있어 라우트는 기다리지 않는다.
+      if (archived) {
+        void this.sleepIfIdle(live, Date.now(), 0).catch((e) => {
+          void reportError(e, { component: "session", operation: "session.archive.sleep", session_id: id });
+        });
+      }
     } else {
       this.updateDiskMeta(id, { archivedAt: next });
       this.emitPresence(this.toPresenceFromDisk(id, entry!));
@@ -467,7 +473,14 @@ class SessionManager {
     }
     this.restoreAutoResumes();
     // 인계서를 쓰던 턴은 재시작으로 끊겼다. 한도 대기와 복사 결과만 남긴다.
-    for (const [id, e] of this.disk) if (e.meta.handoffJob?.state === "writing") this.updateDiskMeta(id, { handoffJob: undefined });
+    for (const [id, e] of this.disk) {
+      if (e.meta.handoffJob?.state !== "writing") continue;
+      try {
+        this.updateDiskMeta(id, { handoffJob: undefined });
+      } catch (error) {
+        void reportError(error, { component: "session", operation: "session.handoff.restore", session_id: id });
+      }
+    }
     return n;
   }
 
@@ -481,16 +494,21 @@ class SessionManager {
     for (const [id, e] of [...this.disk]) {
       const plan = e.meta.autoResume;
       if (!plan) continue;
-      if (e.meta.archivedAt || (plan.at === undefined && !plan.gaveUp)) {
-        this.writeAutoResume(id, undefined);
-        continue;
+      try {
+        if (e.meta.archivedAt || (plan.at === undefined && !plan.gaveUp)) {
+          this.writeAutoResume(id, undefined);
+          continue;
+        }
+        if (plan.at === undefined) continue; // gaveUp: 표시용으로 남긴다
+        const earliest = now + AUTO_RESUME_BOOT_DELAY_MS + AUTO_RESUME_BOOT_STEP_MS * order;
+        if (plan.at < earliest) {
+          order += 1;
+          this.writeAutoResume(id, { ...plan, at: earliest });
+        } else this.armAutoResume(id);
+      } catch (error) {
+        // 세션 하나의 저장 실패가 일기 복원 전체를 막지 않는다. 그 세션은 예약을 다시 걸지 않고 넘어간다.
+        void reportError(error, { component: "session", operation: "session.auto_resume.restore", session_id: id });
       }
-      if (plan.at === undefined) continue; // gaveUp: 표시용으로 남긴다
-      const earliest = now + AUTO_RESUME_BOOT_DELAY_MS + AUTO_RESUME_BOOT_STEP_MS * order;
-      if (plan.at < earliest) {
-        order += 1;
-        this.writeAutoResume(id, { ...plan, at: earliest });
-      } else this.armAutoResume(id);
     }
   }
 
@@ -1053,17 +1071,22 @@ class SessionManager {
     let slept = 0;
     try {
       for (const live of [...this.sessions.values()]) {
-        if (!this.canSleep(live, now, idleMs)) continue;
-        const before = live.idleSince;
-        await Promise.all([live.refreshCommandCatalog(SLEEP_COMMANDS_TIMEOUT_MS), live.refreshPolicyForSleep(SLEEP_COMMANDS_TIMEOUT_MS)]);
-        // 목록을 받는 사이 입력이 들어오거나 세션이 바뀌었을 수 있다. 여기서부터 끝까지는 동기라 끼어들 틈이 없다.
-        if (this.sessions.get(live.id) !== live || live.idleSince !== before || !this.canSleep(live, now, idleMs)) continue;
-        if (this.sleep(live)) slept += 1;
+        if (await this.sleepIfIdle(live, now, idleMs)) slept += 1;
       }
     } finally {
       this.sweeping = false;
     }
     return slept;
+  }
+
+  /** 세션 하나가 잠재워도 되는 상태면 목록을 받아 두고 잠재운다. 잠들었으면 참. */
+  private async sleepIfIdle(live: LiveSession, now: number, idleMs: number): Promise<boolean> {
+    if (!this.canSleep(live, now, idleMs)) return false;
+    const before = live.idleSince;
+    await Promise.all([live.refreshCommandCatalog(SLEEP_COMMANDS_TIMEOUT_MS), live.refreshPolicyForSleep(SLEEP_COMMANDS_TIMEOUT_MS)]);
+    // 목록을 받는 사이 입력이 들어오거나 세션이 바뀌었을 수 있다. 여기서부터 끝까지는 동기라 끼어들 틈이 없다.
+    if (this.sessions.get(live.id) !== live || live.idleSince !== before || !this.canSleep(live, now, idleMs)) return false;
+    return this.sleep(live);
   }
 
   /** 완전 동기. 메타를 먼저 저장하고(실패하면 그대로 둔다) 디스크 세션으로 옮긴 뒤 실행기를 내린다. */

@@ -253,11 +253,22 @@ function promoteMeta(raw: SessionMeta): SessionMeta {
   return { ...rest, permissionMode, ...(raw.resumeKey ?? sdkSessionId ? { resumeKey: raw.resumeKey ?? sdkSessionId } : {}) };
 }
 
+/** 손으로 고친 파일이나 사고로 칸 형태가 틀어진 meta를 읽는 순간 걸러, 뒤의 문자열 처리가 한 세션 때문에 던지지 않게 한다. */
+function assertMetaShape(raw: unknown): void {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("meta.json 형식이 객체가 아니다");
+  for (const k of ["name", "generatedName", "cwd", "model", "provider"]) {
+    const v = (raw as Record<string, unknown>)[k];
+    if (v != null && typeof v !== "string") throw new Error(`meta.json의 ${k} 칸이 문자열이 아니다`);
+  }
+}
+
 export function loadMeta(id: string, strict = false): SessionMeta | null {
   const f = metaFile(id);
   if (!fs.existsSync(f)) return null;
   try {
-    const meta = promoteMeta(JSON.parse(fs.readFileSync(f, "utf8")) as SessionMeta);
+    const parsed: unknown = JSON.parse(fs.readFileSync(f, "utf8"));
+    assertMetaShape(parsed);
+    const meta = promoteMeta(parsed as SessionMeta);
     failures.recoveredFile(f);
     return meta;
   } catch (error) {

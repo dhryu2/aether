@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
 
-const scenarios = ["codex-start", "codex-resume", "grok-new", "ollama-refused"] as const;
+const scenarios = ["codex-start", "codex-resume", "grok-new", "ollama-refused", "codex-noack"] as const;
 type Scenario = (typeof scenarios)[number];
 
 async function child(scenario: Scenario) {
@@ -36,6 +36,34 @@ async function child(scenario: Scenario) {
     onQuestion: async () => ({ answered: false as const, reason: "테스트" }),
     onResumeKey: () => {},
   };
+  if (scenario === "codex-noack") {
+    // 시작 응답이 끝내 안 와서 시간 초과가 나도, 턴은 돌고 있으니 실패 문구 없이 중단이 통해야 한다.
+    const { CodexRuntime } = await import("../sessions/runtimes/codex");
+    const rt = new CodexRuntime(opts);
+    const methods: string[] = [];
+    const errors: string[] = [];
+    const statuses: string[] = [];
+    void (async () => {
+      for await (const raw of rt.events()) {
+        const m = (raw as { msg?: { method?: string; params?: { turn?: { status?: string }; error?: { message?: string } } } }).msg;
+        if (m?.method) methods.push(m.method);
+        if (m?.method === "error") errors.push(String(m.params?.error?.message));
+        if (m?.method === "turn/completed") statuses.push(String(m.params?.turn?.status));
+      }
+    })();
+    const until = async (cond: () => boolean, ms: number) => {
+      for (const t0 = Date.now(); !cond() && Date.now() - t0 < ms; ) await new Promise((r) => setTimeout(r, 20));
+    };
+    rt.push({ text: "@@noack@@ @@slow@@ 응답 없는 시작" });
+    await new Promise((r) => setTimeout(r, 2000)); // 시간 초과(1초)가 지나도록 둔다
+    await rt.interrupt();
+    await until(() => statuses.length >= 1, 5000);
+    rt.push({ text: "다음 입력" });
+    await until(() => statuses.length >= 2, 5000);
+    console.log("RESULT " + JSON.stringify({ ticks: 99, ended: 1, error: "x", noack: { errors, statuses } }));
+    await rt.dispose();
+    process.exit(0);
+  }
   let rt: { push(i: { text: string }): void; events(): AsyncIterable<unknown>; dispose(): Promise<void> };
   if (scenario === "grok-new") {
     process.env.FAKE_GROK_SESSION_NEW = "fail";
@@ -89,14 +117,19 @@ async function parent() {
     const r = spawnSync(process.execPath, ["--import", "tsx", import.meta.filename, "child", s], {
       encoding: "utf8",
       timeout: 15_000,
-      env: { ...process.env, AETHER_DATA_DIR: dataDir },
+      env: { ...process.env, AETHER_DATA_DIR: dataDir, AETHER_CODEX_REQUEST_TIMEOUT_MS: "1000", FAKE_TURN_DELAY_MS: "3000" },
     });
     const line = `${r.stdout}`.split("\n").find((l) => l.startsWith("RESULT "));
     if (!line) {
       check(false, `${s}: 자식이 멈추지 않고 끝난다`, { signal: r.signal, status: r.status });
       continue;
     }
-    const res = JSON.parse(line.slice(7)) as { ticks: number; ended: number; error: string };
+    const res = JSON.parse(line.slice(7)) as { ticks: number; ended: number; error: string; noack?: { errors: string[]; statuses: string[] } };
+    if (res.noack) {
+      check(res.noack.errors.length === 0, `${s}: 시간 초과에 실패 문구를 내지 않는다`, res.noack);
+      check(res.noack.statuses.join() === "interrupted,completed", `${s}: 중단이 통하고 다음 입력이 흐른다`, res.noack);
+      continue;
+    }
     check(res.ticks > 5, `${s}: 이벤트 루프가 계속 돈다`, res);
     check(res.ended === 1 && res.error.length > 0, `${s}: 흐름이 준비 실패 오류로 정확히 한 번 끝난다`, res);
   }

@@ -255,9 +255,10 @@ async function main() {
       const res2 = await post(`/api/sessions/${id}/message`, { text: "깨우는 말" });
       check(res2.status === 200, "메시지가 잠든 세션을 깨운다");
       await waitUntil(() => !sessionManager.get(id)?.isTurnOpen);
-      await waitUntil(() => got.length > 0 && store.lastSeqFromDisk(id) === got.at(-1), 3000);
+      // 저장되지 않는 사건이 번호를 예약해 디스크 상한이 앞서므로, 공개된 마지막 순번과 견준다.
+      await waitUntil(() => got.length > 0 && sessionManager.eventLogFor(id).lastPublished() === got.at(-1), 3000);
       check(new Set(got).size === got.length && got.every((s, i) => i === 0 || s > got[i - 1]), "연결이 끊기지 않고 순번이 겹치지 않는다", got.slice(-8));
-      check(got.at(-1) === store.lastSeqFromDisk(id), "깨운 뒤 새 사건도 같은 연결로 온다", [got.at(-1), store.lastSeqFromDisk(id)]);
+      check(got.at(-1) === sessionManager.eventLogFor(id).lastPublished(), "깨운 뒤 새 사건도 같은 연결로 온다", [got.at(-1), sessionManager.eventLogFor(id).lastPublished()]);
       abort.abort();
       sessionManager.delete(id);
     }

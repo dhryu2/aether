@@ -72,9 +72,13 @@ export function __dropEventLogForTest(id: string): void {
   found?.abandon();
 }
 
+/** 저장본 없는 사건이 번호를 쓸 때 미리 상한을 올려 두는 간격. 강제 종료 뒤에도 공개한 번호를 되풀이하지 않는다. */
+const SEQ_RESERVE_STEP = 1024;
+
 export class SessionEventLog {
   readonly sessionId: string;
   private assigned: number;
+  private reserved: number;
   private nextPublish: number;
   private readonly generation: store.RecordGeneration;
   private readonly queue: PendingWrite[] = [];
@@ -89,6 +93,7 @@ export class SessionEventLog {
     this.generation = store.openRecordGeneration(sessionId);
     const last = store.lastSeqFromDisk(sessionId);
     this.assigned = last;
+    this.reserved = last;
     this.nextPublish = last + 1;
   }
 
@@ -121,6 +126,10 @@ export class SessionEventLog {
     const event = stamp(body, seq);
     let persisted = prepare(event);
     this.assigned = seq;
+    if (!persisted && seq > this.reserved) {
+      this.reserved = seq + SEQ_RESERVE_STEP;
+      store.noteHighSeq(this.sessionId, this.reserved, this.generation);
+    }
     if (persisted) {
       try {
         store.insertEventRow(this.sessionId, persisted, this.generation);

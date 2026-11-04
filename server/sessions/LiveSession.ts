@@ -561,8 +561,8 @@ export class LiveSession {
     documents?: DocAttachment[],
     clientMessageId?: string,
     opts?: { modelText?: string; brief?: boolean; sentBy?: "aether" },
-  ): void | Promise<void> {
-    return this.serialInput(() => this.pushInGate(text, images, documents, clientMessageId, opts));
+  ): void | "duplicate" | Promise<void | "duplicate"> {
+    return this.serialInput<void | "duplicate">(() => this.pushInGate(text, images, documents, clientMessageId, opts));
   }
 
   /**
@@ -603,6 +603,31 @@ export class LiveSession {
     }
   }
 
+  /**
+   * 기록은 됐지만 runtime에 넘기지 못한 입력(clientMessageId별). 같은 식별자로 다시 오면 요청 본문이 아니라 이 값을 넘긴다.
+   * shortcut: 메모리에만 둔다. 넘기다 실패한 직후 세션 인스턴스까지 바뀌면 재시도가 중복으로 처리되어 입력이 가지 않으므로 사용자가 다시 보낸다.
+   */
+  private readonly undelivered = new Map<string, Parameters<AgentRuntime["push"]>[0]>();
+
+  /** `sendToRuntime`에 식별자별 전달 기록을 더한다. 던지면 다시 보낼 수 있게 남기고, 넘기면 지운다. */
+  private deliver(id: string | undefined, input: Parameters<AgentRuntime["push"]>[0]) {
+    try {
+      this.sendToRuntime(input);
+    } catch (e) {
+      if (id) this.undelivered.set(id, input);
+      throw e;
+    }
+    if (id) this.undelivered.delete(id);
+  }
+
+  /** 넘기지 못한 입력이 있으면 저장된 값으로 다시 넘기고 참을 돌려준다. 없으면 거짓. */
+  private redeliver(id: string): boolean {
+    const input = this.undelivered.get(id);
+    if (!input) return false;
+    this.deliver(id, input);
+    return true;
+  }
+
   /** 넘기기 질문 대기 중에 질문지 판독을 켜고 끈다. 브리프 표시와 같은 칸이다. */
   setBriefOpen(open: boolean) {
     if (this.briefOpen === open) return;
@@ -624,7 +649,7 @@ export class LiveSession {
     documents?: DocAttachment[],
     clientMessageId?: string,
     opts?: { modelText?: string; brief?: boolean; sentBy?: "aether" },
-  ): void | Promise<void> {
+  ): void | "duplicate" | Promise<void> {
     // 되돌리는 중이면 꺼지는 중인 실행기로 들어가면 안 된다. 거절 문구는 되돌리기 거절과 같다.
     if (this.rewinding) throw new RewindError("busy");
     if (!store.diaryAcceptsInput(this.id)) throw new Error(st("routes.sessions.diaryBusy"));
@@ -642,17 +667,16 @@ export class LiveSession {
     };
     const id = clientMessageId?.trim();
     if (id && this.hasUserMsgClientId(id)) {
-      // 이미 있으면 user_msg는 skip, runtime.push는 다시(delivered=false 재전송 창).
-      this.sendToRuntime(runtimeInput);
-      return;
+      // 이미 기록된 식별자다. 넘기지 못한 입력이 남아 있을 때만 그 값을 다시 넘기고, 아니면 중복이라 아무것도 하지 않는다.
+      return this.redeliver(id) ? undefined : "duplicate";
     }
     const committed = this.commitUserTurn(text, images, documents, id || undefined, undefined, opts?.sentBy);
     if (committed) {
       return committed.then(() => {
-        this.sendToRuntime(runtimeInput);
+        this.deliver(id || undefined, runtimeInput);
       });
     }
-    this.sendToRuntime(runtimeInput);
+    this.deliver(id || undefined, runtimeInput);
   }
 
   /**
@@ -691,8 +715,7 @@ export class LiveSession {
       });
       if (verdict === "different") return { ok: false, status: 409, error: st("routes.sessions.questionnaire.retryDiffers") };
       if (!opts.resendOnDuplicate) return { ok: true, duplicate: true };
-      this.sendToRuntime({ text: `${existing.text}\n${questionnaireFollowupHint()}` });
-      return { ok: true };
+      return this.redeliver(clientMessageId) ? { ok: true } : { ok: true, duplicate: true };
     }
     const open = await this.openQuestionnaire();
     if (!open || open.id !== opts.questionnaireId || this.questionnaireDismissed) {
@@ -703,7 +726,7 @@ export class LiveSession {
     const text = buildQuestionnaireAnswerText(open.questions, checked.answers);
     const committed = this.commitUserTurn(text, undefined, undefined, clientMessageId, { id: open.id, answers: checked.answers });
     if (committed) await committed;
-    this.sendToRuntime({ text: `${text}\n${questionnaireFollowupHint()}` });
+    this.deliver(clientMessageId, { text: `${text}\n${questionnaireFollowupHint()}` });
     return { ok: true };
   }
 
@@ -738,7 +761,8 @@ export class LiveSession {
 
   /** 버퍼·디스크에서 같은 clientMessageId의 user_msg를 찾는다. */
   private findUserMsgByClientId(clientMessageId: string): { text: string; questionnaireAnswer?: QuestionnaireAnswerRecord } | undefined {
-    const same = (ev: AetherEvent) => ev.kind === "user_msg" && (ev as { clientMessageId?: string }).clientMessageId === clientMessageId;
+    // 되돌려 숨긴 말과 같은 식별자는 새 입력으로 받는다.
+    const same = (ev: AetherEvent) => ev.kind === "user_msg" && (ev as { clientMessageId?: string }).clientMessageId === clientMessageId && !isHiddenSeq(ev.seq, this.hiddenRanges);
     const fromBuffer = this.buffer.find(same);
     if (fromBuffer) return fromBuffer as unknown as { text: string; questionnaireAnswer?: QuestionnaireAnswerRecord };
     try {
@@ -1651,7 +1675,7 @@ export class LiveSession {
     p.resolve(outcome);
     if (outcome.decision === "revise" && outcome.message.trim()) {
       const sent = this.push(outcome.message.trim());
-      if (sent) sent.catch((e) => { void reportError(e, { component: "session", operation: "session.plan.send", session_id: this.id }); console.error("[aether] 계획 수정 글 전달 실패:", e); });
+      if (sent instanceof Promise) sent.catch((e) => { void reportError(e, { component: "session", operation: "session.plan.send", session_id: this.id }); console.error("[aether] 계획 수정 글 전달 실패:", e); });
     }
     return true;
   }

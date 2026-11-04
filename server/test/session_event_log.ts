@@ -242,6 +242,22 @@ async function main() {
       sessionManager.delete(id);
     });
 
+    await scenario("저장되지 않는 사건만 쓴 세션도 강제 종료 뒤 순번이 되돌아가지 않는다", async () => {
+      const id = crypto.randomUUID();
+      metaOf(id, `mock-live-only-${id.slice(0, 8)}`);
+      sessionManager.restoreFromDisk();
+      const log = eventLogFor(id);
+      const last = [1, 2, 3].map(() => log.write(note("라이브 전용"), () => null)).at(-1);
+      // close 없이 버려 강제 종료를 흉내 낸다.
+      __dropEventLogForTest(id);
+      diary.__resetSessionDiaryForTest();
+      await openDiary();
+      await diary.loadSessionDiary(id, path.join(dataDir, id, "events.jsonl"));
+      const next = eventLogFor(id).write(note("재시작 뒤"), (ev) => ev);
+      check(!!last && !!next && next.seq > last.seq, "강제 종료 뒤 새 기록기의 순번이 이미 공개한 번호보다 크다", { last: last?.seq, next: next?.seq });
+      sessionManager.delete(id);
+    });
+
     await scenario("appendEvent가 실패해도 그 순번의 상한이 오른다", async () => {
       const id = crypto.randomUUID();
       metaOf(id, `mock-append-${id.slice(0, 8)}`);

@@ -160,6 +160,28 @@ console.log("\n=== 보관된 세션을 매니저가 다시 만들어도 보관 �
   sessionManager.delete("d2");
 }
 
+console.log("\n=== 보관하면 실행기를 바로 내린다(쉬는 시간 설정이 꺼져 있어도) ===");
+{
+  const { writeIdleSleepMinutes } = await import("../sessions/idleSleepSetting");
+  writeIdleSleepMinutes(0);
+  const live = sessionManager.create({ cwd, provider: mock.MOCK_PROVIDER });
+  const noKey = sessionManager.create({ cwd, provider: mock.MOCK_PROVIDER });
+  try {
+    live.resumeKey = mock.MOCK_RESUME_KEY;
+    noKey.resumeKey = undefined;
+    const a = await archive(live.id, true);
+    check(a.status === 200 && (await waitUntil(() => !sessionManager.get(live.id))), "보관하면 live에서 내려간다", a);
+    check(item(live.id)?.archivedAt === a.body.archivedAt && store.loadMeta(live.id)?.archivedAt === a.body.archivedAt, "내려간 뒤에도 목록·meta에 보관 시각이 남는다");
+    check((await archive(live.id, false)).status === 200 && (await post(live.id, "wake", {})).status === 200 && !!sessionManager.get(live.id), "해제 뒤 깨우면 다시 live가 된다");
+    check((await archive(noKey.id, true)).status === 200, "이어갈 식별자가 없는 세션도 보관된다");
+    await sleep(100);
+    check(!!sessionManager.get(noKey.id), "이어갈 식별자가 없으면 live로 남는다");
+  } finally {
+    sessionManager.delete(live.id);
+    sessionManager.delete(noKey.id);
+  }
+}
+
 console.log("\n=== 오류 ===");
 {
   check((await archive("00000000-0000-4000-8000-000000000000", true)).status === 404, "없는 세션 404");

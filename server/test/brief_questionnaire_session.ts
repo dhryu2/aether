@@ -465,19 +465,39 @@ async function main(): Promise<void> {
       check(qevs(r).length === 1, tag("쌓인 입력이 다 끝나면 질문지가 생긴다"), qevs(r).length);
     }
     {
-      // 같은 식별자로 A를 다시 보내면 runtime에는 두 번 간다
+      // 같은 식별자로 A를 다시 보내도 runtime에는 한 번만 간다
       const r = mk();
       await brief(r, "재전송 요청", "again-1");
-      await brief(r, "재전송 요청", "again-1");
-      check(users(r).filter((u) => u.clientMessageId === "again-1").length === 1 && r.rec.pushes.length === 2, tag("같은 식별자 재전송은 사건 하나에 runtime 입력 둘이다"), r.rec.pushes.length);
+      const second = await r.s.push("재전송 요청", undefined, undefined, "again-1", { modelText: "재전송 요청", brief: true });
+      check(second === "duplicate" && users(r).filter((u) => u.clientMessageId === "again-1").length === 1 && r.rec.pushes.length === 1, tag("같은 식별자 재전송은 사건 하나에 runtime 입력 하나다"), r.rec.pushes.length);
       say(r, box("재전송 첫째"));
       done(r);
       await sync(r);
-      check(qevs(r).length === 0, tag("A 실행 중 같은 식별자로 A를 재전송하면 A 끝에서 질문지가 없다"));
-      say(r, box("재전송 둘째"));
-      done(r);
-      await sync(r);
-      check(qevs(r).length === 1, tag("재전송으로 돈 뒤 턴 끝에서는 질문지가 있다"), qevs(r).length);
+      check(qevs(r).length === 1, tag("재전송이 입력을 늘리지 않아 첫 턴 끝에서 질문지가 있다"), qevs(r).length);
+    }
+    {
+      // 같은 식별자 재전송: 다른 글, 동시 2건, 전달 실패 뒤 재시도, 되돌려 숨긴 말
+      const r = mk();
+      await r.s.push("원래 글", undefined, undefined, "dup-a");
+      const differing = await r.s.push("다른 글", undefined, undefined, "dup-a");
+      check(differing === "duplicate" && r.rec.pushes.join("|") === "원래 글" && users(r).filter((u) => u.clientMessageId === "dup-a").length === 1, tag("같은 식별자에 다른 글이 와도 입력은 다시 실행되지 않는다"), r.rec.pushes);
+      const both = await Promise.all([r.s.push("동시", undefined, undefined, "dup-b"), r.s.push("동시", undefined, undefined, "dup-b")]);
+      check(both.filter((x) => x === "duplicate").length === 1 && r.rec.pushes.filter((t) => t === "동시").length === 1 && users(r).filter((u) => u.clientMessageId === "dup-b").length === 1, tag("같은 식별자 동시 2건은 입력 1건, 사건 1건이다"), both);
+      r.rec.failNextPush = true;
+      let threw = false;
+      try {
+        await r.s.push("전달 실패 글", undefined, undefined, "dup-c");
+      } catch {
+        threw = true;
+      }
+      const retried = await r.s.push("본문이 달라도 저장된 글을 보낸다", undefined, undefined, "dup-c");
+      check(threw && retried === undefined && r.rec.pushes.filter((t) => t === "전달 실패 글").length === 1 && users(r).filter((u) => u.clientMessageId === "dup-c").length === 1, tag("전달 실패 뒤 같은 식별자 재시도는 저장된 글을 한 번 넘기고 사건은 하나다"), r.rec.pushes);
+      const again = await r.s.push("전달 실패 글", undefined, undefined, "dup-c");
+      check(again === "duplicate" && r.rec.pushes.filter((t) => t === "전달 실패 글").length === 1, tag("전달이 끝난 식별자의 재시도는 중복이다"));
+      const hid = users(r).find((u) => u.clientMessageId === "dup-a") as unknown as { seq: number };
+      (r.s as unknown as { hiddenRanges: { after: number; until: number }[] }).hiddenRanges = [{ after: hid.seq - 1, until: hid.seq }];
+      const reused = await r.s.push("원래 글", undefined, undefined, "dup-a");
+      check(reused === undefined && r.rec.pushes.filter((t) => t === "원래 글").length === 2, tag("되돌려 숨긴 말과 같은 식별자는 새 입력으로 받는다"), r.rec.pushes);
     }
     {
       // 턴 끝 사건이 공개되는 순간 들어온 입력은 다음 판정에 센다
@@ -604,9 +624,9 @@ async function main(): Promise<void> {
       check((await r.s.openQuestionnaire()) === null, tag("카드 답으로 질문지가 닫힌다"));
 
       const retry = await submit(ANS, "ans-1");
-      check(retry.ok === true && users(r).filter((u) => u.clientMessageId === "ans-1").length === 1 && r.rec.pushes.length === pushesBefore + 2, tag("같은 식별자 재시도는 성공하고 사건은 하나, runtime에는 다시 보낸다"), retry);
+      check(retry.ok === true && users(r).filter((u) => u.clientMessageId === "ans-1").length === 1 && r.rec.pushes.length === pushesBefore + 1 && "duplicate" in retry, tag("같은 식별자 재시도는 성공하고 사건은 하나, runtime에는 다시 보내지 않고 이미 있음을 알린다"), retry);
       const retryReordered = await submit({ q3: { custom: " 3회 " }, q2: { chosen: ["y", "x"], note: "메모" }, q1: { chosen: ["A"] } }, "ans-1", false);
-      check(retryReordered.ok === true && "duplicate" in retryReordered && r.rec.pushes.length === pushesBefore + 2, tag("승격 길(resendOnDuplicate 거짓)은 runtime에 다시 보내지 않고 이미 있음을 알린다"), retryReordered);
+      check(retryReordered.ok === true && "duplicate" in retryReordered && r.rec.pushes.length === pushesBefore + 1, tag("승격 길(resendOnDuplicate 거짓)은 runtime에 다시 보내지 않고 이미 있음을 알린다"), retryReordered);
       const different = await submit({ ...ANS, q3: { custom: "5회" } }, "ans-1");
       check(!different.ok && different.status === 409, tag("같은 식별자에 다른 답이면 409다"), different);
       const lateNew = await submit(ANS, "ans-2");

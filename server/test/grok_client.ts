@@ -132,6 +132,27 @@ async function main() {
     }
     await h.server.close();
   }
+
+  // 알림 처리기가 던져도 프로세스와 통신선이 산다
+  {
+    let thrown = 0;
+    const server = new GrokStdio({
+      args: grokAgentArgs({ permissionMode: "manual", model: "grok-4.6" }),
+      env: { ...process.env },
+      onNotification: () => {
+        thrown++;
+        throw new Error("알림 처리기 오류(시험)");
+      },
+      onServerRequest: async () => ({ ok: true }),
+      onExit: () => {},
+    });
+    open.add(server);
+    await server.request("initialize", { protocolVersion: 1 });
+    await server.request("test/emit_commands", { repeat: 2, availableCommands: [] });
+    const after = await server.request<{ protocolVersion: number }>("initialize", { protocolVersion: 1 });
+    check(thrown === 2 && after.protocolVersion === 1, "⑥ 알림 처리기 오류가 통신선을 죽이지 않고 후속 요청이 응답한다", { thrown });
+    await server.close();
+  }
 }
 
 try {

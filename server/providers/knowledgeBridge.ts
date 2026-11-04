@@ -107,7 +107,13 @@ let pendingOpens = 0;
 /** 창구를 띄우고 포트를 돌려준다. 이미 떠 있으면 그 포트를 그대로 준다. */
 function ensureServer(): Promise<number> {
   if (listening) return listening;
-  const srv = createServer((req, res) => void handle(req, res));
+  const srv = createServer((req, res) => {
+    handle(req, res).catch((e) => {
+      void reportError(e, { component: "mcp", operation: "provider.knowledge.handle" });
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
+    });
+  });
   server = srv;
   listening = new Promise<number>((resolve, reject) => {
     srv.once("error", (e) => {

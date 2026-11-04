@@ -2111,7 +2111,16 @@ export const actions = {
     try {
       // 브리프도 일반 전송처럼 잠든 세션을 깨운다.
       if (isSessionAsleep(state.sessions, sid)) await actions.wakeSession(sid)
-      await api.sendMessage(sid, trimmed, images, documents, clientMessageId, brief === true)
+      const sent = await api.sendMessage(sid, trimmed, images, documents, clientMessageId, brief === true)
+      // 서버가 이미 받은 같은 식별자라 새 사건이 오지 않는다 — 방금 넣은 임시 말풍선을 걷고 생각 중 표시를 푼다.
+      // 재전달 성공은 새 user_msg가 오지 않는다 — 같은 식별자의 user_msg가 이미 있으면 임시 말풍선이 같은 말을 두 번 보이게 하므로 걷는다.
+      const echoed = (state.convos[sid] ?? []).some((it) => it.kind === 'user_msg' && (it as { clientMessageId?: string }).clientMessageId === clientMessageId)
+      if (sent.duplicate || echoed) {
+        set({
+          ...(sent.duplicate ? { pendingSend: { ...state.pendingSend, [sid]: false } } : {}),
+          convos: { ...state.convos, [sid]: (state.convos[sid] ?? []).filter((it) => !(it.kind === 'local_user' && it.seq === lseq)) },
+        })
+      }
       actions.refreshSessions()
       if (state.composerFill?.id === id || state.composerFill?.id === sid) set({ composerFill: null })
       if (!policyCache.get(sid)) void actions.fetchPermissionPolicy(sid)
@@ -2137,7 +2146,8 @@ export const actions = {
     set({ pendingSend: { ...state.pendingSend, [execId]: true } })
     try {
       if (isSessionAsleep(state.sessions, execId)) await actions.wakeSession(execId)
-      await api.sendMessage(execId, '', undefined, undefined, clientMessageId, false, { id: questionnaireId, answers })
+      const sent = await api.sendMessage(execId, '', undefined, undefined, clientMessageId, false, { id: questionnaireId, answers })
+      if (sent.duplicate) set({ pendingSend: { ...state.pendingSend, [execId]: false } })
       actions.refreshSessions()
       return true
     } catch {

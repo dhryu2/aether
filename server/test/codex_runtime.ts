@@ -203,6 +203,8 @@ async function main() {
     check(await until(() => turnsDone(h) === 1), "하위 thread 시험: 턴이 끝까지 흐른다");
     const starts = h.events.filter((e) => (e.msg as { method?: string }).method === "turn/started");
     check(starts.length === 1, "하위 thread의 턴 시작은 내보내지 않고 메인 턴 시작만 남는다", starts.length);
+    const ends = h.events.filter((e) => (e.msg as { method?: string }).method === "turn/completed");
+    check(ends.length === 1, "하위 thread의 턴 끝은 내보내지 않고 메인 턴 끝만 남는다", ends.length);
     await h.rt.dispose();
   }
   {
@@ -807,6 +809,37 @@ async function main() {
     const last = h.events[h.events.length - 1].msg as { params: { turn: { status: string } } };
     check(last.params.turn.status === "interrupted", "⑧ 중단된 턴은 중단 상태로 끝난다", last.params.turn.status);
     check((await h.calls()).some((c) => c.method === "turn/interrupt"), "⑧ 중단 요청이 실제로 나간다");
+    await h.rt.dispose();
+  }
+
+  // ── ⑧b 시작 응답을 기다리는 사이 누른 중단이 사라지지 않는다 ──
+  for (const [mark, label] of [["@@slowack@@", "응답보다 알림이 늦을 때"], ["@@earlystart@@", "알림이 응답보다 먼저 올 때"]] as const) {
+    const h = start();
+    h.rt.push({ text: `${mark} @@slow@@ 오래 걸리는 일` });
+    // 시작 요청이 상대에게 닿은 뒤(응답은 아직 안 온 사이)에 누른다.
+    for (let i = 0; i < 200 && !(await h.calls()).some((c) => c.method === "turn/start"); i++) await sleep(10);
+    await h.rt.interrupt();
+    check(await until(() => turnsDone(h) === 1, 8000), `⑧b ${label}: 중단한 턴이 끝난다`);
+    const last = h.events[h.events.length - 1].msg as { params: { turn: { status: string } } };
+    check(last.params.turn.status === "interrupted", `⑧b ${label}: 중단 상태로 끝난다`, last.params.turn.status);
+    check((await h.calls()).filter((c) => c.method === "turn/interrupt").length === 1, `⑧b ${label}: 중단 요청이 한 번 나간다`);
+    h.rt.push({ text: "다음 메시지" });
+    check(await until(() => turnsDone(h) === 2, 8000), `⑧b ${label}: 다음 메시지가 취소되지 않고 진행된다`, h.methodsOf(h.events).filter((m) => m === "error").length);
+    await h.rt.dispose();
+  }
+
+  // ── ⑧c /compact 뒤 시작 응답을 기다리는 사이 누른 중단은 낡은 compact 턴 id로 나가지 않는다 ──
+  {
+    const h = start();
+    await h.rt.executeCommand({ name: "compact", arguments: "" });
+    check(await until(() => turnsDone(h) === 1, 8000), "⑧c compact 턴이 끝난다");
+    h.rt.push({ text: "@@slowack@@ @@slow@@ compact 뒤 일" });
+    for (let i = 0; i < 200 && !(await h.calls()).some((c) => c.method === "turn/start"); i++) await sleep(10);
+    await h.rt.interrupt();
+    check(await until(() => turnsDone(h) === 2, 8000), "⑧c compact 뒤 중단한 턴이 끝난다");
+    const last = h.events[h.events.length - 1].msg as { params: { turn: { status: string } } };
+    const ints = (await h.calls()).filter((c) => c.method === "turn/interrupt");
+    check(last.params.turn.status === "interrupted" && ints.length === 1 && !String(ints[0].params.turnId).startsWith("compact"), "⑧c 중단이 새 턴 id로 나가 새 턴이 중단된다", ints.map((c) => c.params.turnId));
     await h.rt.dispose();
   }
 

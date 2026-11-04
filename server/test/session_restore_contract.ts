@@ -186,6 +186,44 @@ async function main() {
     check(k3.join() === k1.join(), "부팅: 두 번 더 재시작해도 사건이 늘지 않는다", { k1: k1.length, k3: k3.length });
     const view = await openStream(cid, 0);
     check(view.seqs.length === k1.length, "부팅: 재시작 뒤 첫 진입도 같은 사건 수를 보낸다", [view.seqs.length, k1.length]);
+
+    // ── 세션 하나의 meta가 틀려도 나머지 복원이 산다 ──
+    {
+      const okId = crypto.randomUUID();
+      store.saveMeta({ id: okId, cwd, provider: MOCK_PROVIDER, resumeKey: "mock-thread-ok", createdAt: Date.now() } as never);
+      const badNames: string[] = [];
+      for (const field of ["name", "generatedName"]) {
+        const badId = crypto.randomUUID();
+        store.saveMeta({ id: badId, cwd, provider: MOCK_PROVIDER, createdAt: Date.now() } as never);
+        const f = path.join(config.dataDir, badId, "meta.json");
+        fs.writeFileSync(f, JSON.stringify({ id: badId, cwd, provider: MOCK_PROVIDER, createdAt: Date.now(), [field]: 123 }));
+        badNames.push(badId);
+      }
+      let listed: ReturnType<typeof sessionManager.list> | null = null;
+      let threw = "";
+      try {
+        sessionManager.restoreFromDisk();
+        listed = sessionManager.list();
+      } catch (e) {
+        threw = String(e);
+      }
+      check(listed !== null, "meta 칸 형태가 틀린 세션이 있어도 복원과 목록이 던지지 않는다", threw);
+      check(!!listed?.find((x) => x.id === okId), "정상 세션은 그대로 목록에 있다");
+      check(badNames.every((b) => listed?.find((x) => x.id === b)?.status === "corrupted"), "칸이 틀린 세션만 손상으로 표시된다");
+
+      // 시각이 지난 자동 재개 예약 + 저장 임시 파일 자리를 폴더로 막아 saveMeta를 실패시킨다.
+      const arId = crypto.randomUUID();
+      store.saveMeta({ id: arId, cwd, provider: MOCK_PROVIDER, resumeKey: "mock-thread-ar", createdAt: Date.now(), autoResume: { action: { type: "send", text: "계속" }, at: 1, attempts: 0 } } as never);
+      fs.mkdirSync(path.join(config.dataDir, arId, "meta.json.tmp"));
+      let threw2 = "";
+      try {
+        sessionManager.restoreFromDisk();
+      } catch (e) {
+        threw2 = String(e);
+      }
+      check(threw2 === "", "자동 재개 예약 저장이 실패해도 복원이 던지지 않는다", threw2);
+      check(!!sessionManager.list().find((x) => x.id === okId), "그 뒤에도 다른 세션이 목록에 있다");
+    }
   } catch (err) {
     check(false, "시험 중 예외", err instanceof Error ? err.message : String(err));
   } finally {

@@ -143,6 +143,17 @@ export function pickHandoffText(events: readonly AetherEvent[], codec: Normalize
   return out || null;
 }
 
+/**
+ * 뒤에서 도는 작업을 기다리며 멈춘 턴인가. 인계서도 질문도 없이 정상으로 끝났고, 작업이 돌고 있거나
+ * 이미 기다리는 중에 글 없이 끝난 턴이면 그렇다. 이런 턴의 글은 인계서가 아니므로 다음 턴을 본다.
+ */
+export function handoffTurnAwaitsWork(events: readonly AetherEvent[], codec: Normalizer, running: boolean, waiting: boolean): boolean {
+  if (handoffTurnOutcome(events, codec) !== "ok" || pickHandoffText(events, codec, true) !== null) return false;
+  const hasText = events.some((ev) => codec.normalize(ev).some((a) => a.type === "text" && !a.subtaskOf && a.text.trim()));
+  if (hasText && pickHandoffText(events, codec) === null) return false; // 질문 턴이다
+  return running || (waiting && !hasText);
+}
+
 export type HandoffOutcome = "ok" | "limit" | "interrupted" | "failed";
 
 /** 턴 결과. 사람이 멈춘 턴이 먼저고, 실패한 턴에 한도 막힘 알림이 있으면 한도 대기다. */

@@ -160,6 +160,14 @@ async function main() {
     eq('진행 중: 흘러오는 글에 상자가 열리면 자리 표시', kinds(r.segs), ['user', 'live', 'questionnairePending'])
     r = build([userMsg(), modelText('기다립니다.'), turnEnd(), modelText('정리했어요.\n' + BOX)], 'running')
     eq('진행 중: 사람 말 없이 이어진 턴의 상자도 자리 표시로 바뀐다', kinds(r.segs).includes('questionnairePending'), true)
+    {
+      const src = modelText('정리\n' + BOX)
+      const later = modelText('기다립니다.')
+      r = build([userMsg(), src, later, questionnaire('after', src.seq), turnEnd()])
+      check('상자 뒤에 글이 더 와도 카드가 나온다', kinds(r.segs).includes('questionnaire'), kinds(r.segs))
+      check('상자 뒤에 글이 더 와도 원문 상자는 지운다', !textsOf(r.segs).some((x) => x.includes('aether-questions')))
+      check('상자 뒤의 글은 남는다', textsOf(r.segs).some((x) => x.includes('기다립니다')))
+    }
     r = build([userMsg(), modelText('끝난 글\n' + BOX), turnEnd(), modelText('이어진 글')], 'running')
     check('진행 중: 앞서 끝난 턴의 일반 상자는 원문 그대로다', textsOf(r.segs).some((x) => x.includes('aether-questions')))
 

@@ -583,6 +583,64 @@ console.log("\n=== 질문 대기(asking) ===");
     }
   }
 
+  // 뒤에서 도는 작업을 기다리며 멈춘 턴의 글은 인계서가 아니다
+  {
+    const { live, rt } = mk();
+    let next: string | undefined;
+    try {
+      mock.mockState.manualReply = true;
+      await post(live.id, {});
+      rt.emitRaw({ t: "bg", tasks: ["t1"] });
+      rt.emitRaw({ t: "say", text: "에이전트를 띄웠다. 결과를 기다린다." });
+      rt.emitRaw({ t: "done" });
+      await new Promise((r) => setTimeout(r, 50));
+      eq("작업을 기다리는 턴에서는 넘기지 않는다", [item(live.id)?.handoffState, nextOf(live.id)], ["writing", undefined]);
+      rt.emitRaw({ t: "bg", tasks: [] });
+      rt.emitRaw({ t: "done" });
+      await new Promise((r) => setTimeout(r, 50));
+      eq("기다리는 중에 글 없이 끝난 턴에서도 넘기지 않는다", [item(live.id)?.handoffState, nextOf(live.id)], ["writing", undefined]);
+      rt.emitRaw({ t: "start" });
+      finishWith(rt, "작업 뒤에 쓴 본문");
+      check(await waitUntil(() => !!nextOf(live.id)), "작업이 끝난 뒤의 인계서로 넘어간다");
+      next = nextOf(live.id)!;
+      const text = (await getInfo(next)).incoming?.text ?? "";
+      check(text.includes("작업 뒤에 쓴 본문") && !text.includes("결과를 기다린다"), "기다린 턴의 글은 인계서에 들어가지 않는다", text);
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id);
+      if (next) cleanup(next);
+    }
+  }
+  {
+    const { live, rt } = mk();
+    let next: string | undefined;
+    try {
+      mock.mockState.manualReply = true;
+      await post(live.id, {});
+      rt.emitRaw({ t: "bg", tasks: ["t1"] });
+      finishWith(rt, "작업이 도는 중에 쓴 본문");
+      check(await waitUntil(() => !!nextOf(live.id)), "표식 있는 인계서는 작업이 돌아도 바로 받는다");
+      next = nextOf(live.id)!;
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id);
+      if (next) cleanup(next);
+    }
+  }
+  {
+    const { live, rt } = mk();
+    try {
+      mock.mockState.manualReply = true;
+      await post(live.id, {});
+      rt.emitRaw({ t: "bg", tasks: ["t1"] });
+      ask(rt, 1);
+      check(await waitUntil(() => item(live.id)?.handoffState === "asking"), "질문 턴은 작업이 돌아도 질문 대기가 된다");
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id);
+    }
+  }
+
   // 물을 게 없으면 바로 인계서 + 요청은 질문지 판독을 켠다(briefOpen이 저장된다)
   {
     const { live, rt } = mk();

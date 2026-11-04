@@ -27,7 +27,7 @@ import type { ProviderId } from "../providers/types";
 import type { AetherEvent, AetherEventBody, DerivedStatus, SessionEffort, SessionListItem, SessionMeta } from "../types";
 import { PERMISSION_MODES, type SlashCommandInfo, type AutoResumePlan, type HandoffFields, type HandoffJob, type HandoffSource, type PermissionMode, type PresenceSession } from "../../shared/http";
 import { computeAttention, isStickyAttentionKind } from "./attention";
-import { changedFiles, handoffForceWriteText, handoffRequest, handoffTurnOutcome, HANDOFF_ASK_ROUNDS_MAX, HANDOFF_CLIENT_ID_PREFIX, latestTodoItems, limitResetsAt, pickHandoffText, recentUserTexts, skeletonHandoff, withHandoffFrame } from "./handoff";
+import { changedFiles, handoffForceWriteText, handoffRequest, handoffTurnAwaitsWork, handoffTurnOutcome, HANDOFF_ASK_ROUNDS_MAX, HANDOFF_CLIENT_ID_PREFIX, latestTodoItems, limitResetsAt, pickHandoffText, recentUserTexts, skeletonHandoff, withHandoffFrame } from "./handoff";
 import { autoResumeStoppedIntent, waitingFromPending, type NotifyIntent } from "../notify/worthNotifying";
 import { AUTO_RESUME_MAX_ATTEMPTS, AUTO_RESUME_TEXT_MAX, nextAttemptAt, readAutoResumeSettings, type AutoResumeVerdict } from "./autoResume";
 import { st } from "../i18n";
@@ -1172,6 +1172,7 @@ class SessionManager {
     this.unwatchHandoff(id);
     let events: AetherEvent[] = [];
     let chat = false;
+    let waiting = false;
     const unsub = live.subscribe((ev) => {
       const job = this.handoffMeta(id)?.handoffJob;
       const kind = (ev as { kind?: string }).kind;
@@ -1194,9 +1195,14 @@ class SessionManager {
         return;
       }
       events.push(ev);
-      // 구독 뒤 첫 턴 끝까지가 이번 턴이다. 세션 종료 사건이 먼저 오면 턴 끝 없이 닫는다.
+      // 구독 뒤 첫 턴 끝까지가 이번 턴이다(작업을 기다리며 멈춘 턴은 빼고 센다). 세션 종료 사건이 먼저 오면 턴 끝 없이 닫는다.
       const turnEnd = live.codec.endsTurn(ev);
       if (!turnEnd && kind !== "status") return;
+      if (turnEnd && !chat && handoffTurnAwaitsWork(events, live.codec, live.hasRunningBackground, waiting)) {
+        events = [];
+        waiting = true;
+        return;
+      }
       unsub();
       this.handoffWatch.delete(id);
       queueMicrotask(() => void this.settleHandoff(live, events, turnEnd, chat));

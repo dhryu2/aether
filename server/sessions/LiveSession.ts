@@ -991,6 +991,11 @@ export class LiveSession {
     return [];
   }
 
+  /** 지금 실제로 도는 뒤 작업이 있는가(보류 중인 직전 목록은 이미 끝난 작업이라 제외). */
+  get hasRunningBackground(): boolean {
+    return !this.ended && this.bgTasks.length > 0;
+  }
+
   /** 보류가 걸려 있으면 그 마감 시각(ms). 없으면 undefined. */
   get backgroundHoldUntil(): number | undefined {
     return this.ended ? undefined : this.bgHold?.until;
@@ -1798,18 +1803,21 @@ export class LiveSession {
     }
   }
 
-  /** 방금 기록한 사건 안의 마지막 모델 글을 질문지 후보로 기억한다. */
+  /** 방금 기록한 사건의 모델 글을 질문지 후보로 기억한다. 상자 뒤에 글이 더 와도 이번 턴의 상자를 지킨다. */
   private noteTextCandidate(ingested: AetherEvent) {
-    const texts = this.codec.normalize(ingested).filter((a) => a.type === "text");
-    const last = texts[texts.length - 1];
-    if (last && last.type === "text") this.textCandidate = { seq: last.seq, part: last.part, text: last.text };
+    for (const a of this.codec.normalize(ingested)) {
+      if (a.type !== "text") continue;
+      const kept = this.textCandidate;
+      if (kept && kept.seq > this.lastUserMsgSeq && findQuestionnaireBlock(kept.text) !== null && findQuestionnaireBlock(a.text) === null) continue;
+      this.textCandidate = { seq: a.seq, part: a.part, text: a.text };
+    }
   }
 
   /**
    * 턴 끝에서 질문지를 읽어 사건으로 남긴다. 브리프 여부는 보지 않는다. 후보가 마지막 사람 입력 뒤의 글이고,
    * 이 턴 말고 기다리는 입력이 없을 때(openTurns가 1 이하)만 만든다. 0은 사람 입력 없이 이어진 턴이다.
    * 후보 지우기와 계수기 감소도 여기서 한다. 형식이 틀린 상자도 물은 것으로 본다.
-   * 상자 없는 턴은 사람 입력에 답을 마친 턴일 때만 브리프 대화를 끝낸다. 뒤에서 도는 작업을 기다리며 멈춘 턴,
+   * 이번 턴에 상자가 없으면(상자가 있는 글이 후보로 남으므로 뒤에 글이 더 와도 물은 것이다) 사람 입력에 답을 마친 턴일 때만 브리프 대화를 끝낸다. 뒤에서 도는 작업을 기다리며 멈춘 턴,
    * 사람 입력 없이 이어진 턴, 사람 입력 전에 쓴 글로 끝난 턴(그 입력의 답은 아직 안 왔다)은 끝이 아니다.
    */
   private settleTurnQuestionnaire() {

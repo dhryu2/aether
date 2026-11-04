@@ -292,6 +292,30 @@ async function main(): Promise<void> {
       check(qevs(cut).length === 2, tag("끼어든 말의 답에 쓴 상자도 질문지가 된다"), qevs(cut).length);
     }
 
+    // ── 상자 뒤에 글이 더 온 턴 ──
+    {
+      const r = mk();
+      await brief(r, "뒤 글 요청", "after-1");
+      say(r, box("앞"));
+      say(r, "답을 기다리겠습니다.");
+      done(r);
+      await sync(r);
+      check(qevs(r).length === 1 && qevs(r)[0].sourceSeq === sayEv(r, box("앞"))!.seq, tag("상자 뒤에 글이 더 와도 그 상자가 질문지가 된다"), qevs(r).length);
+      check(store.loadMeta(r.s.id)?.briefOpen === true, tag("상자 뒤에 글이 더 와도 물은 것으로 본다"));
+      await r.s.push("답", undefined, undefined, "after-2");
+      say(r, box("옛"));
+      say(r, box("새"));
+      say(r, "끝");
+      done(r);
+      await sync(r);
+      check(qevs(r)[1]?.sourceSeq === sayEv(r, box("새"))!.seq, tag("상자가 둘이면 마지막 상자를 쓴다"), qevs(r).length);
+      await r.s.push("다음", undefined, undefined, "after-3");
+      say(r, "상자 없는 답");
+      done(r);
+      await sync(r);
+      check(qevs(r).length === 2, tag("앞 턴의 상자가 다음 턴의 질문지가 되지 않는다"), qevs(r).length);
+    }
+
     // ── 브리프 대화의 끝 ──
     {
       const askHeld = async (r: Rig, id: string) => {
@@ -371,7 +395,7 @@ async function main(): Promise<void> {
       say(r, `${box("여럿둘")}${SPLIT}뒷말`);
       done(r);
       await sync(r);
-      check(qevs(r).length === 1, tag("마지막 글에 상자가 없으면 앞 글의 상자는 쓰지 않는다"), qevs(r).length);
+      check(qevs(r).length === 2 && qevs(r)[1].sourcePart === 0, tag("마지막 글에 상자가 없으면 앞 글의 상자를 쓴다"), qevs(r).length);
     }
     {
       const r = mk();
@@ -380,7 +404,7 @@ async function main(): Promise<void> {
       say(r, "다음 작업을 했다");
       done(r);
       await sync(r);
-      check(qevs(r).length === 0, tag("작업 도중 글의 상자는 무시한다"));
+      check(qevs(r).length === 1, tag("작업 도중 글의 상자도 질문지가 된다"), qevs(r).length);
     }
     {
       const r = mk();

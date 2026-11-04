@@ -548,8 +548,16 @@ export class CodexRuntime implements AgentRuntime {
     this.pumping = true;
     /** 이 호출이 끝난 뒤 곧바로 다음 턴을 이어가야 하는가(이미 끝났거나 실패한 경우). */
     let resume = false;
+    // 준비 실패는 같은 프로세스에서 되풀이해도 같은 거부다 — 입력을 꺼내기 전이므로 아래 catch로 보내면
+    //   `resume`이 바로 다시 불러 이벤트 루프를 굶긴다. 흐름을 오류로 끝내고 다음 입력은 새 런타임이 받는다.
     try {
       await this.ready();
+    } catch (e) {
+      this.pumping = false;
+      this.failBoot(e);
+      return;
+    }
+    try {
       if (this.disposed || this.activeTurnId || this.startingTurn || this.queue.length === 0) return;
       const job = this.queue.shift()!;
       this.activeFiles = job.files;
@@ -602,6 +610,13 @@ export class CodexRuntime implements AgentRuntime {
       this.pumping = false;
     }
     if (resume && !this.disposed) void this.pump();
+  }
+
+  /** 준비에 실패한 런타임을 마감한다 — 흐름을 오류로 끝내고 정리한다(공통 계층이 다음 입력에 되살린다). */
+  private failBoot(e: unknown) {
+    void reportError(e, { component: "session", operation: "session.turn.start", session_id: this.opts.sessionId, model: this.opts.model, provider: this.backend.services.provider });
+    this.endStream(new Error(st("notice.codex.turnFailed", { provider: this.backend.services.displayName, error: String((e as Error)?.message ?? e) })));
+    void this.dispose();
   }
 
   /**

@@ -377,6 +377,7 @@ function main() {
 
       case "thread/start":
         record({ method, params });
+        if (process.env.FAKE_THREAD_START === "fail") return fail(-32000, "thread start refused");
         threadId = FAKE_THREAD_ID;
         return ok({
           thread: { id: threadId, ephemeral: false, status: "idle", turns: [] },
@@ -389,6 +390,7 @@ function main() {
 
       case "thread/resume":
         record({ method, params });
+        if (process.env.FAKE_THREAD_START === "fail") return fail(-32000, "thread resume refused");
         threadId = String(params.threadId ?? FAKE_THREAD_ID);
         return ok({
           thread: { id: threadId, ephemeral: false, status: "idle", turns: [] },

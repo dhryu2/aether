@@ -460,8 +460,16 @@ export class GrokRuntime implements AgentRuntime {
     if (this.pumping || this.prompting || this.disposed || this.queue.length === 0) return;
     this.pumping = true;
     let resume = false;
+    // 준비 실패는 같은 프로세스에서 되풀이해도 같은 거부다 — 아래 catch로 보내면 `resume`이 바로 다시 불러
+    //   이벤트 루프를 굶긴다. 흐름을 오류로 끝내고 다음 입력은 새 런타임이 받는다.
     try {
       await this.ready();
+    } catch (e) {
+      this.pumping = false;
+      this.failBoot(e);
+      return;
+    }
+    try {
       if (this.disposed || this.prompting || this.queue.length === 0 || !this.sessionId) return;
       const job = this.queue.shift()!;
       this.activeFiles(job.files);
@@ -508,6 +516,13 @@ export class GrokRuntime implements AgentRuntime {
       this.pumping = false;
     }
     if (resume && !this.disposed) void this.pump();
+  }
+
+  /** 준비에 실패한 런타임을 마감한다 — 흐름을 오류로 끝내고 정리한다(공통 계층이 다음 입력에 되살린다). */
+  private failBoot(e: unknown) {
+    void reportError(e, { component: "session", operation: "session.turn.start", session_id: this.opts.sessionId, model: this.opts.model, provider: "grok" });
+    this.endStream(new Error(st("notice.grok.turnFailed", { error: String((e as Error)?.message ?? e) })));
+    void this.dispose();
   }
 
   /**

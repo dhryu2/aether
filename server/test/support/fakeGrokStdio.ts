@@ -535,6 +535,7 @@ function main() {
         return;
       case "session/new":
         if (!initialized) return fail(id, "not initialized");
+        if (process.env.FAKE_GROK_SESSION_NEW === "fail") return fail(id, "session new refused", -32000);
         if (typeof params.cwd === "string" && params.cwd) cwd = params.cwd;
         sessionId = sessionId ? FAKE_GROK_CLEARED_SESSION_ID : FAKE_GROK_SESSION_ID;
         ok(id, { sessionId });

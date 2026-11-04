@@ -6,7 +6,6 @@ import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const git = (...a) => spawnSync("git", a, { encoding: "utf8", maxBuffer: 1 << 26 });
@@ -26,7 +25,7 @@ const RULES = [
   ["npm 토큰", /\bnpm_[A-Za-z0-9]{36}\b/],
   ["Tailscale 키", /\btskey-[A-Za-z0-9-]{10,}/],
   ["JWT", /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/],
-  ["주소 안의 비밀번호", /[a-z][a-z0-9+.-]*:\/\/[^\s:/@'"`]+:[^\s:/@'"`$<{]{3,}@(?!localhost\b|127\.0\.0\.1\b|\[::1\]|example\.)[a-z0-9]/i],
+  ["주소 안의 비밀번호", /(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*:\/\/[^\s:/@'"`]+:[^\s:/@'"`$<{]{3,}@(?!localhost\b|127\.0\.0\.1\b|\[::1\]|example\.)[a-z0-9]/i],
   ["비밀값 대입", /\b[\w-]*(?:password|passwd|secret|token|api[_-]?key|private[_-]?key)[\w-]*["']?\s*[:=]\s*["']([^"'\s]{12,})["']/i, (m) => !PLACEHOLDER.test(m[0]) && /\d/.test(m[1]) && /[A-Za-z]/.test(m[1])],
   ["주민등록번호", /\b\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])-[1-4]\d{6}\b/],
   ["전화번호", /\b01[016789][- .]\d{3,4}[- .]\d{4}\b/],
@@ -109,15 +108,41 @@ function checkAuthor() {
   }
 }
 
+// 입력 줄은 \n으로만 나눈다. 맨 CR, U+2028, U+2029는 줄 끝이 아니라 내용이다(readline은 이 글자들에서도 줄을 나눈다).
+async function* splitLines(stream) {
+  stream.setEncoding("utf8");
+  let buf = "";
+  for await (const chunk of stream) {
+    buf += chunk;
+    for (let i = buf.indexOf("\n"); i >= 0; i = buf.indexOf("\n")) {
+      yield buf.slice(0, i);
+      buf = buf.slice(i + 1);
+    }
+  }
+  if (buf) yield buf;
+}
+
 // git diff/log -p -U0 출력에서 추가된 줄만 본다. 지운 줄과 앞뒤 문맥은 올라가는 새 내용이 아니다.
+// 내용 줄은 hunk 머리글이 알려 준 줄 수만큼 세어 읽는다. 내용이 `++ x`나 `diff --`처럼 생겨도 머리글로 읽지 않는다.
 async function scanPatch(args) {
   const child = spawn("git", ["-c", "core.quotepath=off", ...args], { stdio: ["ignore", "pipe", "pipe"] });
   let err = "";
   child.stderr.on("data", (d) => (err += d));
   const exited = new Promise((r) => child.on("close", r));
-  let commit = "", file = null, n = 0, combined = false, inMsg = false;
+  let commit = "", file = null, n = 0, inMsg = false, hunk = null, headers = 0, outside = 0;
   const at = () => (commit ? `${commit.slice(0, 8)} ` : "");
-  for await (const line of readline.createInterface({ input: child.stdout, crlfDelay: Infinity })) {
+  for await (const line of splitLines(child.stdout)) {
+    if (hunk && " +-\\".includes(line[0] ?? "\0")) {
+      if (line[0] === "\\") continue; // "\ No newline at end of file"
+      const mark = line.slice(0, hunk.old.length);
+      const removed = mark.includes("-");
+      if (!removed) { hunk.neu--; n++; }
+      for (let k = 0; k < hunk.old.length; k++) if (removed ? mark[k] === "-" : mark[k] === " ") hunk.old[k]--;
+      if (file && !removed && mark.includes("+")) scanLine(line.slice(hunk.old.length), `${at()}${file}:${n - 1}`, file);
+      if (hunk.neu <= 0 && hunk.old.every((c) => c <= 0)) hunk = null;
+      continue;
+    }
+    hunk = null; // 줄 수를 채우기 전에 다른 줄이 오면 머리글 판정으로 되돌린다
     if (line.startsWith("\0C")) {
       const [hash, author = ""] = line.slice(2).split(" ");
       commit = hash; inMsg = true; file = null;
@@ -126,29 +151,36 @@ async function scanPatch(args) {
     }
     if (line.startsWith("\0E")) { inMsg = false; continue; }
     if (inMsg) { scanLine(line, `${at()}커밋 메시지`); continue; }
-    if (line.startsWith("diff --")) { combined = !line.startsWith("diff --git"); file = null; continue; }
-    const bin = /^Binary files .* and b\/(.*) differ$/.exec(line);
-    if (bin) checkPath(bin[1], `${at()}${bin[1]}`);
+    if (line.startsWith("diff --")) { headers++; file = null; continue; }
     if (line.startsWith("+++ ")) {
       file = line === "+++ /dev/null" ? null : line.slice(6);
       if (file) checkPath(file, `${at()}${file}`);
       continue;
     }
-    const hunk = /^@@+ .*\+(\d+)(?:,\d+)? @@/.exec(line);
-    if (hunk) { n = Number(hunk[1]); continue; }
-    if (!file) continue;
-    const added = combined ? /^[ +]{2}/.test(line) && line.slice(0, 2).includes("+") : line.startsWith("+");
-    if (added) { scanLine(line.slice(combined ? 2 : 1), `${at()}${file}:${n}`, file); n++; }
+    const h = /^@@+ ((?:-\d+(?:,\d+)? )+)\+(\d+)(?:,(\d+))? @@/.exec(line);
+    if (h) {
+      n = Number(h[2]);
+      hunk = { old: h[1].trim().split(" ").map((o) => Number(o.split(",")[1] ?? 1)), neu: Number(h[3] ?? 1) };
+      if (hunk.neu <= 0 && hunk.old.every((c) => c <= 0)) hunk = null;
+      continue;
+    }
+    if (line.trim()) outside++;
   }
   if ((await exited) !== 0) throw new Error(`git 실행 실패: ${err.trim().slice(0, 300)}`);
+  // 머리글을 하나도 못 읽었는데 읽을 수 없는 출력이 있으면 git 설정이 출력 모양을 바꾼 것이다. 조용히 통과시키지 않는다.
+  if (!headers && outside) throw new Error("git 출력 형식을 읽지 못했습니다");
 }
 
-const LOG = ["log", "-p", "-U0", "-c", "--format=%x00C%H %ae%n%B%n%x00E"];
+// 출력 모양을 사용자 설정(색, 접두어, 이름 변경 감지, 외부 비교기, 변환기)과 서명 표시에 맡기지 않는다.
+// --text는 `-diff` 속성이나 NUL 한 글자로 이진 취급되어 내용이 빠지는 것을 막는다.
+// shortcut: --text는 병합 커밋(-c)에 듣지 않는다. NUL이 든 병합은 내용을 못 읽는다. 병합에 키를 숨기는 경우가 실제로 보이면 병합도 -m으로 펼친다.
+const FORMAT = ["--no-color", "--no-renames", "--no-ext-diff", "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/", "--text"];
+const LOG = ["log", "-p", "-U0", "-c", "--no-show-signature", ...FORMAT, "--format=%x00C%H %ae%n%B%n%x00E"];
 const [mode, ...rest] = process.argv.slice(2);
 if (mode === "--staged") {
   checkStagedPaths();
   checkAuthor();
-  await scanPatch(["diff", "--cached", "-U0", "--no-color"]);
+  await scanPatch(["diff", "--cached", "-U0", ...FORMAT]);
 } else if (mode === "--message") {
   // 주석 줄은 git이 지우므로 커밋 메시지에 들어가지 않는다.
   for (const l of fs.readFileSync(rest[0], "utf8").split(/\r?\n/)) if (!l.startsWith("#")) scanLine(l, "커밋 메시지");

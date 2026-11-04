@@ -145,6 +145,99 @@ for (const f of ["README.md", "README.en.md", "server/README.md", "deploy/site/n
   check(r.status === 0, `허용한다: ${f}`, r.stderr);
 }
 
+// 패치 해석: 내용 줄이 머리글처럼 생기거나 줄바꿈 글자가 섞여도 뒤의 키를 놓치지 않는다.
+const U2028 = String.fromCharCode(0x2028);
+const U2029 = String.fromCharCode(0x2029);
+const tricks: [string, string][] = [
+  ["앞줄이 ++ x", `++ x\nconst k = "${KEY}";\n`],
+  ["앞줄이 ++ i;", `++ i;\n${KEY}\n`],
+  ["앞줄이 ++ /dev/null", `++ /dev/null\n${KEY}\n`],
+  ["맨 CR 뒤의 키", `a\r${KEY}\n`],
+  ["U+2028 뒤의 키", `a${U2028}${KEY}\n`],
+  ["U+2029 뒤의 키", `a${U2029}${KEY}\n`],
+  ["맨 CR 뒤 diff 조각 뒤의 키", `x\rdiff --git a/q b/q\r${KEY}\n`],
+];
+for (const [name, body] of tricks) {
+  write("trick.txt", body);
+  const r = commit();
+  check(r.status !== 0 && /Anthropic 키/.test(r.stderr) && !r.stderr.includes(KEY), `막는다: ${name}`, r.stderr);
+  clean("trick.txt");
+}
+write("multi.txt", "l1\nl2\nl3\nl4\nl5\n");
+commit("기준");
+write("multi.txt", `++ x\nl2\nl3\nl4\n${KEY}\n`);
+const multi = commit();
+check(multi.status !== 0 && /Anthropic 키/.test(multi.stderr) && /multi\.txt:5/.test(multi.stderr), "같은 파일의 다음 hunk에 있는 키도 막고 줄 번호를 맞춘다", multi.stderr);
+clean();
+write("plus.txt", "++ y\n++ i;\n-- z\n");
+check(commit("머리글 모양 내용").status === 0, "머리글처럼 생긴 내용이라도 키가 없으면 커밋된다");
+
+// 훅이 없는 임시 저장소에서 스크립트를 직접 돌려, git 설정이 출력 모양을 바꿔도 막히는지 본다.
+const plain = path.join(tmp, "plain");
+fs.mkdirSync(plain);
+const pgit = (...a: string[]) => spawnSync("git", a, { cwd: plain, env, encoding: "utf8" });
+pgit("init", "-q", "-b", "main");
+pgit("config", "user.email", "t@users.noreply.github.com");
+pgit("config", "user.name", "t");
+fs.writeFileSync(path.join(plain, ".git", "secret-scan-literals.txt"), "placeholder-value\n");
+const pw = (f: string, c: string | Buffer) => fs.writeFileSync(path.join(plain, f), c);
+const pcommit = (m = "t") => { pgit("add", "-A"); return pgit("commit", "-q", "-m", m); };
+const scan = (range: string, extraEnv: NodeJS.ProcessEnv = {}) => spawnSync("node", [path.join(REPO, "scripts/secret-scan.mjs"), "--range", range], { cwd: plain, env: { ...env, ...extraEnv }, encoding: "utf8" });
+pw("base.txt", "기준\n");
+pcommit("기준");
+let nth = 0;
+const keyFile = () => { pw("k.txt", `v${nth++} ${KEY}\n`); return pcommit(); };
+for (const [name, cfg] of [["color.ui=always", ["color.ui", "always"]], ["diff.noprefix=true", ["diff.noprefix", "true"]], ["diff.external", ["diff.external", "true"]]] as const) {
+  pgit("config", cfg[0], cfg[1]);
+  keyFile();
+  const r = scan("HEAD~1..HEAD");
+  check(r.status !== 0 && /Anthropic 키/.test(r.stderr), `git 설정 ${name}여도 키를 잡는다`, r.stderr);
+  pgit("config", "--unset", cfg[0]);
+}
+pw(".gitattributes", "*.txt diff=hide\n");
+pcommit("속성");
+pgit("config", "diff.hide.textconv", "echo hidden");
+keyFile();
+const tc = scan("HEAD~1..HEAD");
+check(tc.status !== 0 && /Anthropic 키/.test(tc.stderr), "textconv 드라이버가 있어도 키를 잡는다", tc.stderr);
+pgit("config", "--unset", "diff.hide.textconv");
+pw(".gitattributes", "*.txt -diff\n");
+pcommit("이진 취급");
+keyFile();
+const nodiff = scan("HEAD~1..HEAD");
+check(nodiff.status !== 0 && /Anthropic 키/.test(nodiff.stderr), "*.txt -diff 속성이 있어도 키를 잡는다", nodiff.stderr);
+pw(".gitattributes", "");
+pcommit("속성 제거");
+pw("nul.txt", Buffer.from(["\0", KEY, "\n"].join("")));
+pcommit("NUL");
+const nul = scan("HEAD~1..HEAD");
+check(nul.status !== 0 && /Anthropic 키/.test(nul.stderr), "NUL 한 글자 뒤의 키도 잡는다", nul.stderr);
+fs.renameSync(path.join(plain, "base.txt"), path.join(plain, ".env"));
+pcommit("이름만 바꿈");
+const ren = scan("HEAD~1..HEAD");
+check(ren.status !== 0 && /올리면 안 되는 파일/.test(ren.stderr), "순수 이름 변경으로 만든 .env도 잡는다", ren.stderr);
+
+// 영숫자가 이어진 큰 파일도 빨리 끝나고, 진짜 주소 안 비밀번호는 여전히 잡는다.
+{
+  pw("big.txt", "a".repeat(1_000_000) + "\n");
+  pcommit("큰 파일");
+  const t0 = Date.now();
+  const big = spawnSync("node", [path.join(REPO, "scripts/secret-scan.mjs"), "--range", "HEAD~1..HEAD"], { cwd: plain, env, encoding: "utf8", timeout: 20_000 });
+  check(big.status === 0 && Date.now() - t0 < 10_000, "영숫자 1MB 한 줄도 10초 안에 끝난다", { ms: Date.now() - t0, status: big.status });
+  pw("addr.txt", "url = " + "https://svc:" + "Zq7pass9Rt" + "@db.corp.net/x\n");
+  pcommit("주소");
+  const addr = scan("HEAD~1..HEAD");
+  check(addr.status !== 0 && /주소 안의 비밀번호/.test(addr.stderr), "주소 안의 비밀번호는 여전히 잡는다", addr.stderr);
+}
+
+// 출력 형식을 읽지 못하면 조용히 통과하지 않고 실패한다
+const stubDir = path.join(tmp, "stub");
+fs.mkdirSync(stubDir);
+const realGit = spawnSync("which", ["git"], { env, encoding: "utf8" }).stdout.trim();
+fs.writeFileSync(path.join(stubDir, "git"), `#!/bin/sh\ncase " $* " in *" log "*|*" diff "*) echo "알 수 없는 출력"; exit 0;; esac\nexec "${realGit}" "$@"\n`, { mode: 0o755 });
+const odd = scan("HEAD", { PATH: `${stubDir}${path.delimiter}${process.env.PATH}` });
+check(odd.status !== 0 && /git 출력 형식을 읽지 못했습니다/.test(odd.stderr), "git 출력 형식을 읽지 못하면 실패한다", odd.stderr.slice(0, 300));
+
 // 작성자 메일
 git("config", "user.email", "me@" + "gmail.com");
 write("author.txt", "내용\n");

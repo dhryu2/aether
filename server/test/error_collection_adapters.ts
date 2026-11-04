@@ -183,6 +183,7 @@ try {
           fs.writeFileSync(path.join(copy, '.git'), 'gitdir: unused');
           rows.length = 0;
           const marker = path.join(cwd, '.git'), parent = path.join(cwd, 'missing');
+          if (operation === 'parent') fs.mkdirSync(parent);
           fs.statSync = ((p: any, ...args: any[]) => { if ((operation === 'linked' && p === marker) || (operation === 'exists' && p === cwd)) throw error(); return (stat as any)(p, ...args); }) as typeof stat;
           fs.realpathSync = ((p: any, ...args: any[]) => {
             if ((['same', 'approval', 'restore'].includes(operation) && p === cwd) || (operation === 'parent' && p === parent)) throw error();
@@ -194,7 +195,7 @@ try {
           if (operation === 'same') assert.equal((await workspace.workspaceCopyState(copy, cwd)).needsApply, false);
           if (operation === 'approval') assert.equal(checkpointsForApproval(1, { kind: 'edit', path: 'file.txt', files: [{ path: 'file.txt' }] }, cwd)[0].ok, true);
           if (operation === 'restore') assert.deepEqual(applyRestore(cwd, []), { restored: [], failed: [] });
-          if (operation === 'parent') assert.equal(resolveFileUnderCwd(cwd, 'missing/new.txt').real, path.join(parent, 'new.txt'));
+          if (operation === 'parent') assert.throws(() => resolveFileUnderCwd(cwd, 'missing/new.txt'));
           fs.statSync = stat; fs.realpathSync = realpath;
           assert.equal(rows.length, expected ? 1 : 0, `${owner}:${code}:${operation}`);
           if (rows.length) assert.equal(rows[0].severity, 'warning');

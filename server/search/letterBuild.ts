@@ -23,6 +23,8 @@ export function buildLetterDocs(
   codec: ProviderEventCodec,
   rules?: Partial<RefineRules>,
   onError?: (kind: "parse" | "extract", error: unknown) => void,
+  /** 되돌려 숨긴 순번이면 참. 진행 기록(seen)에는 넣되 글은 만들지 않는다. */
+  isHidden?: (seq: number) => boolean,
 ): LetterBuild {
   const docs: LetterDoc[] = [];
   const turnSeqs: number[] = [];
@@ -31,6 +33,8 @@ export function buildLetterDocs(
   let parseFailed = false, extractFailed = false, seen = 0;
   source((row) => {
     if (row.seq > seen) seen = row.seq;
+    // 정제기보다 앞이어야 숨긴 줄이 "앞의 #번호와 같은 출력"의 원본이 되지 않는다.
+    if (isHidden?.(row.seq)) return;
     let ev: AetherEvent;
     try {
       const parsed = JSON.parse(row.line) as unknown;
@@ -152,8 +156,8 @@ function compareLetters(db: DatabaseSync, sessionId: string, expected: LetterDoc
   return out;
 }
 
-export function checkLetters(db: DatabaseSync, sessionId: string, source: RowSource, codec: ProviderEventCodec): LetterCheck {
-  const build = buildLetterDocs(source, codec);
+export function checkLetters(db: DatabaseSync, sessionId: string, source: RowSource, codec: ProviderEventCodec, isHidden?: (seq: number) => boolean): LetterCheck {
+  const build = buildLetterDocs(source, codec, undefined, undefined, isHidden);
   const expected = sanitizeDocs(build.docs);
   const want = docCounts(expected);
   const have = storedCounts(db, sessionId);

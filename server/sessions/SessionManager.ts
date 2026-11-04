@@ -32,7 +32,7 @@ import { autoResumeStoppedIntent, waitingFromPending, type NotifyIntent } from "
 import { AUTO_RESUME_MAX_ATTEMPTS, AUTO_RESUME_TEXT_MAX, nextAttemptAt, readAutoResumeSettings, type AutoResumeVerdict } from "./autoResume";
 import { st } from "../i18n";
 import { deriveWorkTitle, resolveWorkTitle } from "../../shared/workTitle";
-import { parseHiddenRanges, rewindDisk, RewindError, sessionWasRewound, type HiddenRange, type RewindOutcome } from "./rewind";
+import { forgetRewoundLetters, parseHiddenRanges, rewindDisk, RewindError, sessionWasRewound, type HiddenRange, type RewindOutcome } from "./rewind";
 
 const NAME_MAX = 80;
 /** 일하는 중이라 자동 재개를 미룰 때의 간격. */
@@ -122,6 +122,8 @@ class SessionManager {
   private readonly onTitleChange = (live: LiveSession) => {
     if (this.sessions.get(live.id) === live) this.emitPresence(this.toPresenceFromLive(live));
   };
+  /** 되돌리기가 진행 중인 세션. 실행기가 끝난 뒤에도 끝날 때까지 이 세션의 입력을 막는다. */
+  private rewindsInFlight = new Set<string>();
   private presenceSubs = new Set<(update: PresenceSession) => void>();
   private lastPresence = new Map<string, string>();
   private bgHoldTimers = new Map<string, { until: number; timer: ReturnType<typeof setTimeout> }>();
@@ -498,6 +500,8 @@ class SessionManager {
    *   get-miss와 sessions.set 사이에 인터리브하지 못해 같은 id 더블-spawn(자원폭발)이 안 난다.
    */
   getOrResume(id: string): LiveSession {
+    // 실행기가 끝난 뒤 되돌리기가 끝나기 전에 새 객체를 만들면 옛 숨김 범위와 키로 시작해 메타를 덮는다.
+    if (this.rewindsInFlight.has(id)) throw new RewindError("busy");
     if (!store.diaryAcceptsInput(id)) throw classifyError(new Error(st("routes.sessions.diaryBusy")), "user_action");
     const live = this.sessions.get(id);
     if (live && !live.isEnded) return live;
@@ -639,12 +643,28 @@ class SessionManager {
     return parseHiddenRanges(meta?.hiddenRanges);
   }
 
+  rewindInFlight(id: string): boolean {
+    return this.rewindsInFlight.has(id);
+  }
+
   /** 사용자 말 뒤로 대화와 저장해 둔 파일을 되돌린다. 진행 중이면 거절한다. */
   async rewind(id: string, seq: number): Promise<RewindOutcome> {
     if (!UUID_RE.test(id)) throw new RewindError("missing");
+    // 먼저 검사해야 두 번째 요청의 finally가 첫 요청의 표시를 지우지 않는다.
+    if (this.rewindsInFlight.has(id)) throw new RewindError("busy");
+    this.rewindsInFlight.add(id);
+    try {
+      return await this.rewindInner(id, seq);
+    } finally {
+      this.rewindsInFlight.delete(id);
+    }
+  }
+
+  private async rewindInner(id: string, seq: number): Promise<RewindOutcome> {
     const live = this.sessions.get(id);
     if (live && !live.isDisposed) {
       const out = await live.rewind(seq);
+      await forgetRewoundLetters(id, out);
       if (this.handoffMeta(id)?.handoffJob?.state === "asking") this.dropAskingHandoff(id); // 요청이나 질문 카드가 숨겨졌을 수 있다
       return out;
     }
@@ -653,6 +673,7 @@ class SessionManager {
     const codec = providerEntry(storedProviderId(meta.provider)).codec;
     // 디스크 칸은 깨진 세션을 { id }만 담으려고 Partial이다. cwd가 있으면 저장된 메타 전체를 되돌린다.
     const result = rewindDisk(meta as SessionMeta, seq, (event) => codec.normalize(event));
+    await forgetRewoundLetters(id, result);
     const saved = store.loadMeta(id);
     const entry = this.disk.get(id);
     if (entry && saved) entry.meta = saved;

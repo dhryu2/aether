@@ -1898,15 +1898,12 @@ export class LiveSession {
     }
     // 끄기 시작 전에 막아야, 같은 객체를 받은 새 입력이 꺼지는 실행기로 들어가지 않는다.
     this.rewinding = true;
-    // 이번 시도에서 실행기 종료가 끝났는지. 예전 되돌리기로 rewound 가 이미 참이어도, 종료 실패면 입력을 다시 연다.
-    let disposeFinished = this.ended;
     try {
       const before = store.readEventsSince(this.id, 0);
       const target = rewindTarget(before, seq, this.hiddenRanges);
       if (!this.ended) {
         await this.runtime.dispose();
         await this.endedPromise;
-        disposeFinished = true;
       }
       const events = store.readEventsSince(this.id, 0);
       let until = target.until;
@@ -1938,9 +1935,9 @@ export class LiveSession {
         until,
         ...(idleSeq ? { idleSeq } : {}),
       };
-    } catch (error) {
-      if (!disposeFinished) this.rewinding = false;
-      throw error;
+    } finally {
+      // 진행 중 표시는 SessionManager의 rewindsInFlight가 맡는다. 끝난 객체에 이 표시가 남으면 다음 되돌리기와 자동 재개가 막힌다.
+      this.rewinding = false;
     }
   }
 

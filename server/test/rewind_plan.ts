@@ -10,8 +10,10 @@ import { randomUUID } from "node:crypto";
 import { config } from "../config";
 import { isControlEvent } from "../types";
 import { previewFromUnifiedDiff } from "../sessions/mutationPreview";
+import { buildMutationPreview } from "../providers/claude/mutationPreview";
 import * as store from "../sessions/persistence";
 import {
+  appendCheckpoint,
   applyRestore,
   buildReseed,
   checkpointFromMutation,
@@ -121,7 +123,7 @@ const diffNotes = checkpointsForApproval(8, preview, diffWork);
 check(diffNotes.map((note) => note.path).join("|") === "a.ts|b.ts|new.ts", "파일마다 복원 경로를 남긴다", diffNotes.map((note) => note.path));
 check(!diffNotes.some((note) => note.path.includes(",")), "여러 파일을 쉼표로 이은 한 경로로 저장하지 않는다");
 const outsidePreview = previewFromUnifiedDiff([{ path: "/tmp/example-outside/x.ts", diff: "@@ -1 +1 @@\n-a\n+b\n" }], diffWork);
-check(outsidePreview?.path === "/tmp/example-outside/x.ts" && outsidePreview.files?.[0].path === "x.ts", "폴더 밖 변경은 화면 경로만 전체이고 복원 기록 경로는 이전과 같다", outsidePreview);
+check(outsidePreview?.path === "/tmp/example-outside/x.ts" && outsidePreview.files?.[0].path.startsWith("..") === true, "폴더 밖 변경은 화면 경로는 전체이고 복원 기록 경로는 폴더 밖(..)을 가리킨다", outsidePreview);
 check(diffNotes.find((note) => note.path === "a.ts")?.before === "alpha\n" && diffNotes.find((note) => note.path === "a.ts")?.ok === true, "첫 파일의 이전 내용을 읽는다");
 check(diffNotes.find((note) => note.path === "b.ts")?.before === "beta\n", "둘째 파일의 이전 내용도 따로 읽는다");
 check(diffNotes.find((note) => note.path === "new.ts")?.isCreate === true && diffNotes.find((note) => note.path === "new.ts")?.ok === true, "없던 파일은 되돌릴 때 지울 기록이다");
@@ -135,6 +137,107 @@ check(!fs.existsSync(path.join(diffWork, "new.ts")), "새로 만든 파일은 �
 const legacy = checkpointsForApproval(3, { kind: "edit", path: "a.ts", before: "카드에 있던 내용" }, diffWork);
 check(legacy.length === 1 && legacy[0]?.before === "카드에 있던 내용" && legacy[0]?.path === "a.ts", "이전 내용이 이미 있으면 그 한 파일을 그대로 쓴다");
 fs.rmSync(diffWork, { recursive: true, force: true });
+
+// 폴더 밖 파일이 같은 이름의 폴더 안 파일로 착각되던 문제의 회귀 시험
+{
+  const inside = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "aether-same-in-")));
+  const outside = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "aether-same-out-")));
+  fs.writeFileSync(path.join(inside, "a.ts"), "inside");
+  fs.writeFileSync(path.join(outside, "a.ts"), "outside");
+  for (const isCreate of [false, true]) {
+    const pv = previewFromUnifiedDiff([{ path: path.join(outside, "a.ts"), diff: "@@ -1 +1 @@\n-a\n+b\n", isCreate }], inside);
+    const notes = checkpointsForApproval(4, pv, inside);
+    check(notes[0]?.ok === false && notes[0].skip === "outside" && notes[0].path.startsWith(".."), `폴더 밖 파일 기록은 outside로 건너뛴다(isCreate=${isCreate})`, notes);
+    const applied = applyRestore(inside, [{ seq: 4, path: pv!.files![0].path, before: "x", isCreate, ok: true }]);
+    check(fs.readFileSync(path.join(inside, "a.ts"), "utf8") === "inside" && applied.restored.length === 0, `같은 이름의 폴더 안 파일을 건드리지 않는다(isCreate=${isCreate})`, applied);
+  }
+  fs.rmSync(inside, { recursive: true, force: true });
+  fs.rmSync(outside, { recursive: true, force: true });
+}
+
+// auth.json 승인 기록은 비밀로 건너뛴다
+{
+  const authDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "aether-auth-")));
+  fs.writeFileSync(path.join(authDir, "auth.json"), "{}");
+  const pv = buildMutationPreview("Write", { file_path: "auth.json", content: "x" }, authDir);
+  const notes = checkpointsForApproval(4, pv, authDir);
+  check(notes.length === 1 && notes[0].skip === "secret" && notes[0].ok === false, "auth.json 승인 기록은 secret으로 건너뛴다", notes);
+  fs.rmSync(authDir, { recursive: true, force: true });
+}
+
+// 끊긴 링크와 링크 아래 없는 경로를 따라 폴더 밖에 쓰던 문제의 회귀 시험
+{
+  const work = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "aether-link-in-")));
+  const away = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "aether-link-out-")));
+  fs.symlinkSync(path.join(away, "target.txt"), path.join(work, "dangling.txt"));
+  fs.symlinkSync(away, path.join(work, "dirlink"));
+  for (const rel of ["dangling.txt", "dirlink/sub/file.txt"]) {
+    const notes = checkpointsForApproval(4, { kind: "write", path: rel, files: [{ path: rel }] }, work);
+    check(notes[0]?.skip === "outside", `승인 기록도 outside로 남긴다: ${rel}`, notes);
+    const applied = applyRestore(work, [{ seq: 4, path: rel, before: "x", isCreate: false, ok: true, wholeFile: true }]);
+    check(applied.failed.some((f) => f.path === rel && f.reason === "outside") && applied.restored.length === 0, `링크를 따라 밖으로 나가는 복원은 outside다: ${rel}`, applied);
+  }
+  check(fs.readdirSync(away).length === 0, "바깥 폴더에는 파일도 폴더도 생기지 않는다", fs.readdirSync(away));
+  fs.mkdirSync(path.join(work, "real"));
+  fs.symlinkSync(path.join(work, "real"), path.join(work, "inlink"));
+  const okApplied = applyRestore(work, [
+    { seq: 4, path: "new.txt", before: "n", isCreate: false, ok: true, wholeFile: true },
+    { seq: 4, path: "a/b/new.txt", before: "n", isCreate: false, ok: true, wholeFile: true },
+    { seq: 4, path: "inlink/new.txt", before: "n", isCreate: false, ok: true, wholeFile: true },
+  ]);
+  check(okApplied.restored.length === 3 && okApplied.failed.length === 0, "새 파일, 없는 하위 폴더, 폴더 안 링크 경로는 통과한다", okApplied);
+  fs.rmSync(work, { recursive: true, force: true });
+  fs.rmSync(away, { recursive: true, force: true });
+}
+
+// 조각(Edit old_string, 노트북 셀)이 파일 전체로 기록되어 파일을 덮던 문제의 회귀 시험
+{
+  const frag = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "aether-frag-")));
+  const full = "line1\nTARGET\nline3\n";
+  fs.writeFileSync(path.join(frag, "e.ts"), full);
+  const p1 = buildMutationPreview("Edit", { file_path: "e.ts", old_string: "TARGET", new_string: "CHANGED" }, frag);
+  const n1 = checkpointsForApproval(4, p1, frag);
+  fs.writeFileSync(path.join(frag, "e.ts"), "line1\nCHANGED\nline3\n");
+  const p2 = buildMutationPreview("Edit", { file_path: "e.ts", old_string: "CHANGED", new_string: "THIRD" }, frag);
+  const n2 = checkpointsForApproval(6, p2, frag);
+  fs.writeFileSync(path.join(frag, "e.ts"), "line1\nTHIRD\nline3\n");
+  applyRestore(frag, planRewind([...n1, ...n2], 5, 9).restore);
+  check(fs.readFileSync(path.join(frag, "e.ts"), "utf8") === "line1\nCHANGED\nline3\n", "두 번째 승인 이후만 되돌리면 파일 전체가 그 시점 내용이 된다");
+  applyRestore(frag, planRewind([...n1, ...n2], 3, 9).restore);
+  check(fs.readFileSync(path.join(frag, "e.ts"), "utf8") === full, "Edit 승인 앞으로 되돌리면 파일 전체가 원본이다(조각으로 덮지 않는다)");
+
+  const nb = JSON.stringify({ cells: [{ id: "c1", cell_type: "code", source: ["a = 1"] }], nbformat: 4 });
+  for (const mode of ["replace", "delete", "insert"] as const) {
+    fs.writeFileSync(path.join(frag, "n.ipynb"), nb);
+    const pv = buildMutationPreview("NotebookEdit", { notebook_path: "n.ipynb", cell_id: "c1", edit_mode: mode, new_source: "b = 2" }, frag);
+    const notes = checkpointsForApproval(4, pv, frag);
+    fs.writeFileSync(path.join(frag, "n.ipynb"), "{}");
+    applyRestore(frag, planRewind(notes, 3, 9).restore);
+    check(fs.readFileSync(path.join(frag, "n.ipynb"), "utf8") === nb, `노트북 ${mode}를 되돌리면 .ipynb 전체가 복원된다`);
+  }
+
+  const bigBody = "x".repeat(config.diffMaxBytes + 10);
+  fs.writeFileSync(path.join(frag, "big.ts"), bigBody);
+  const bigNotes = checkpointsForApproval(4, buildMutationPreview("Edit", { file_path: "big.ts", old_string: "x", new_string: "y" }, frag), frag);
+  const bigPlan = planRewind(bigNotes, 3, 9);
+  fs.writeFileSync(path.join(frag, "big.ts"), "after");
+  applyRestore(frag, bigPlan.restore);
+  check(bigPlan.skipped.some((s) => s.path === "big.ts" && s.reason === "truncated") && fs.readFileSync(path.join(frag, "big.ts"), "utf8") === "after", "큰 파일의 Edit은 건너뛰고 파일을 그대로 둔다");
+  // UTF-8이 아닌 파일은 깨진 글자로 저장되면 복원이 원본 바이트를 못 살리므로 binary로 건너뛴다
+  const euc = Buffer.from([0xb0, 0xa1, 0xb3, 0xaa, 0xb4, 0xd9, 0x0a]);
+  fs.writeFileSync(path.join(frag, "euc.txt"), euc);
+  const eucPlan = planRewind(checkpointsForApproval(4, buildMutationPreview("Edit", { file_path: "euc.txt", old_string: "x", new_string: "y" }, frag), frag), 3, 9);
+  applyRestore(frag, eucPlan.restore);
+  check(eucPlan.restore.length === 0 && eucPlan.skipped.some((s) => s.reason === "binary") && fs.readFileSync(path.join(frag, "euc.txt")).equals(euc), "UTF-8이 아닌 파일은 binary로 건너뛰고 파일이 그대로다", eucPlan);
+  fs.writeFileSync(path.join(frag, "ko.txt"), "가나다\n");
+  const koPlan = planRewind(checkpointsForApproval(4, buildMutationPreview("Edit", { file_path: "ko.txt", old_string: "x", new_string: "y" }, frag), frag), 3, 9);
+  check(koPlan.restore.length === 1 && koPlan.restore[0].before === "가나다\n", "정상 UTF-8 파일은 그대로 복원 대상이다", koPlan);
+  const koBig = (config.diffMaxBytes % 3 === 0 ? "a" : "") + "가".repeat(Math.ceil(config.diffMaxBytes / 3) + 5);
+  fs.writeFileSync(path.join(frag, "kobig.txt"), koBig);
+  const koBigPlan = planRewind(checkpointsForApproval(4, buildMutationPreview("Edit", { file_path: "kobig.txt", old_string: "x", new_string: "y" }, frag), frag), 3, 9);
+  check(koBigPlan.skipped.some((s) => s.reason === "truncated") && !koBigPlan.skipped.some((s) => s.reason === "binary"), "잘린 경계에서 멀티바이트가 끊겨도 binary가 아니라 truncated다", koBigPlan);
+  fs.rmSync(frag, { recursive: true, force: true });
+}
 
 await (await import("./support/tempDb")).useTempDiary("rewind_plan"); // 임시 SQLite 일기
 const previousData = config.dataDir;
@@ -160,6 +263,22 @@ try {
   const saved = store.loadMeta(id);
   check(saved?.rewound === true && saved.resumeKey === undefined && sessionWasRewound(saved), "되돌린 메타는 옛 이어가기 키를 비운다");
   fs.rmSync(diskCwd, { recursive: true, force: true });
+
+  // 옛 기록(wholeFile 표시 없음)은 Edit 조각과 전체 내용을 구별할 수 없어 파일을 덮지 않고 건너뛴다
+  const oldId = "rewind-old-note";
+  const oldCwd = fs.mkdtempSync(path.join(os.tmpdir(), "aether-rewind-old-"));
+  fs.writeFileSync(path.join(oldCwd, "f.ts"), "current");
+  fs.writeFileSync(path.join(oldCwd, "made.ts"), "created");
+  store.ensureSessionDir(oldId);
+  store.appendEvent(oldId, { seq: 1, ts: 1, kind: "user_msg", text: "남겨" });
+  store.appendEvent(oldId, { seq: 2, ts: 2, kind: "status", status: "completed" });
+  appendCheckpoint(oldId, { seq: 2, path: "f.ts", before: "TARGET", isCreate: false, ok: true });
+  appendCheckpoint(oldId, { seq: 2, path: "made.ts", before: null, isCreate: true, ok: true });
+  const oldOutcome = rewindDisk({ id: oldId, cwd: oldCwd, createdAt: 1 }, 1, () => []);
+  check(fs.readFileSync(path.join(oldCwd, "f.ts"), "utf8") === "current", "옛 내용 기록은 파일을 덮지 않는다");
+  check(oldOutcome.skipped.some((s) => s.path === "f.ts" && s.reason === "unknown"), "옛 내용 기록은 unknown으로 알린다", oldOutcome.skipped);
+  check(!fs.existsSync(path.join(oldCwd, "made.ts")) && oldOutcome.restored.includes("made.ts"), "옛 새 파일 기록은 그대로 지운다");
+  fs.rmSync(oldCwd, { recursive: true, force: true });
 } finally {
   config.dataDir = previousData;
   fs.rmSync(diskData, { recursive: true, force: true });

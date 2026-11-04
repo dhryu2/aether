@@ -374,7 +374,7 @@ export type MutationPreview = {
   inexact?: boolean;
   additions?: number;
   deletions?: number;
-  /** 파일이 여럿이면 복원은 이 목록을 따른다. 화면용 path 한 줄로 되돌리지 않는다. */
+  /** 복원은 이 목록을 따른다. 화면용 path 한 줄로 되돌리지 않는다. 목록이 없으면 `before`는 파일 전체여야 한다. */
   files?: MutationFile[];
 };
 

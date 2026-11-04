@@ -19,7 +19,7 @@ console.log("=== 경로 표시 ===");
 {
   const p = previewFromUnifiedDiff([{ path: `${OUT}/.profile`, diff: "@@ -1 +1 @@\n-a\n+b\n" }], cwd);
   check(p?.path === `${OUT}/.profile`, "폴더 밖 변경은 전체 경로를 보인다", p?.path);
-  check(p?.files?.[0].path === ".profile", "복원 기록용 files 경로는 이전 그대로", p?.files);
+  check(p?.files?.[0].path === "../example-outside/.profile", "복원 기록용 files 경로는 폴더 밖(..)을 가리킨다", p?.files);
   const inside = previewFromUnifiedDiff([{ path: path.join(cwd, "src/a.txt"), diff: "@@ -1 +1 @@\n-a\n+b\n" }], cwd);
   check(inside?.path === "src/a.txt", "폴더 안은 상대 경로", inside?.path);
   const moved = previewFromUnifiedDiff([{ path: "src/inside.txt", movePath: `${OUT}/target`, diff: "@@ -1 +1 @@\n-a\n+b\n" }], cwd);

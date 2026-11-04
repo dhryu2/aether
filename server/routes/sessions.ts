@@ -63,6 +63,7 @@ function providerErrorText(err: unknown): string {
  * (경로 등 경계 정보를 응답에 싣지 않는다 — fs.ts와 동일 정책).
  */
 function replyResumeFailure(res: Response, what: string, err: unknown, sessionId: string) {
+  if (err instanceof RewindError && err.code === "busy") return res.status(409).json({ error: st("routes.sessions.rewind.busy") });
   // 응답 문구와 상태 판정은 유지한다. 수집 여부는 생성 지점의 중립 원인만 따른다.
   const cause = !isExpectedError(err) && err instanceof Error ? err.cause ?? err : err;
   void reportResponseError(res, cause, { component: "session", operation: "session.resume", session_id: sessionId });
@@ -695,6 +696,7 @@ sessionsRouter.post("/:id/commands", async (req: Request, res: Response) => {
     return res.status(400).json({ error: st("routes.sessions.commandArgumentsInvalid", { max: MAX_COMMAND_ARGUMENTS }) });
   }
   if (sessionManager.isArchived(String(req.params.id))) return res.status(409).json({ error: st("routes.sessions.archivedReadOnly") });
+  if (sessionManager.rewindInFlight(String(req.params.id))) return res.status(409).json({ error: st("routes.sessions.rewind.busy") });
   const s = sessionManager.get(String(req.params.id));
   if (!s) return res.status(404).json({ error: st("routes.sessions.liveOnly") });
   try {

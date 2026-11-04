@@ -223,27 +223,30 @@ export function samePath(a: string, b: string): boolean {
  * Write/Edit before 읽기 전용: 세션 cwd 경계검사. 비존재(신규)=isNew 정상, 디렉터리 강제 없음.
  * resolveWorkFolder(디렉터리 강제·비존재 throw)와 달리 cwd 기준·파일 허용.
  * ⚠️ startsWith 금지(형제디렉터리 버그). path.relative 경계검사만.
+ * 끊긴 링크와 링크 아래 없는 경로는 밖으로 본다. `providers/codex/permissionPolicy.ts`의 `changesInsideFolder`와 같은 판정이다.
  */
 export function resolveFileUnderCwd(cwd: string, filePath: string): { real: string; rel: string; isNew: boolean } {
   const target = path.resolve(cwd, filePath);
   let real: string;
   let isNew = false;
+  let probe = target;
+  const tail: string[] = [];
   try {
-    real = fs.realpathSync(target); // 심볼릭 해소
-  } catch (e) {
-    if ((e as { code?: string }).code === "ENOENT") {
-      isNew = true;
-      // 신규 파일: 부모 디렉터리를 realpath 해소(심볼릭 부모를 통한 cwd 탈출 차단). 부모도 없으면 lexical.
-      try {
-        real = path.join(fs.realpathSync(path.dirname(target)), path.basename(target));
-      } catch (error) {
-        if (!isManagedWorkspacePath(path.dirname(target)) && ((error as NodeJS.ErrnoException)?.code === "EACCES" || (error as NodeJS.ErrnoException)?.code === "EPERM")) classifyError(error as Error, "user_action");
-        failures.file(error, { component: "session", operation: "session.path.parent", severity: "warning" }, path.dirname(target));
-        real = target;
-      }
-    } else {
-      throw classifyError(new Error(st("notice.path.accessDenied"), { cause: e }), (e as NodeJS.ErrnoException).code === "EACCES" || (e as NodeJS.ErrnoException).code === "EPERM" ? "user_action" : "aether_defect");
+    // 있는 가장 깊은 구간을 찾아 realpath로 풀고, 없는 조각은 뒤에 붙인다(심볼릭 부모를 통한 cwd 탈출 차단).
+    while (!fs.lstatSync(probe, { throwIfNoEntry: false }) && path.dirname(probe) !== probe) {
+      tail.unshift(path.basename(probe));
+      probe = path.dirname(probe);
     }
+    real = path.join(fs.realpathSync(probe), ...tail);
+    isNew = tail.length > 0;
+  } catch (e) {
+    // lstat에는 보이는데 realpath가 못 푸는 ENOENT는 끊긴 링크다. 어디로 가는지 모르므로 밖으로 본다.
+    if ((e as { code?: string }).code === "ENOENT") throw classifyError(new Error(st("notice.path.outsideCwd")), "user_action");
+    if (tail.length) {
+      if (!isManagedWorkspacePath(probe) && ((e as NodeJS.ErrnoException)?.code === "EACCES" || (e as NodeJS.ErrnoException)?.code === "EPERM")) classifyError(e as Error, "user_action");
+      failures.file(e, { component: "session", operation: "session.path.parent", severity: "warning" }, probe);
+    }
+    throw classifyError(new Error(st("notice.path.accessDenied"), { cause: e }), (e as NodeJS.ErrnoException).code === "EACCES" || (e as NodeJS.ErrnoException).code === "EPERM" ? "user_action" : "aether_defect");
   }
   const rel = path.relative(cwd, real);
   if (rel.startsWith("..") || path.isAbsolute(rel)) throw classifyError(new Error(st("notice.path.outsideCwd")), "user_action");

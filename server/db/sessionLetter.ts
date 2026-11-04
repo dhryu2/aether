@@ -454,6 +454,22 @@ export function deleteLetterSession(sessionId: string): Promise<void> {
   });
 }
 
+/**
+ * 되돌려 숨긴 순번 범위의 글을 색인에서 지운다(범위는 `after < seq <= until`).
+ * enqueue를 타므로 이미 줄 선 실시간 쓰기보다 뒤에 돈다. FTS 표는 삭제 트리거가 맞춘다.
+ */
+export function deleteLetterRanges(sessionId: string, ranges: readonly { after: number; until: number }[]): Promise<void> {
+  if (!sessionLetterReady() || !ranges.length) return Promise.resolve();
+  return enqueue(async () => {
+    assertSessionId(sessionId);
+    const db = database();
+    transaction(db, () => {
+      const del = db.prepare("DELETE FROM session_letter WHERE session_id = ? AND seq > ? AND seq <= ?");
+      for (const range of ranges) del.run(sessionId, range.after, range.until);
+    });
+  });
+}
+
 async function writeLive(input: LiveLetterInput): Promise<void> {
   assertSessionId(input.sessionId);
   if (!Number.isSafeInteger(input.seq) || input.seq <= 0) return;

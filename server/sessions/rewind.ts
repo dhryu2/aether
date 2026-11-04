@@ -9,6 +9,8 @@ import { isManagedWorkspacePath } from "./isolatedWorkspace";
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config";
+import { deleteLetterRanges } from "../db/sessionLetter";
+import { reportError } from "../observability/report";
 import type { AetherEvent, MutationPreview, SessionMeta } from "../types";
 import { readBefore } from "./mutationPreview";
 import * as store from "./persistence";
@@ -28,6 +30,8 @@ export type CheckpointNote = {
   isCreate: boolean;
   ok: boolean;
   skip?: SkipReason;
+  /** `before`가 파일 전체임을 뜻한다. 이 표시가 없는 옛 기록은 Edit 조각일 수 있어 복원하지 않는다. */
+  wholeFile?: true;
 };
 
 export class RewindError extends Error {
@@ -73,7 +77,7 @@ export function checkpointFromMutation(seq: number, mutation: MutationPreview | 
   if (typeof mutation.before !== "string") {
     return { seq, path: filePath, before: null, isCreate: false, ok: false, skip: "unknown" };
   }
-  return { seq, path: filePath, before: mutation.before, isCreate: false, ok: true };
+  return { seq, path: filePath, before: mutation.before, isCreate: false, ok: true, wholeFile: true };
 }
 
 /** 승인 순간 작업 폴더에 있는 이전 내용. 없으면 새 파일이라 되돌릴 때 지운다. */
@@ -99,7 +103,7 @@ function noteFromWorkdir(seq: number, filePath: string, cwd: string): Checkpoint
     if (read.binary) return { seq, path: pathShown, before: null, isCreate: false, ok: false, skip: "binary" };
     if (read.truncated) return { seq, path: pathShown, before: null, isCreate: false, ok: false, skip: "truncated" };
     if (typeof read.before !== "string") return { seq, path: pathShown, before: null, isCreate: false, ok: false, skip: "unknown" };
-    return { seq, path: pathShown, before: read.before, isCreate: false, ok: true };
+    return { seq, path: pathShown, before: read.before, isCreate: false, ok: true, wholeFile: true };
   } catch (error) {
     failures.report(error, { component: "session", operation: "session.checkpoint.preview", severity: "warning" }, `preview:${cwd}:${shown}`);
     return { seq, path: shown, before: null, isCreate: false, ok: false, skip: "outside" };
@@ -236,6 +240,19 @@ export function rewindDisk(
   };
 }
 
+/**
+ * 되돌려 숨긴 글을 검색 색인에서 지운다. 실패해도 되돌리기는 성공으로 둔다.
+ * 숨김 범위가 메타에 있어 다음 부팅의 재생성이 다시 지운다.
+ */
+export async function forgetRewoundLetters(id: string, range: { after: number; until: number }): Promise<void> {
+  try {
+    await deleteLetterRanges(id, [range]);
+  } catch (error) {
+    void reportError(error, { component: "session", operation: "session.rewind.letters", session_id: id });
+    console.error("[aether] 되돌린 글 색인 정리 실패:", error);
+  }
+}
+
 export function buildReseed(
   lines: readonly { role: "user" | "assistant"; text: string }[],
   cap = RESEED_CAP,
@@ -309,7 +326,12 @@ export function loadCheckpoints(id: string): CheckpointNote[] {
       return [];
     }
     failures.recoveredFile(checkpointsFile(id));
-    return parsed.notes.filter(isNote);
+    // 옛 기록은 Edit 조각과 전체 내용을 구별할 수 없어, 파일을 덮지 않고 건너뛴다.
+    return parsed.notes.filter(isNote).map((note) =>
+      note.ok && !note.isCreate && typeof note.before === "string" && !note.wholeFile
+        ? { ...note, before: null, ok: false, skip: "unknown" as const }
+        : note,
+    );
   } catch (error) {
     failures.file(error, { component: "session", operation: "session.checkpoints.read", session_id: id }, checkpointsFile(id));
     return [];

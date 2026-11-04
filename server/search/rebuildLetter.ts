@@ -10,8 +10,9 @@ import { reportError } from "../observability/report";
  */
 import { codecFor, storedProviderId } from "../providers/registry";
 import { diaryMaxSeq, forEachDiaryRow, listDiarySessionIds } from "../db/sessionDiary";
-import { hasLetterSession, readLetterProgress, replaceSessionLetter, sessionLetterReady, touchLetterSession, type LetterSessionMeta } from "../db/sessionLetter";
+import { deleteLetterRanges, hasLetterSession, readLetterProgress, replaceSessionLetter, sessionLetterReady, touchLetterSession, type LetterSessionMeta } from "../db/sessionLetter";
 import { loadMeta } from "../sessions/persistence";
+import { isHiddenSeq, parseHiddenRanges } from "../sessions/rewind";
 import { applyRecover, buildLetterDocs, checkLetters, detectCodec, type RowSource } from "./letterBuild";
 import { database } from "../db/sqlite";
 import { letterRulesVersion, type RefineRules } from "./refineLetter";
@@ -43,9 +44,12 @@ async function rebuildOne(sessionId: string, rules?: Partial<RefineRules>): Prom
   // 원본도 폴더도 없으면 만들 재료가 없다. 있는 글자는 그대로 두고, 완전 삭제된 세션을 빈 채로 되살리지도 않는다.
   if (!meta && diaryMaxSeq(sessionId) === 0) return -1;
   const version = letterRulesVersion(rules);
+  const hidden = parseHiddenRanges(meta?.hiddenRanges);
   const done = await readLetterProgress(sessionId);
   const highSeq = diaryMaxSeq(sessionId);
   if (meta && done && done.rulesVersion === version && done.highSeq === highSeq) {
+    // 이전 버전이 만든 색인에 남은 숨긴 글을 지운다. 지울 것이 없으면 DELETE 한 번이다.
+    await deleteLetterRanges(sessionId, hidden);
     // 이름·폴더는 일기와 따로 바뀔 수 있어 가볍게 맞춘다.
     await touchLetterSession({ sessionId, ...metaOf(sessionId, meta) });
     return -1;
@@ -56,7 +60,7 @@ async function rebuildOne(sessionId: string, rules?: Partial<RefineRules>): Prom
   const built = buildLetterDocs(source, codec, rules, (kind, error) => {
     if (kind === "parse") failures.report(error, { component: "search", operation: "search.diary.parse", session_id: sessionId }, `search.diary.parse:${sessionId}`);
     else failures.report(error, { component: "search", operation: "search.event.extract", session_id: sessionId }, `search.event.extract:${sessionId}`);
-  });
+  }, (seq) => isHiddenSeq(seq, hidden));
   if (!built.parseFailed) failures.clear(`search.diary.parse:${sessionId}`);
   if (!built.extractFailed) failures.clear(`search.event.extract:${sessionId}`);
   const { docs, turnSeqs, seen } = built;
@@ -80,13 +84,15 @@ export function metaOf(sessionId: string, meta: ReturnType<typeof loadMeta>): Le
  * 글자 색인이 닫혀 있거나 채울 수 없으면 false이고, 이때는 원본을 남겨야 한다.
  * 세션 정보가 있으므로 그 세션 provider의 해석기를 쓴다.
  */
+// shortcut: scripts/purge-deleted-session-events.ts는 메타를 몰라 숨긴 구간을 모른다. keepEvents로 남긴 드문 세션을 그 도구로 정리하면 숨긴 글이 다시 채워질 수 있다. 일회용 도구라 두고, 다시 쓸 일이 생기면 고친다.
 export function ensureLettersBeforeDelete(sessionId: string, meta: ReturnType<typeof loadMeta>): boolean {
   if (!sessionLetterReady()) return false;
   if (diaryMaxSeq(sessionId) === 0) return true;
   const db = database();
   const source: RowSource = (visit) => forEachDiaryRow(sessionId, visit);
   const codec = meta ? codecFor(storedProviderId(meta.provider)) : detectCodec(source);
-  const check = checkLetters(db, sessionId, source, codec);
+  const hidden = parseHiddenRanges(meta?.hiddenRanges);
+  const check = checkLetters(db, sessionId, source, codec, (seq) => isHiddenSeq(seq, hidden));
   if (check.state === "keep") return false;
   return check.state === "match" || applyRecover(db, sessionId, check, metaOf(sessionId, meta));
 }

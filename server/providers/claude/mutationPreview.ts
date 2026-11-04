@@ -39,7 +39,7 @@ function previewNotebook(input: any, cwd: string): MutationPreview | undefined {
   const editMode: string = input.edit_mode ?? "replace";
   const newSource: string = input.new_source ?? "";
   if (editMode === "insert") {
-    return { kind: "notebook", path: rel, before: null, after: newSource, isCreate: false, ...patch(rel, "", newSource) };
+    return { kind: "notebook", path: rel, before: null, after: newSource, isCreate: false, files: [{ path: rel }], ...patch(rel, "", newSource) };
   }
   // replace/delete: 대상 셀 기존 source 필요
   let beforeCell = "";
@@ -54,8 +54,8 @@ function previewNotebook(input: any, cwd: string): MutationPreview | undefined {
     previewFailures.file(error, { component: "provider", operation: "provider.notebook.preview", severity: "warning" }, real);
     return undefined; // 파싱 실패 fail-closed
   }
-  if (editMode === "delete") return { kind: "notebook", path: rel, before: beforeCell, after: undefined, ...patch(rel, beforeCell, "") };
-  return { kind: "notebook", path: rel, before: beforeCell, after: newSource, ...patch(rel, beforeCell, newSource) };
+  if (editMode === "delete") return { kind: "notebook", path: rel, before: beforeCell, after: undefined, files: [{ path: rel }], ...patch(rel, beforeCell, "") };
+  return { kind: "notebook", path: rel, before: beforeCell, after: newSource, files: [{ path: rel }], ...patch(rel, beforeCell, newSource) };
 }
 
 function previewMultiEdit(input: any, cwd: string): MutationPreview | undefined {
@@ -93,7 +93,8 @@ export function buildMutationPreview(toolName: string, input: any, cwd: string):
       if (isSecretPath(rel)) return { kind: "edit", path: rel, redacted: true, replaceAll: !!input.replace_all };
       const before = input.old_string ?? "";
       const after = input.new_string ?? "";
-      return { kind: "edit", path: rel, before, after, replaceAll: !!input.replace_all, ...patch(rel, before, after) };
+      // 이 before는 화면용 조각이다. files를 두어 복원은 승인 순간 디스크의 파일 전체에서 읽게 한다.
+      return { kind: "edit", path: rel, before, after, replaceAll: !!input.replace_all, files: [{ path: rel }], ...patch(rel, before, after) };
     }
     if (toolName === "Write") return previewFromDisk("write", input.file_path, input.content ?? "", cwd);
     if (toolName === "NotebookEdit") return previewNotebook(input, cwd);

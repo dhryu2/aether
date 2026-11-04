@@ -24,10 +24,9 @@ import type { MutationHunk, MutationPreview } from "../../shared/http";
 
 export type { MutationHunk, MutationPreview };
 
-/** 복원 기록용 상대경로(읽기 안 함). cwd 밖/절대면 basename으로 축약한다. 화면에 보이는 경로는 `shownPath`다. */
+/** 복원 기록용 상대경로(읽기 안 함). cwd 밖이면 `..`로 시작하는 경로를 그대로 두어, 복원이 같은 이름의 폴더 안 파일로 착각하지 않게 한다. */
 export function relOf(filePath: string, cwd: string): string {
-  const r = path.relative(cwd, path.resolve(cwd, filePath));
-  return r && !r.startsWith("..") && !path.isAbsolute(r) ? r : path.basename(filePath);
+  return path.relative(cwd, path.resolve(cwd, filePath));
 }
 
 /** 카드에 보이는 경로. cwd 안이면 상대경로, 밖이면 전체 경로 — 승인하는 사람이 실제 대상을 알아야 한다. */
@@ -58,6 +57,12 @@ export function readBefore(real: string): { before: string | null; truncated?: b
     const buf = Buffer.alloc(len);
     if (len > 0) fs.readSync(fd, buf, 0, len, 0);
     if (buf.subarray(0, Math.min(len, 8192)).includes(0)) {
+      return { before: null, binary: true, totalBytes: st.size, isCreate: false };
+    }
+    // UTF-8이 아니면(예: EUC-KR) 깨진 글자로 저장돼 복원이 원본 바이트를 못 살린다. 잘린 끝의 멀티바이트는 stream으로 허용한다.
+    try {
+      new TextDecoder("utf-8", { fatal: true }).decode(buf, { stream: st.size > max });
+    } catch {
       return { before: null, binary: true, totalBytes: st.size, isCreate: false };
     }
     return { before: buf.toString("utf8"), truncated: st.size > max, totalBytes: st.size, isCreate: false };

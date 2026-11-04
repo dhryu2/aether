@@ -297,8 +297,9 @@ export interface AgentRuntime {
    * 권한 모드를 바꾼다. 늦어도 다음 턴부터 적용한다.
    * 핵심 안전 조작이라 optional이 아니다 — 못 바꾸는 provider가 조용히 성공하면 화면이 거짓 상태를 보인다.
    * 목록에 없는 모드이거나 바꿀 수 없는 상황이면 오류로 거부하고, 이후 `effectivePermissionPolicy()`는 바뀐 값을 기준으로 답한다.
+   * `deferred: true`는 이미 진행 중인 턴에는 닿지 않고 다음 턴부터 적용된다는 뜻이다. 필수 반환값이라 새 provider가 빠뜨리면 타입 오류가 난다.
    */
-  setPermissionMode(mode: PermissionMode): Promise<void>;
+  setPermissionMode(mode: PermissionMode): Promise<{ deferred: boolean }>;
   /**
    * 이 세션이 지금 고를 수 있는 권한 모드와 실제 적용 중인 모드. 안전 판단(어느 모드가 가능한가)은 provider 몫이다.
    * 모델에 따라 목록이 달라질 수 있어(자동 모드 지원 여부) 모델을 바꾼 뒤에 다시 부른다.

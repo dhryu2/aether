@@ -568,7 +568,7 @@ export function Composer({ sessionId }: { sessionId: string }) {
           paddingBottom: `max(${s.isNarrow ? 10 : 14}px, env(safe-area-inset-bottom))`,
         }}
       >
-        {pendingPerm && !loading && <PermissionQuickBar perm={pendingPerm} isNarrow={s.isNarrow} />}
+        {pendingPerm && !loading && <PermissionQuickBar perm={pendingPerm} isNarrow={s.isNarrow} seq={s.convos[execId]?.find((e) => e.kind === 'permission_request' && e.req.id === pendingPerm.id)?.seq} sessionId={sessionId} />}
         {handoffFrom && !loading && <HandoffNote fromId={handoffFrom} source={handoffSource} />}
         {room?.autoResume && <AutoResumeBar plan={room.autoResume} sessionId={sessionId} execId={execId} />}
         <BackgroundAnnouncer count={bgTasks.length} />

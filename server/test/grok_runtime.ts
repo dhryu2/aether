@@ -162,6 +162,7 @@ async function main() {
     const calls = await h.calls();
     const created = calls.find((c) => c.method === "session/new");
     check((created?.params._meta as { yoloMode?: boolean } | undefined)?.yoloMode === true, "①b yoloMode를 session/new에 실는다", created?.params);
+    check((await h.rt.setPermissionMode("manual")).deferred === false, "①b 모드 변경은 프로세스를 다시 띄워 즉시 적용하므로 deferred가 아니다");
     await h.rt.dispose();
   }
 
@@ -223,6 +224,17 @@ async function main() {
       "⑤ allow_once만 고른다(세션 전체 허용은 안 고른다)",
       permCalls,
     );
+    await h.rt.dispose();
+  }
+
+  {
+    const h = start();
+    h.rt.push({ text: "@@ask-secret@@ 써라" });
+    check(await until(() => h.asks.length === 1, 8000), "⑤c 비밀 경로 승인 카드가 온다");
+    const input = h.asks[0]?.input as Record<string, unknown> | undefined;
+    check(JSON.stringify(input ?? {}).includes("example-outside/.env"), "⑤c 경로는 카드에 실린다", input);
+    check(!JSON.stringify(h.asks[0] ?? {}).includes("DUMMY-SECRET"), "⑤c 비밀 내용은 카드 입력에 없다", h.asks[0]);
+    await until(() => turnsDone(h) === 1);
     await h.rt.dispose();
   }
 

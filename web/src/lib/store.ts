@@ -247,7 +247,7 @@ export type LocalEvent =
       /** 넘기기로 이어 받은 첫 말을 보내는 순간. 접힌 카드가 펼친 글로 잠깐 보이지 않게 미리 싣는다. */
       handoffFrom?: string
     }
-  | { seq: number; ts: number; kind: 'local_notice'; variant: 'stop' | 'model' | 'effort' | 'permission'; detail?: string }
+  | { seq: number; ts: number; kind: 'local_notice'; variant: 'stop' | 'model' | 'effort' | 'permission' | 'permission_deferred'; detail?: string }
 export type ConvoItem = AetherEvent | LocalEvent
 
 /** 모델 목록 취득 결과. 화면이 상태마다 다른 것을 보여줘야 해서 실패를 한 덩어리로 뭉치지 않는다. */
@@ -2273,9 +2273,10 @@ export const actions = {
     if (!id) return
     try {
       await ensureAwake(id)
-      await api.setPermissionMode(id, mode)
+      const r = await api.setPermissionMode(id, mode)
       set({ sessions: state.sessions.map((x) => (x.id === id ? { ...x, permissionMode: mode } : x)) })
-      pushLocal(id, { seq: localSeq--, ts: Date.now(), kind: 'local_notice', variant: 'permission', detail: mode })
+      // deferred: 진행 중인 응답에는 닿지 않는다. 안내 문구가 다르다.
+      pushLocal(id, { seq: localSeq--, ts: Date.now(), kind: 'local_notice', variant: r.deferred ? 'permission_deferred' : 'permission', detail: mode })
       policyCache.delete(id)
       void actions.fetchPermissionPolicy(id)
       void actions.fetchPermissionModes(id)

@@ -296,7 +296,7 @@ export const api = {
     req<{ ok: true; effort: string }>(`/api/sessions/${id}/effort`, { method: 'POST', body: JSON.stringify({ effort }) }),
 
   setPermissionMode: (id: string, permissionMode: PermissionMode) =>
-    req<{ ok: true; permissionMode: PermissionMode }>(`/api/sessions/${id}/permissions`, { method: 'POST', body: JSON.stringify({ permissionMode }) }),
+    req<{ ok: true; permissionMode: PermissionMode; deferred?: boolean }>(`/api/sessions/${id}/permissions`, { method: 'POST', body: JSON.stringify({ permissionMode }) }),
 
   getPermissionModes: (id: string) => req<PermissionModesResponse>(`/api/sessions/${id}/permission-modes`),
 

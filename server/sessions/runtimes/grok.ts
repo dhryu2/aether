@@ -33,6 +33,7 @@ import {
 
 import { AttachmentStore, type MaterializedAttachment } from "../attachments";
 import { previewFromDisk } from "../mutationPreview";
+import { isSecretPath } from "../secretPaths";
 import { mapQuestionOption } from "../questionParse";
 import type { AetherQuestion, PermissionMode } from "../../../shared/http";
 import type { DocAttachment, ImageAttachment, RawProviderEventBody, SessionEffort } from "../../types";
@@ -635,9 +636,9 @@ export class GrokRuntime implements AgentRuntime {
   }
 
   /** 권한 모드는 실행 인자와 세션 열기 설정에 박히므로 모델·강도 변경처럼 프로세스를 다시 띄운다. */
-  async setPermissionMode(mode: PermissionMode): Promise<void> {
+  async setPermissionMode(mode: PermissionMode): Promise<{ deferred: boolean }> {
     await this.ready();
-    if (mode === this.permissionMode) return;
+    if (mode === this.permissionMode) return { deferred: false };
     const previous = this.permissionMode;
     this.permissionMode = mode;
     try {
@@ -646,6 +647,7 @@ export class GrokRuntime implements AgentRuntime {
       this.permissionMode = previous;
       throw e;
     }
+    return { deferred: false };
   }
 
   /** Grok CLI는 네 모드를 모두 가진다. */
@@ -890,7 +892,8 @@ export class GrokRuntime implements AgentRuntime {
       const command = typeof raw.command === "string" ? raw.command : undefined;
       const content = typeof raw.content === "string" ? raw.content : undefined;
       const title = typeof toolCall.title === "string" ? toolCall.title : typeof p.title === "string" ? p.title : st("notice.grok.tool.generic");
-      const input: Record<string, unknown> = { ...raw };
+      // 비밀 경로(폴더 밖 포함)는 경로만 남긴다. 폴더 밖이면 미리보기가 없어, 이 처리가 없으면 내용이 카드에 펼쳐진다.
+      const input: Record<string, unknown> = path && isSecretPath(path) ? { path } : { ...raw };
       if (path && !input.path) input.path = path;
       if (command && !input.command) input.command = command;
       let mutation: ReturnType<typeof previewFromDisk> | undefined;

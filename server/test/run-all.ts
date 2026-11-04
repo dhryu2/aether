@@ -85,6 +85,7 @@ const EXTRA_SUITES: { name: string; file: string }[] = [
   { name: "web:autoResume", file: path.join(TEST_DIR, "..", "..", "web", "test", "autoResume.test.ts") },
   { name: "web:handoff", file: path.join(TEST_DIR, "..", "..", "web", "test", "handoff.test.ts") },
   { name: "web:contextMenu", file: path.join(TEST_DIR, "..", "..", "web", "test", "contextMenu.test.ts") },
+  { name: "web:permissionCard", file: path.join(TEST_DIR, "..", "..", "web", "test", "permissionCard.test.ts") },
 ];
 
 const filters = process.argv.slice(2);

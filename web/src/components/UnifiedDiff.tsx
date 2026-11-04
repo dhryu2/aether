@@ -60,6 +60,7 @@ export function UnifiedDiff({ m }: { m: MutationPreview }) {
   return (
     <div className="flex flex-col" style={{ gap: 8 }}>
       {m.inexact && <Label tone="warn">{t('stream.diff.inexact')}</Label>}
+      {m.replaceAll && <Label tone="warn">{t('stream.diff.replaceAll')}</Label>}
       {/* tabular-nums = 줄 번호의 숫자 폭을 같게. 9와 10에서 자릿수가 어긋나 보이지 않는다. */}
       <div className="font-mono tabular-nums overflow-x-auto" style={{ ...PANEL, overflow: 'auto', fontSize: 12.5, lineHeight: 1.7, padding: '8px 0' }}>
         {rows.map((r, i) => {

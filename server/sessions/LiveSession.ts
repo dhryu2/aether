@@ -894,6 +894,7 @@ export class LiveSession {
    *    이름을 그대로 저장해두면 다음에 깨어날 때 그 잘못된 이름으로 세션이 뜬다.
    */
   async setModel(model: string): Promise<{ deferred: boolean }> {
+    if (this.disposed) throw new Error(st("routes.sessions.sessionGone"));
     const previous = this.model;
     const previousObserved = this.observedModel;
     const previousEffort = this.observedEffort;
@@ -1267,6 +1268,7 @@ export class LiveSession {
 
   /** 세션 effort 변경(/effort). 다음 턴부터 적용. meta.json 영속. 끝난 세션·거부 처리는 setModel과 동일. */
   async setEffort(effort: SessionEffort): Promise<{ deferred: boolean }> {
+    if (this.disposed) throw new Error(st("routes.sessions.sessionGone"));
     const previous = this.effort;
     const previousObserved = this.observedEffort;
     this.effort = effort;
@@ -1290,6 +1292,7 @@ export class LiveSession {
    * 이미 떠 있는 카드는 건드리지 않는다 — 사람이 보고 있는 결정을 몰래 대신 내리지 않는다.
    */
   async setPermissionMode(mode: PermissionMode): Promise<{ deferred: boolean }> {
+    if (this.disposed) throw new Error(st("routes.sessions.sessionGone"));
     const previous = this.permissionMode;
     const epoch = ++this.permissionEpoch;
     this.freshPermission = false;
@@ -1301,8 +1304,8 @@ export class LiveSession {
       // 어댑터가 응답하지 않아도 finally가 돌도록 시간 상한을 둔다. 늦게 끝나면 그때 어댑터 값을 다시 맞춘다.
       const call = this.runtime.setPermissionMode(mode);
       try {
-        await this.within(call, config.sessionReadyTimeoutMs);
-        return { deferred: false };
+        const { deferred } = await this.within(call, config.sessionReadyTimeoutMs);
+        return { deferred };
       } catch (e) {
         if (e instanceof SessionReadyTimeoutError) void call.then(() => this.reconcileAdapterMode(), () => this.reconcileAdapterMode());
         // 그 사이 다른 변경이 있었다면 이 실패가 새 선택을 되돌리지 않는다.

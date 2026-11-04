@@ -320,10 +320,12 @@ export function buildStreamSegments({ items, turn, providerName, answers, t, vie
           ? t('stream.notice.modelChanged', { detail: it.detail ?? '' })
           : it.variant === 'effort'
             ? t('stream.notice.effortChanged', { detail: it.detail ?? '' })
-            : it.variant === 'permission'
-              ? // 옛 기록에 남은 'ask'는 수동으로 읽는다.
-                t('stream.notice.permissionChanged', { mode: t(`session.permission.mode.${!it.detail || it.detail === 'ask' ? 'manual' : it.detail}`) })
-              : t('stream.notice.stopped')
+            : it.variant === 'permission_deferred'
+              ? t('stream.notice.permissionDeferred', { mode: t(`session.permission.mode.${it.detail || 'manual'}`) })
+              : it.variant === 'permission'
+                ? // 옛 기록에 남은 'ask'는 수동으로 읽는다.
+                  t('stream.notice.permissionChanged', { mode: t(`session.permission.mode.${!it.detail || it.detail === 'ask' ? 'manual' : it.detail}`) })
+                : t('stream.notice.stopped')
       // 사용자가 직접 멈춘 것도 끊긴 턴이다 — 배너보다 먼저 닫아야 "무엇을 하다 멈췄나"가 배너 위에 남는다.
       if (it.variant === 'stop') closeInterrupted(it.seq)
       segs.push({ kind: 'banner', key: `n-${it.seq}`, seq: it.seq, convo: true, variant: it.variant === 'stop' ? 'stop' : 'model', text })

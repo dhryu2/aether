@@ -734,6 +734,18 @@ check('자식 작업이 없으면 팀 조각을 안 만든다', !noTask.segs.som
   )
 }
 
+// 진행 중인 응답에 닿지 않는 권한 낮추기는 다음 응답부터 적용된다는 안내가 따로 나온다.
+{
+  const deferred = buildStreamSegments({
+    items: [own({ kind: 'local_notice', variant: 'permission_deferred', detail: 'manual' })],
+    turn: 'idle',
+    providerName: 'MockProvider',
+    answers: {},
+    t,
+  }).segs.filter((x) => x.kind === 'banner') as Extract<StreamSeg, { kind: 'banner' }>[]
+  eq('낮추기 지연 안내', deferred.map((x) => x.text).join('|'), 'stream.notice.permissionDeferred(mode=session.permission.mode.manual)')
+}
+
 {
   // 옛 서버가 남긴 브리프 사건은 카드를 그리지 않고, 앞뒤 대화 조각도 바꾸지 않는다.
   const doneTurn = [

@@ -33,7 +33,7 @@ const check = (c: boolean, n: string, detail?: unknown) => {
 
 const { ClaudeRuntime } = await import("../sessions/runtimes/claude");
 type PermissionMode = import("../../shared/http").PermissionMode;
-type Priv = { permissionMode: PermissionMode; autoDefault: boolean; autoStart: Promise<void>; qh: unknown; model?: string; tryAutoMode(): Promise<void>; setModel(m: string): Promise<void>; setPermissionMode(m: PermissionMode): Promise<void> };
+type Priv = { permissionMode: PermissionMode; autoDefault: boolean; autoStart: Promise<void>; qh: unknown; model?: string; tryAutoMode(): Promise<void>; setModel(m: string): Promise<void>; setPermissionMode(m: PermissionMode): Promise<{ deferred: boolean }> };
 
 const make = (permissionMode: PermissionMode | undefined, model?: string) =>
   new ClaudeRuntime({
@@ -75,7 +75,7 @@ console.log("=== 가짜 qh로 이어서 ===");
   check(rt.permissionMode === "manual" && sets.at(-1) === "default", "첫 턴 전에 모델을 바꾸면 지원 여부를 다시 정한다(자동 → 수동)", { m: rt.permissionMode, sets });
   await rt.setModel("sonnet");
   check(rt.permissionMode === "auto", "다시 지원 모델이면 자동으로 돌아간다", rt.permissionMode);
-  await rt.setPermissionMode("edits");
+  check((await rt.setPermissionMode("edits")).deferred === false, "SDK 제어 요청은 즉시 나가므로 deferred가 아니다");
   await rt.setModel("haiku");
   await rt.setModel("sonnet");
   check(rt.permissionMode === "edits", "사용자가 정한 뒤에는 모델을 바꿔도 모드를 건드리지 않는다", rt.permissionMode);

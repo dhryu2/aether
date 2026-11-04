@@ -24,10 +24,17 @@ import type { MutationHunk, MutationPreview } from "../../shared/http";
 
 export type { MutationHunk, MutationPreview };
 
-/** 표시용 상대경로(읽기 안 함). cwd 밖/절대면 basename으로 축약(절대경로 미노출). */
+/** 복원 기록용 상대경로(읽기 안 함). cwd 밖/절대면 basename으로 축약한다. 화면에 보이는 경로는 `shownPath`다. */
 export function relOf(filePath: string, cwd: string): string {
   const r = path.relative(cwd, path.resolve(cwd, filePath));
   return r && !r.startsWith("..") && !path.isAbsolute(r) ? r : path.basename(filePath);
+}
+
+/** 카드에 보이는 경로. cwd 안이면 상대경로, 밖이면 전체 경로 — 승인하는 사람이 실제 대상을 알아야 한다. */
+export function shownPath(filePath: string, cwd: string): string {
+  const abs = path.resolve(cwd, filePath);
+  const r = path.relative(cwd, abs);
+  return r && !r.startsWith("..") && !path.isAbsolute(r) ? r : abs;
 }
 
 /** 검증된 real 경로에서 before 읽기 — 크기상한·바이너리 가드, ENOENT=신규. */
@@ -92,21 +99,28 @@ export function previewFromDisk(kind: "write" | "multiedit", filePath: string, a
  *
  * unified diff는 `@@ -지운쪽시작,줄수 +더한쪽시작,줄수 @@`로 시작하는 덩어리들이고, 그 아래 줄은
  * 맨 앞 한 글자가 뜻을 정한다(`-` 지움, `+` 더함, 공백 그대로).
- * 파일 이름 줄(`---`/`+++`)은 건너뛴다 — 우리는 경로를 따로 알고 있다.
+ * 머리글의 줄 수가 남아 있는 동안은 `--- `, `+++ `로 시작하는 줄도 내용 줄이다(`-- x` 줄을 지운 것 등).
+ * 줄 수를 다 채운 뒤에 `--- `/`+++ ` 쌍이 오면 다음 파일의 머리글이므로 건너뛴다. 우리는 경로를 따로 알고 있다.
+ * 줄 수와 맞지 않는 입력은 줄을 버리지 않고 덩어리에 넣은 채 `inexact`로 알린다 — 카드가 줄을 숨기면 안 된다.
  *
  * 덩어리 표시를 하나도 못 찾으면 빈 목록을 돌려준다. 억지로 한 덩어리로 만들면 줄 번호가 실제와 어긋나
  * 카드가 거짓말을 하게 되므로, 그럴 바엔 "미리보기 없음"이 낫다.
  */
-export function parseUnifiedDiff(diff: string): MutationHunk[] {
+export function parseUnifiedDiff(diff: string): { hunks: MutationHunk[]; inexact: boolean } {
   const hunks: MutationHunk[] = [];
+  let inexact = false;
   let current: MutationHunk | null = null;
+  let oldLeft = 0;
+  let newLeft = 0;
   const lines = diff.split("\n");
   // 정상적인 diff는 줄바꿈으로 끝나므로 쪼개면 마지막에 빈 조각이 하나 남는다. 그걸 그대로 두면
   //   있지도 않은 빈 줄이 카드에 한 줄 더 그려진다(외부 검토 지적, 2026-08-18).
   if (lines.length && lines[lines.length - 1] === "") lines.pop();
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const header = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
     if (header) {
+      if (current && (oldLeft > 0 || newLeft > 0)) inexact = true; // 앞 덩어리가 줄 수보다 짧게 끝났다
       current = {
         oldStart: Number(header[1]),
         oldLines: header[2] === undefined ? 1 : Number(header[2]),
@@ -114,16 +128,45 @@ export function parseUnifiedDiff(diff: string): MutationHunk[] {
         newLines: header[4] === undefined ? 1 : Number(header[4]),
         lines: [],
       };
+      oldLeft = current.oldLines;
+      newLeft = current.newLines;
       hunks.push(current);
       continue;
     }
     if (!current) continue; // 덩어리 시작 전의 파일 이름 줄 등
-    if (line.startsWith("--- ") || line.startsWith("+++ ")) continue;
     if (line.startsWith("\\")) continue; // "\ No newline at end of file"
-    if (line === "" || line[0] === " " || line[0] === "+" || line[0] === "-") current.lines.push(line === "" ? " " : line);
-    else current = null; // 덩어리가 끝나고 다른 내용이 시작됐다
+    const c = line === "" ? " " : line[0];
+    if (oldLeft > 0 || newLeft > 0) {
+      if (c === " ") {
+        if (oldLeft <= 0 || newLeft <= 0) inexact = true;
+        oldLeft--;
+        newLeft--;
+      } else if (c === "+") {
+        if (newLeft <= 0) inexact = true;
+        newLeft--;
+      } else if (c === "-") {
+        if (oldLeft <= 0) inexact = true;
+        oldLeft--;
+      } else {
+        inexact = true; // 줄 수가 남았는데 다른 내용이 시작됐다
+        current = null;
+        continue;
+      }
+      current.lines.push(line === "" ? " " : line);
+      continue;
+    }
+    // 줄 수를 다 채운 뒤: --- 다음 줄이 +++ 인 쌍만 다음 파일의 머리글이다.
+    if (line.startsWith("--- ") && lines[i + 1]?.startsWith("+++ ")) {
+      i++;
+      continue;
+    }
+    if (c === " " || c === "+" || c === "-") {
+      inexact = true;
+      current.lines.push(line === "" ? " " : line);
+    } else current = null; // 덩어리가 끝나고 다른 내용이 시작됐다
   }
-  return hunks;
+  if (current && (oldLeft > 0 || newLeft > 0)) inexact = true;
+  return { hunks, inexact };
 }
 
 /**
@@ -133,7 +176,7 @@ export function parseUnifiedDiff(diff: string): MutationHunk[] {
  * 복원 기록은 `files`로 파일마다 남긴다. 이전 본문은 여기 넣지 않고, 승인하는 순간에 디스크에서 읽는다.
  */
 export function previewFromUnifiedDiff(
-  changes: readonly { path: string; diff: string; isCreate?: boolean }[],
+  changes: readonly { path: string; diff: string; isCreate?: boolean; movePath?: string }[],
   cwd: string,
 ): MutationPreview | undefined {
   if (!changes.length) return undefined;
@@ -142,12 +185,14 @@ export function previewFromUnifiedDiff(
     return change.isCreate ? { path: filePath, isCreate: true as const } : { path: filePath };
   });
   const kind = changes.length === 1 && changes[0].isCreate ? "write" : "edit";
-  const shown = files.map((file) => file.path).join(", ");
+  const shown = changes.map((c) => shownPath(c.path, cwd) + (c.movePath ? ` → ${shownPath(c.movePath, cwd)}` : "")).join(", ");
   // 하나라도 비밀을 담은 파일이면 내용을 통째로 가린다 — 섞여 있을 때 일부만 가리면 어느 줄이 어느 파일인지
   //   화면에서 구분되지 않아 결국 비밀이 보인다. 파일 목록도 빼서 승인 때 본문을 읽지 않게 한다.
-  if (changes.some((c) => isSecretPath(c.path))) return { kind, path: shown, redacted: true };
-  const hunks = changes.flatMap((c) => parseUnifiedDiff(c.diff));
+  if (changes.some((c) => isSecretPath(c.path) || (c.movePath && isSecretPath(c.movePath)))) return { kind, path: shown, redacted: true };
+  const parsed = changes.map((c) => parseUnifiedDiff(c.diff));
+  const hunks = parsed.flatMap((r) => r.hunks);
+  const inexact = parsed.some((r) => r.inexact) ? { inexact: true as const } : {};
   const isCreate = changes.every((c) => c.isCreate) || undefined;
   if (!hunks.length) return { kind, path: shown, files, isCreate };
-  return { kind, path: shown, files, hunks, isCreate, ...countLines(hunks) };
+  return { kind, path: shown, files, hunks, isCreate, ...inexact, ...countLines(hunks) };
 }

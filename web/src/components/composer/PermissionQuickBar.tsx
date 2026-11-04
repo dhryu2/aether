@@ -4,16 +4,16 @@ import { actions } from '../../lib/store'
 import { useT } from '../../lib/i18n'
 import { Button } from '../ui'
 import type { PermissionRequest } from '../../lib/types'
-import { usePermButtonsVisible } from '../../lib/permButtonsVisibility'
+import { reviewPermCard, usePermButtonsVisible } from '../../lib/permButtonsVisibility'
 
 // 승인 Y/N 퀵바 — 미해결 권한요청이 있으면 카드까지 스크롤하지 않고 여기서 원탭 승인/거부.
 //   카드의 버튼이 이미 화면에 보이면 뜨지 않는다. 같은 거부·승인이 한 화면에 두 벌 있으면 어느 쪽을 누를지 헷갈린다.
-export function PermissionQuickBar({ perm, isNarrow }: { perm: PermissionRequest; isNarrow: boolean }) {
+export function PermissionQuickBar({ perm, isNarrow, seq, sessionId = null }: { perm: PermissionRequest; isNarrow: boolean; seq?: number; sessionId?: string | null }) {
   const t = useT()
   const cardVisible = usePermButtonsVisible(perm.id)
   if (cardVisible) return null
   const label = perm.mutation?.path || perm.displayName || perm.toolName
-  const h = isNarrow ? 40 : 34 // 터치는 크게, 마우스는 작게
+  const h = isNarrow ? 44 : 34 // 터치는 크게, 마우스는 작게
   return (
     // 입력창 위에 뜬 유리 알약(재설계 4단계). 기다림은 주황 방패 아이콘이 알린다 — 테두리는 칠하지 않는다.
     <div
@@ -36,15 +36,17 @@ export function PermissionQuickBar({ perm, isNarrow }: { perm: PermissionRequest
       >
         {t('composer.permission.deny')}
       </Button>
+      {/* 승인은 카드에서만 한다 — 입력창 위에서는 인자 전체를 볼 수 없다. 거부는 보지 못한 것을 실행하지 않아 여기에 둔다. */}
       <Button
         tone="primary"
-        onClick={() => actions.resolvePermission(perm.id, 'allow')}
+        onClick={() => reviewPermCard(perm.id, seq, sessionId, actions.jumpInSession)}
         height={h}
         paddingX={16}
         fontSize={13}
         style={{ flexShrink: 0 }}
+        aria-label={`${t('composer.permission.review')}: ${label}`}
       >
-        {t('composer.permission.allow')}
+        {t('composer.permission.review')}
       </Button>
     </div>
   )

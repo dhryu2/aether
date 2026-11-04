@@ -102,6 +102,11 @@ export function toolPath(input: Record<string, unknown>): string {
   return ''
 }
 
+/** 권한 카드가 그리는 도구 인자 전부. 키를 거르거나 해석하지 않는다 — 승인하는 사람이 실행될 값을 다 봐야 한다. */
+export function permissionArgs(input: Record<string, unknown> | undefined): { key: string; value: string }[] {
+  return Object.entries(input ?? {}).map(([key, v]) => ({ key, value: typeof v === 'string' ? v : (JSON.stringify(v, null, 2) ?? String(v)) }))
+}
+
 /** tool_result content를 문자열로 평탄화. */
 function toolResultText(content: unknown): string {
   if (typeof content === 'string') return content

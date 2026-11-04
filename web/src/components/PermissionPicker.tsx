@@ -1,5 +1,5 @@
 // 권한 칩 — 이 세션이 지금 어떤 권한 모드인지 보여 주고, 그 세션의 provider가 알려 준 모드 중에서 고르게 한다.
-//   고르면 서버가 그 세션의 provider 어댑터에 넘겨 바로 적용한다. 화면은 provider를 모르고 받은 목록만 본다.
+//   고르면 서버가 그 세션의 provider 어댑터에 넘긴다. 진행 중인 응답에 닿지 않는 변경은 서버가 지연으로 알리고 대화에 안내가 남는다. 화면은 provider를 모르고 받은 목록만 본다.
 //   칩 글자는 현재 모드 이름이다. 수동일 때는 작업 폴더 설정의 자동승인 규칙도 여기 드러난다(8d-3 ⑥ⓕ).
 import { Shield } from 'lucide-react'
 import { actions, chromeSessionId, convoLoading, paneView, permissionBadgeKind, useStore, type State } from '../lib/store'

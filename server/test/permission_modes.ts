@@ -376,6 +376,46 @@ console.log("\n=== Grok 인자 ===");
   eq("full은 전역 인자 없이 --always-approve", flag("full"), ["agent", "--no-leader", "--always-approve", "-m", "m", "stdio"]);
 }
 
+console.log("\n=== 잠든(해제된) 세션의 변경은 성공으로 답하지 않는다 ===");
+{
+  mock.mockState.permissionModes = [...ALL];
+  const live = sessionManager.create({ cwd, provider: mock.MOCK_PROVIDER, permissionMode: "manual" });
+  await sleep(30);
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  mock.mockState.permissionModesHook = async () => {
+    await gate;
+  };
+  const pending = call("POST", `/api/sessions/${live.id}/permissions`, { permissionMode: "edits" });
+  await sleep(30);
+  live.dispose(); // 잠재우기가 끝난 뒤의 인스턴스와 같은 상태(disposed·ended)
+  release();
+  const res = await pending;
+  mock.mockState.permissionModesHook = undefined;
+  check(res.status === 400 && !res.json.deferred && !!res.json.error, "해제된 뒤 도착한 권한 변경은 400이고 deferred가 없다", res.json);
+  eq("권한 모드는 이전 값 그대로", live.permissionMode, "manual");
+  const modelBefore = live.model;
+  const effortBefore = live.effort;
+  const m = await live.setModel("other-model").then(() => "ok", () => "rejected");
+  const e = await live.setEffort("high").then(() => "ok", () => "rejected");
+  eq("해제된 인스턴스의 setModel·setEffort는 거부", [m, e], ["rejected", "rejected"]);
+  eq("모델·강도 값도 안 바뀐다", [live.model, live.effort], [modelBefore, effortBefore]);
+}
+
+console.log("\n=== 진행 중 턴에 닿지 않는 변경 신호(deferred)는 공통 계층이 그대로 옮긴다 ===");
+{
+  mock.mockState.permissionModes = [...ALL];
+  const live = sessionManager.create({ cwd, provider: mock.MOCK_PROVIDER, permissionMode: "full" });
+  await sleep(30);
+  mock.mockState.permissionDeferred = true;
+  const res = await call("POST", `/api/sessions/${live.id}/permissions`, { permissionMode: "manual" });
+  mock.mockState.permissionDeferred = false;
+  eq("어댑터가 deferred로 답하면 응답에 deferred:true", [res.status, res.json.permissionMode, res.json.deferred], [200, "manual", true]);
+  eq("저장값은 낮춘 모드", live.permissionMode, "manual");
+  const plain = await call("POST", `/api/sessions/${live.id}/permissions`, { permissionMode: "edits" });
+  check(plain.status === 200 && plain.json.deferred === undefined, "어댑터가 즉시 적용이라 답하면 deferred가 없다", plain.json);
+}
+
 console.log("\n=== Codex 정책 ===");
 {
   eq("manual", codexModePolicy("manual"), { approvalPolicy: "untrusted", approvalsReviewer: "user", fullAccess: false });

@@ -185,6 +185,19 @@ async function main() {
     check(methods.includes("turn/completed"), "턴이 끝난다", methods);
     check(!methods.includes("account/rateLimits/updated"), "사용 한도 알림은 세션 이벤트로 남지 않는다", methods);
     await rt.dispose();
+
+    // 턴 도중 권한을 낮추면 그 턴에는 닿지 않는다고 Codex와 같은 방식으로 답한다.
+    const slow = entry.createRuntime({ ...opts("ollama-slow"), permissionMode: "full" });
+    const slowMethods: string[] = [];
+    void (async () => {
+      for await (const ev of slow.events()) slowMethods.push(String((ev.msg as { method?: string })?.method));
+    })().catch(() => {});
+    slow.push({ text: "@@slow@@ 오래 걸리는 일" });
+    const t1 = Date.now();
+    while (!slowMethods.includes("turn/started") && Date.now() - t1 < 10_000) await new Promise((r) => setTimeout(r, 20));
+    const lowered = await slow.setPermissionMode("manual");
+    check(lowered.deferred === true, "턴 도중 full에서 manual로 낮추면 deferred", lowered);
+    await slow.dispose();
   }
 
   console.log("── ⑤ 주입 없는 Codex 세션");

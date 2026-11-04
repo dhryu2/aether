@@ -28,6 +28,7 @@ const { knowledgeBridgeStatus } = await import("../providers/knowledgeBridge");
 const { codexCodec } = await import("../sessions/codec/codex");
 type CodexRuntimeT = InstanceType<typeof CodexRuntime>;
 type RuntimeStartOptions = import("../providers/types").RuntimeStartOptions;
+type PermissionMode = import("../../shared/http").PermissionMode;
 type PermissionAsk = import("../providers/types").PermissionAsk;
 type QuestionAsk = import("../providers/types").QuestionAsk;
 type RawProviderEventBody = import("../types").RawProviderEventBody;
@@ -417,6 +418,38 @@ async function main() {
     check((turns[1]?.params.sandboxPolicy as { type?: string })?.type === "workspaceWrite", "④c 끄면 작업 폴더 샌드박스로 돌아간다", turns[1]?.params.sandboxPolicy);
     check((await h.rt.effectivePermissionPolicy()).bypassAll === false, "④c 끈 뒤 요약도 우회 아님");
     await h.rt.dispose();
+  }
+
+  // ── ④c-2 진행 중인 턴에는 닿지 않는 권한 낮추기는 deferred로 알린다 ──
+  {
+    const h = start({ permissionMode: "full" });
+    h.rt.push({ text: "@@slow@@ 오래 걸리는 일" });
+    await until(() => h.methodsOf(h.events).includes("turn/started"));
+    const before = (await h.calls()).length;
+    const r = await h.rt.setPermissionMode("manual");
+    check(r.deferred === true, "④c-2 full로 시작한 턴 도중 manual로 낮추면 deferred", r);
+    check((await h.calls()).length === before, "④c-2 낮추기는 새 RPC를 보내지 않는다");
+    check(await until(() => turnsDone(h) === 1, 8000), "④c-2 진행 중 턴이 끝난다");
+    const idle = await h.rt.setPermissionMode("full");
+    check(idle.deferred === false, "④c-2 턴이 없을 때의 변경은 deferred가 아니다", idle);
+    await h.rt.setPermissionMode("manual");
+    h.rt.push({ text: "다음 턴" });
+    await until(() => turnsDone(h) === 2);
+    const turns = (await h.calls()).filter((c) => c.method === "turn/start");
+    check(turns[1]?.params.approvalPolicy === "untrusted", "④c-2 다음 턴 정책은 낮춘 값", turns[1]?.params.approvalPolicy);
+    await h.rt.dispose();
+  }
+  {
+    // 정책이 안 달라지는 이동·올리기는 턴 도중이어도 deferred가 아니다. auto → manual은 달라지므로 deferred.
+    const cases: [PermissionMode, PermissionMode, boolean][] = [["auto", "manual", true], ["manual", "edits", false], ["edits", "manual", false], ["manual", "full", false]];
+    for (const [from, to, want] of cases) {
+      const h = start({ permissionMode: from });
+      h.rt.push({ text: "@@slow@@ 오래 걸리는 일" });
+      await until(() => h.methodsOf(h.events).includes("turn/started"));
+      const r = await h.rt.setPermissionMode(to);
+      check(r.deferred === want, `④c-2 턴 도중 ${from} → ${to}는 deferred=${want}`, r);
+      await h.rt.dispose();
+    }
   }
 
   // ── ④d 자동 모드는 필요할 때 요청하고 판단을 자동 검토에 맡긴다. 수동·편집은 사람이 판단한다 ──

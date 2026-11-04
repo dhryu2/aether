@@ -29,6 +29,10 @@ export const stream: Dict = {
   'stream.notice.modelChanged': { ko: '모델을 {detail}(으)로 변경했어요. 다음 응답부터 적용돼요', en: 'Model changed to {detail}. Applies from the next response' },
   'stream.notice.effortChanged': { ko: 'Effort를 {detail}(으)로 변경했어요. 다음 응답부터 적용돼요', en: 'Effort changed to {detail}. Applies from the next response' },
   'stream.notice.permissionChanged': { ko: '권한 모드를 {mode}(으)로 바꿨어요', en: 'Permission mode set to {mode}' },
+  'stream.notice.permissionDeferred': {
+    ko: '권한 모드를 {mode}(으)로 바꿨어요. 다음 응답부터 적용돼요. 진행 중인 응답은 이전 권한으로 끝까지 실행돼요. 바로 막으려면 중단하세요',
+    en: 'Permission mode set to {mode}. Applies from the next response. The response in progress keeps its previous permissions, so stop it to block it now',
+  },
   'stream.notice.stopped': { ko: '응답을 중단했어요', en: 'Stopped. The in-progress turn was halted' },
   // provider 이름은 세션의 provider에서 온다(8d-3 ④). 서버가 보낸 detail이 있으면 그쪽이 우선이라 이건 폴백 문구다.
   'stream.notice.authExpired': { ko: '{provider} 로그인이 만료됐어요. 다시 로그인해 주세요.', en: '{provider} authentication has expired. Re-authentication is required.' },
@@ -141,5 +145,6 @@ export const stream: Dict = {
   'stream.diff.binary': { ko: '바이너리 파일이라 미리보기가 없어요', en: 'Binary file, no preview' },
   'stream.diff.truncated': { ko: '파일이 커서 변경 내용을 생략했어요', en: 'File too large, diff omitted (truncated)' },
   'stream.diff.noPreview': { ko: '변경 미리보기 없음', en: 'No change preview' },
+  'stream.diff.replaceAll': { ko: '일치하는 곳을 모두 바꿔요', en: 'Replaces every match' },
   'stream.diff.inexact': { ko: '미리보기가 실제 결과와 다를 수 있어요', en: 'Preview may differ from the actual result (inexact)' },
 }

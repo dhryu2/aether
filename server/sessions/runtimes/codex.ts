@@ -33,7 +33,7 @@ import { buildKnowledgeTools } from "../../knowledge/tools";
 import { projectSkillsDir, userSkillsDir } from "../../skill/skillPaths";
 import { openKnowledgeBridge, type KnowledgeBridge } from "../../providers/knowledgeBridge";
 import { codexThreadConfig } from "../../providers/codex/knowledgeThreadConfig";
-import { changesInsideFolder, codexModePolicy, codexPermissionPolicy, type ConfigOrigins } from "../../providers/codex/permissionPolicy";
+import { changesInsideFolder, codexModePolicy, codexPermissionPolicy, codexTurnStaysWider, type ConfigOrigins } from "../../providers/codex/permissionPolicy";
 import type { PermissionMode } from "../../../shared/http";
 import { codexServices } from "../../providers/codex/services";
 import { modelEnv } from "../../providers/modelEnv";
@@ -228,6 +228,8 @@ export class CodexRuntime implements AgentRuntime {
   private effort?: SessionEffort;
   /** 지금 적용 중인 권한 모드. 시작값은 opts에서 오고 `setPermissionMode`로 바뀐다. */
   private permissionMode: PermissionMode;
+  /** provider에 마지막으로 보낸 모드(thread 시작·turn/start 시점). 진행 중 턴이 어느 정책으로 도는지 가린다. */
+  private sentMode: PermissionMode;
 
   private readonly queue: QueuedTurn[] = [];
   private activeTurnId: string | null = null;
@@ -278,6 +280,7 @@ export class CodexRuntime implements AgentRuntime {
     // 미지정 = 새 세션. 자동 검토가 있으면 자동, 없으면 수동으로 시작한다. 이 공급처에 없는 모드가 오면 수동으로 시작한다.
     const wanted = opts.permissionMode ?? (backend.autoReview ? "auto" : "manual");
     this.permissionMode = this.offeredModes().includes(wanted) ? wanted : "manual";
+    this.sentMode = this.permissionMode;
     this.attachments = new AttachmentStore(opts.sessionId);
     this.server = new CodexAppServer({
       // 질문 카드를 켜는 스위치(위 상수 주석) — 사용자 전역 설정에 기대지 않는다.
@@ -317,6 +320,7 @@ export class CodexRuntime implements AgentRuntime {
     //   이어가기(`thread/resume`)에도 같은 설정을 넘긴다. 스레드 단위 설정이라 안 넘기면 재개한 세션만
     //   조용히 지식툴을 잃는다.
     await this.openBridge();
+    this.sentMode = this.permissionMode;
 
     const common = {
       cwd: this.opts.cwd,
@@ -577,6 +581,7 @@ export class CodexRuntime implements AgentRuntime {
         }
       } else {
         this.startingTurn = true;
+        this.sentMode = this.permissionMode;
         const ack = await this.server.request<TurnStartResponse>("turn/start", {
           threadId: this.threadId,
           input: job.input,
@@ -739,10 +744,14 @@ export class CodexRuntime implements AgentRuntime {
     this.effort = effort;
   }
 
-  /** 승인 정책과 샌드박스는 `turn/start`마다 실려 가므로 값만 바꾸면 다음 턴부터 적용된다. */
-  async setPermissionMode(mode: PermissionMode): Promise<void> {
+  /**
+   * 승인 정책과 샌드박스는 `turn/start`마다 실려 가므로 값만 바꾸면 다음 턴부터 적용된다.
+   * 진행 중인 턴이 이전(더 넓은) 정책으로 끝까지 도는 경우는 deferred로 알린다.
+   */
+  async setPermissionMode(mode: PermissionMode): Promise<{ deferred: boolean }> {
     if (!this.offeredModes().includes(mode)) throw new Error(st("notice.permission.unavailable"));
     this.permissionMode = mode;
+    return { deferred: !!(this.activeTurnId || this.startingTurn) && codexTurnStaysWider(this.sentMode, mode) };
   }
 
   /** 자동은 공급처에 자동 검토가 있을 때만, 편집 자동 수락은 파일 변경 승인 요청이 올 때만 준다. */

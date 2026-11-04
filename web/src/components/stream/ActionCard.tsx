@@ -76,14 +76,15 @@ export function ActionCardHeader({ pending, icon, children }: { pending: boolean
 }
 
 /** 카드 제목 블록 — 제목(16) + 아래 한 줄(12.5). 아래 줄이 경로·도구 이름처럼 기계 문자열이면 mono. */
-export function ActionCardTitle({ title, sub, subMono, subTitle }: { title: ReactNode; sub?: ReactNode; subMono?: boolean; subTitle?: string }) {
+export function ActionCardTitle({ title, sub, subMono, subTitle, subWrap }: { title: ReactNode; sub?: ReactNode; subMono?: boolean; subTitle?: string; subWrap?: boolean }) {
   return (
     <div className="min-w-0 flex-1">
       <div style={{ fontSize: 16, fontWeight: 600, color: C.label, letterSpacing: '-0.01em' }}>{title}</div>
       {sub != null && sub !== '' && (
         <div
-          className={subMono ? 'font-mono truncate' : 'truncate'}
-          style={{ fontSize: subMono ? 12 : 12.5, color: C.label2, marginTop: 1 }}
+          className={(subMono ? 'font-mono ' : '') + (subWrap ? '' : 'truncate')}
+          // subWrap: 승인 대상이 잘리면 안 되는 경로 줄은 여러 줄로 늘어난다.
+          style={{ fontSize: subMono ? 12 : 12.5, color: C.label2, marginTop: 1, ...(subWrap ? { overflowWrap: 'anywhere' as const } : null) }}
           title={subTitle}
           // 경로·명령 같은 기계 문자열 줄만 복사 메뉴가 있다. 허용·거부는 메뉴에 넣지 않는다(실수로 승인하지 않게).
           onContextMenu={subMono ? onCopyMenu(subTitle ?? (typeof sub === 'string' ? sub : null), tNow('menu.copy')) : undefined}

@@ -120,6 +120,8 @@ check(preview.before === undefined && !preview.files?.some((file) => "before" in
 const diffNotes = checkpointsForApproval(8, preview, diffWork);
 check(diffNotes.map((note) => note.path).join("|") === "a.ts|b.ts|new.ts", "파일마다 복원 경로를 남긴다", diffNotes.map((note) => note.path));
 check(!diffNotes.some((note) => note.path.includes(",")), "여러 파일을 쉼표로 이은 한 경로로 저장하지 않는다");
+const outsidePreview = previewFromUnifiedDiff([{ path: "/tmp/example-outside/x.ts", diff: "@@ -1 +1 @@\n-a\n+b\n" }], diffWork);
+check(outsidePreview?.path === "/tmp/example-outside/x.ts" && outsidePreview.files?.[0].path === "x.ts", "폴더 밖 변경은 화면 경로만 전체이고 복원 기록 경로는 이전과 같다", outsidePreview);
 check(diffNotes.find((note) => note.path === "a.ts")?.before === "alpha\n" && diffNotes.find((note) => note.path === "a.ts")?.ok === true, "첫 파일의 이전 내용을 읽는다");
 check(diffNotes.find((note) => note.path === "b.ts")?.before === "beta\n", "둘째 파일의 이전 내용도 따로 읽는다");
 check(diffNotes.find((note) => note.path === "new.ts")?.isCreate === true && diffNotes.find((note) => note.path === "new.ts")?.ok === true, "없던 파일은 되돌릴 때 지울 기록이다");

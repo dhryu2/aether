@@ -451,10 +451,15 @@ export function useJumpToSeq({ ref, jumpToSeq, id, renderId, showSkeleton, itemC
     // 찾을 수 있는 것 = 화면에 남는 말 전부. 작업 중 알림(`.work-note`)은 말풍선이 없으므로 따로 적어 준다 —
     //   빠뜨리면 검색 결과에는 나오는데 눌러도 아무 일이 안 일어난다.
     const box = ref.current?.querySelector(
-      `[data-seq="${tseq}"] .bubble-assistant, [data-seq="${tseq}"] .bubble-user, [data-seq="${tseq}"] .work-note`,
+      `[data-seq="${tseq}"] .bubble-assistant, [data-seq="${tseq}"] .bubble-user, [data-seq="${tseq}"] .work-note, [data-seq="${tseq}"] .action-card`,
     ) as HTMLElement | null
     if (box) {
       box.scrollIntoView({ block: 'center' })
+      if (box.classList.contains('action-card')) {
+        // 결정 카드로 이동했으면 초점도 옮긴다(키보드·스크린리더 사용자가 길을 잃지 않게).
+        if (!box.hasAttribute('tabindex')) box.setAttribute('tabindex', '-1')
+        box.focus({ preventScroll: true })
+      }
       leaveBottom() // 위로 점프 — 자동 하단추적 해제(하단 버튼 노출) + 직전 scrollTop 비교값 리셋
       setFlashSeq(tseq)
       jumpConsumedRef.current = j.nonce

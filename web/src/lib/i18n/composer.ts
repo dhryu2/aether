@@ -35,7 +35,7 @@ export const composer: Dict = {
   // 승인 Y/N 퀵바
   'composer.permission.waiting': { ko: '승인 대기', en: 'Awaiting approval' },
   'composer.permission.deny': { ko: '거부', en: 'Deny' },
-  'composer.permission.allow': { ko: '승인', en: 'Allow' },
+  'composer.permission.review': { ko: '카드 보기', en: 'View card' },
 
   // 첨부 미리보기
   'composer.attach.previewAlt': { ko: '첨부 미리보기', en: 'Attachment preview' },

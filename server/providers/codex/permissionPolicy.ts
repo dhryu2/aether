@@ -54,7 +54,7 @@ import { reportError } from "../../observability/report";
  */
 import fs from "node:fs";
 import path from "node:path";
-import type { PermissionMode } from "../../../shared/http";
+import { PERMISSION_RANK, type PermissionMode } from "../../../shared/http";
 import type { PermissionPolicy, PermissionPolicyScope } from "../types";
 import type { ConfigLayerSource } from "../../codex/protocol/v2/ConfigLayerSource";
 
@@ -272,6 +272,15 @@ export function codexModePolicy(mode: PermissionMode): {
     default:
       return { approvalPolicy: "untrusted", approvalsReviewer: "user", fullAccess: false };
   }
+}
+
+/**
+ * 이미 provider에 보낸 모드(sent) 때문에, 진행 중인 턴이 새 모드(next)보다 넓은 권한으로 끝까지 도는가.
+ * 낮추는 쪽이면서 턴에 실린 승인 정책이 달라질 때만 참이다. 수동↔편집 자동 수락은 정책이 같고,
+ * 올리는 쪽은 승인 요청을 받을 때 모드를 보므로 거짓이다.
+ */
+export function codexTurnStaysWider(sent: PermissionMode, next: PermissionMode): boolean {
+  return PERMISSION_RANK[next] < PERMISSION_RANK[sent] && codexModePolicy(sent).approvalPolicy !== codexModePolicy(next).approvalPolicy;
 }
 
 /**

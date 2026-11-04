@@ -513,12 +513,13 @@ export class ClaudeRuntime implements AgentRuntime {
   }
 
   /** SDK 컨트롤 setPermissionMode — 다음 도구 호출부터 적용. 자동 모드는 현재 모델이 지원할 때만 받는다. */
-  async setPermissionMode(mode: PermissionMode): Promise<void> {
+  async setPermissionMode(mode: PermissionMode): Promise<{ deferred: boolean }> {
     await this.autoStart;
     this.autoDefault = false; // 사용자가 정했다. 기본값 재설정은 더 하지 않는다.
     if (mode === "auto" && !(await this.autoSupported())) throw new Error(st("notice.permission.unavailable"));
     await (await this.qh).setPermissionMode(CLAUDE_MODE[mode]);
     this.permissionMode = mode;
+    return { deferred: false };
   }
 
   /** 수동·편집 자동 수락·권한 무시는 늘 되고, 자동은 현재 모델이 지원할 때만 더한다. */

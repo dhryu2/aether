@@ -965,6 +965,7 @@ a,
    어두운 화면에서는 카드 면(#1c1c1e)과 바탕(검정)의 밝기 차이가 층을 맡는다. */
 /* overflow: hidden = 결정 순간 결과 줄이 아래에서 올라오는 동안(settle-in) 카드 경계 밖으로 비치지 않게 자른다. */
 .action-card {
+  scroll-margin-top: 16px; /* 「카드 보기」로 스크롤할 때 위쪽 고정 요소에 붙지 않게 */
   --card-shadow: 0 1px 2px color-mix(in srgb, var(--c-shadow) 4%, transparent), 0 8px 24px color-mix(in srgb, var(--c-shadow) 5%, transparent);
   background: var(--c-cell);
   box-shadow: var(--card-shadow);

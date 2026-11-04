@@ -131,6 +131,10 @@ export const routes: Dict = {
     ko: "permissionMode는 manual, edits, auto, full 중 하나여야 합니다",
     en: "permissionMode must be one of manual, edits, auto, full",
   },
+  "routes.sessions.sessionGone": {
+    ko: "세션이 방금 잠들어서 적용하지 않았어요. 다시 시도해 주세요",
+    en: "The session just went to sleep, so this change was not applied. Please try again",
+  },
   "routes.sessions.permissionModeConflict": {
     ko: "그 사이 권한 모드가 바뀌어서 적용하지 않았어요. 다시 골라 주세요",
     en: "The permission mode changed in the meantime, so this change was not applied. Please pick again",

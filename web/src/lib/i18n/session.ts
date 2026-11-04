@@ -320,6 +320,7 @@ export const session: Dict = {
   'session.permission.notebookTitle': { ko: '노트북 편집 승인', en: 'Approve notebook edit' },
   'session.permission.runTitle': { ko: '{tool} 실행 승인', en: 'Approve running {tool}' },
   'session.permission.deny': { ko: '거부', en: 'Deny' },
+  'session.permission.allArgs': { ko: '전체 인자 보기', en: 'View all arguments' },
   'session.permission.allow': { ko: '승인', en: 'Allow' },
   'session.permission.allowedStatus': { ko: '✓ 승인됨 · 변경 적용 완료', en: '✓ Approved · Changes applied' },
   'session.permission.deniedStatus': { ko: '✕ 거부됨 · 적용하지 않음', en: '✕ Denied · Not applied' },

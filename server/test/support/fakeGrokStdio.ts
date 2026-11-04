@@ -266,15 +266,16 @@ function main() {
       });
     }
 
-    if (text.includes("@@ask@@") || text.includes("@@ask-session@@")) {
+    if (text.includes("@@ask@@") || text.includes("@@ask-session@@") || text.includes("@@ask-secret@@")) {
       const sessionOnly = text.includes("@@ask-session@@");
+      const secret = text.includes("@@ask-secret@@"); // 폴더 밖 비밀 경로 쓰기
       await askClient("permissionAnswer", "session/request_permission", {
         sessionId,
         toolCall: {
           toolCallId: "tc-ask",
           title: "Write",
           kind: "edit",
-          rawInput: { file_path: "/tmp/demo.txt", content: "hello" },
+          rawInput: secret ? { file_path: "/tmp/example-outside/.env", content: "DUMMY-SECRET" } : { file_path: "/tmp/demo.txt", content: "hello" },
         },
         options: sessionOnly
           ? [

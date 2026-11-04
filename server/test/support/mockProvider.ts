@@ -174,6 +174,8 @@ export const mockState = {
   permissionModesFail: false,
   /** 권한 모드 조회가 끝나기 전에 부르는 훅. 조회를 붙잡아 두어 요청 순서 경쟁을 재현한다. */
   permissionModesHook: undefined as (() => Promise<void>) | undefined,
+  /** 참이면 권한 모드 변경이 deferred(진행 중 턴에는 닿지 않음)로 답한다. */
+  permissionDeferred: false,
   /** 어댑터가 받은 권한 모드 변경 기록. */
   permissionSets: [] as PermissionMode[],
 };
@@ -341,11 +343,12 @@ export class MockRuntime implements AgentRuntime {
     if (!MOCK_EFFORTS.includes(effort)) throw new Error(`mock: 지원하지 않는 effort ${effort}`); // 조용한 무시 금지(D12)
     this.effort = effort;
   }
-  async setPermissionMode(mode: PermissionMode): Promise<void> {
+  async setPermissionMode(mode: PermissionMode): Promise<{ deferred: boolean }> {
     await mockState.permissionSetHook?.(mode);
     if (!mockState.permissionModes.includes(mode)) throw new Error(`mock: 지원하지 않는 권한 모드 ${mode}`); // 조용한 무시 금지
     mockState.permissionSets.push(mode);
     this.permissionMode = mode;
+    return { deferred: mockState.permissionDeferred };
   }
   async permissionModes(): Promise<{ modes: readonly PermissionMode[]; current: PermissionMode }> {
     await mockState.permissionModesHook?.();

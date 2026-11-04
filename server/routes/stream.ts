@@ -16,6 +16,7 @@ import { reportResponseError } from "../observability/http";
  */
 import { Router, type Request, type Response } from "express";
 import { config } from "../config";
+import { endIfRevoked } from "../middleware/auth";
 import { sessionManager } from "../sessions/SessionManager";
 import type { LiveSession } from "../sessions/LiveSession";
 import * as store from "../sessions/persistence";
@@ -259,6 +260,7 @@ streamRouter.get("/:id/stream", (req: Request, res: Response) => {
   // ⚠️ no-transform·heartbeat: 클라가 *볼 수 있는* named 이벤트로 보낸다(':ping' 코멘트는 EventSource가 무시 → half-open
   //   워치독에 무용). AetherEvent는 default 'message'(event 필드 없음)라 분리됨. 역압/종료 시 skip.
   const hb = setInterval(() => {
+    endIfRevoked(req, res, cleanup); // 역압 검사보다 앞 — 느린 연결이 자격 검사를 피하지 못하게
     if (closed || backpressured) return;
     try {
       res.write("event: ping\ndata: {}\n\n");

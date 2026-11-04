@@ -192,7 +192,9 @@ const relogin = await login(newPassword);
 const recookie = [relogin.headers["set-cookie"] ?? []].flat().map((c) => c.split(";")[0]).join("; ");
 const out_ = await req("POST", "/api/auth/logout", { headers: { cookie: recookie } });
 check("로그아웃 응답이 쿠키를 지운다", out_.status === 200 && /aether_session=;/.test([out_.headers["set-cookie"] ?? []].flat().join("; ")), out_.headers["set-cookie"]);
-cookie = recookie; // 아래 단계는 재설정 뒤의 로그인을 쓴다
+check("로그아웃한 쿠키는 서버에서도 무효(401)", (await get("/api/sessions", { cookie: recookie })).status === 401);
+// 아래 단계는 재설정 뒤의 로그인을 쓴다. 로그아웃한 쿠키는 쓸 수 없으니 새로 로그인한다.
+cookie = [(await login(newPassword)).headers["set-cookie"] ?? []].flat().map((c) => c.split(";")[0]).join("; ");
 // 새 버전 확인 주소: 묶음 package.json의 aetherUpdateUrl이 있으면 실행 중 서버에서 켜져 있어야 하고(묶음에 박힌 값이 아니라 복사본을 기준으로 비교), 없으면 꺼져 있어야 한다.
 const bundledUrl = JSON.parse(fs.readFileSync(path.join(serverDir, "package.json"), "utf8")).aetherUpdateUrl;
 const upd = await get("/api/system/update", { cookie });

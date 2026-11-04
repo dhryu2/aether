@@ -8,6 +8,7 @@
  */
 import { Router, type Request, type Response } from "express";
 import { config } from "../config";
+import { endIfRevoked } from "../middleware/auth";
 import { sessionManager } from "../sessions/SessionManager";
 import { AGENT_EVENT_CONTRACT_VERSION } from "../../shared/agentEvent";
 import type { PresenceSnapshot } from "../../shared/http";
@@ -52,6 +53,7 @@ presenceRouter.get("/stream", (req: Request, res: Response) => {
   });
 
   const hb = setInterval(() => {
+    endIfRevoked(req, res, cleanup);
     if (closed) return;
     write("event: ping\ndata: {}\n\n");
   }, config.heartbeatMs);

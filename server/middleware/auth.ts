@@ -40,22 +40,35 @@ export function createTailscaleStrategy(opts: { resolver?: IdentityResolver } = 
   };
 }
 
+/** Authorization: Bearer 토큰. 없거나 모양이 다르면 undefined. */
+export function bearerToken(req: Request): string | undefined {
+  const raw = req.headers?.authorization;
+  if (typeof raw !== "string") return undefined;
+  return /^Bearer\s+(\S+)/i.exec(raw.trim())?.[1];
+}
+
 /** password: 쿠키 JWT 우선, 없으면 Authorization Bearer. 쿠키가 있는데 실패하면 Bearer로 우회하지 않는다. */
 export function createPasswordStrategy(opts: { verify?: (t: string) => Promise<boolean> } = {}): AuthStrategy {
   const verify = opts.verify ?? verifySession;
   return {
     authenticate: async (req) => {
       const cookie = req.cookies?.aether_session as string | undefined;
-      if (cookie) {
-        return (await verify(cookie)) ? { login: "owner", via: "password" } : null;
-      }
-      const raw = req.headers?.authorization;
-      if (typeof raw !== "string") return null;
-      const m = /^Bearer\s+(\S+)/i.exec(raw.trim());
-      if (!m) return null;
-      return (await verify(m[1]!)) ? { login: "owner", via: "password" } : null;
+      const token = cookie || bearerToken(req); // 쿠키가 있는데 실패하면 Bearer로 우회하지 않는다
+      if (!token) return null;
+      return (await verify(token)) ? { login: "owner", via: "password", stillValid: () => verify(token) } : null;
     },
   };
+}
+
+/** 열려 있는 스트림이 심장박동마다 부른다. 신원의 자격이 폐기됐거나 검사에 실패하면 cleanup 뒤 응답을 끝낸다. */
+export function endIfRevoked(req: Request, res: Response, cleanup: () => void): void {
+  const stillValid = req.auth?.stillValid;
+  if (!stillValid) return;
+  stillValid().catch(() => false).then((ok) => {
+    if (ok) return;
+    cleanup();
+    res.end();
+  });
 }
 
 /** config.authMode로 전략 선택(index.ts 배선). 알 수 없는 모드는 throw(fail-closed). */

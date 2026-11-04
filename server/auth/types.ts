@@ -8,6 +8,8 @@ export type AuthMode = "off" | "tailscale" | "password";
 export interface AuthIdentity {
   login: string;
   via: AuthMode;
+  /** 이 신원을 만든 자격이 아직 유효한지. 오래 열려 있는 스트림이 주기적으로 묻는다. 없으면 폐기 개념이 없는 방식이다. */
+  stillValid?: () => Promise<boolean>;
 }
 
 export interface AuthStrategy {

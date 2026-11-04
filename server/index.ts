@@ -2,9 +2,9 @@
  * Aether 백엔드 부팅. 상시 단일 Node 프로세스(Next.js 아님 — live 세션 보유 필요).
  *
  * 미들웨어 순서(load-bearing, 바꾸지 말 것):
- *   helmet → compression(SSE filter) → express.json(limit) → cookie-parser
+ *   helmet → compression(SSE filter) → cookie-parser → /api/sessions 인증 게이트 → express.json(limit)
  *   → /api/health (공개) → /api/auth (공개)
- *   → 인증 게이트 → streamRouter(SSE 먼저) → sessionsRouter → /api/search(보호) → /api/fs(보호)
+ *   → 보호 라우터 → streamRouter(SSE 먼저) → sessionsRouter → /api/search(보호) → /api/fs(보호)
  *   → /api 404 가드 → static + SPA fallback → 에러 핸들러(맨 끝)
  *
  * 인증은 기본 off(config.authMode). 게이트는 /api/sessions 앞에만(health·auth는 공개 = 로그인 경로 보장).
@@ -111,19 +111,25 @@ const staticAddon = createStaticAddon({ enabled: config.serveStatic });
 // ── 보안/전송 미들웨어 ──
 if (config.helmet) app.use(helmet(staticAddon.helmetOptions()));
 if (config.compression) app.use(sseSafeCompression()); // 기본 ON, SSE는 자동 제외
-// 이미지 첨부 메시지 라우트만 큰 한도로 파싱(전역은 256kb 유지 — DoS 표면 축소). 먼저 파싱하면 _body 마킹으로 아래 전역 json은 skip.
-app.post("/api/sessions/:id/message", express.json({ limit: config.imageBodyLimit }));
-app.use(express.json({ limit: config.bodyLimit }));
 app.use(cookieParser());
+// 큰 본문 파싱은 인증 뒤에서만 한다(인증 없는 요청이 40MB 파서나 압축 해제를 돌리지 못하게). 게이트는 파서 앞에 한 번만 둔다.
+app.use("/api/sessions", createAuthMiddleware(selectStrategy()));
+// 이미지 첨부 메시지 라우트만 큰 한도로 파싱(전역은 256kb 유지 — DoS 표면 축소). 먼저 파싱하면 _body 마킹으로 아래 전역 json은 skip.
+// inflate: false — 압축된 요청 본문은 풀지 않고 415로 거절한다(압축 폭탄 방지, 쓰는 클라이언트 없음).
+app.post("/api/sessions/:id/message", express.json({ limit: config.imageBodyLimit, inflate: false }));
+app.use(express.json({ limit: config.bodyLimit, inflate: false }));
 
 // ── 인증 (기본 off). password 모드는 시크릿 fail-fast + serve loopback 신뢰 ──
+if (config.authMode === "off" && !["127.0.0.1", "localhost", "::1"].includes(config.host.trim().toLowerCase())) {
+  throw new Error(`AETHER_AUTH_MODE=off인데 AETHER_HOST=${config.host}는 루프백이 아닙니다. 인증 없이 이 주소에 닿는 누구나 에이전트로 명령을 실행할 수 있습니다. AETHER_AUTH_MODE를 password나 tailscale로 바꾸세요.`);
+}
 if (config.authMode === "password") {
   const jwtSecret = process.env.AETHER_JWT_SECRET;
   if (!jwtSecret) throw new Error("AETHER_AUTH_MODE=password에는 AETHER_JWT_SECRET(.env)가 필요합니다.");
   if (Buffer.byteLength(jwtSecret, "utf8") < MIN_JWT_SECRET_BYTES) {
     throw new Error(`AETHER_JWT_SECRET가 너무 짧습니다 — ${MIN_JWT_SECRET_BYTES}바이트 이상 필요(openssl rand -base64 48).`);
   }
-  if (!currentPasswordHash()) throw new Error("AETHER_AUTH_MODE=password에는 AETHER_PASSWORD_HASH(.env)가 필요합니다.");
+  if (!currentPasswordHash()) throw new Error("AETHER_AUTH_MODE=password에는 비밀번호 해시가 필요합니다. 비밀번호 해시를 읽지 못했다: auth-password.json 또는 AETHER_PASSWORD_HASH(.env)를 확인하세요.");
   app.set("trust proxy", "loopback"); // tailscale serve TLS 종단→loopback 포워딩 뒤 req.secure 판정
 }
 
@@ -138,7 +144,6 @@ app.use("/api/auth", authRouter); // login/logout — 게이트 앞이라 로그
 
 // ── 인증 게이트 + 보호 라우터(SSE 포함) ──
 app.use("/api/errors", createAuthMiddleware(selectStrategy()), errorsRouter);
-app.use("/api/sessions", createAuthMiddleware(selectStrategy()));
 app.use("/api/sessions", streamRouter); // SSE 먼저(경로 겹침 없음)
 app.use("/api/sessions", sessionsRouter);
 
@@ -229,9 +234,6 @@ const onListen = () => {
   console.log(`[aether] 백엔드 기동 → http://${config.host}:${config.port} (HTTPS 종단=tailscale serve)`);
   if (restored) console.log(`[aether] 세션 ${restored}개 복원 — message 시 resume`);
   console.log(`[aether] 작업 폴더 범위 제한 없음, 기본 폴더 ${config.projectRoot}`);
-  if (config.authMode === "off" && !["127.0.0.1", "localhost", "::1"].includes(config.host.trim().toLowerCase())) {
-    console.warn("[aether] 경고: 인증이 꺼져 있고 루프백이 아닌 주소에 열려 있어 같은 망의 누구나 이 컴퓨터의 폴더 이름을 볼 수 있습니다");
-  }
   if (config.authMode === "tailscale" && !resolveTailscaleCli()) {
     console.warn("[aether] 경고: 인증이 tailscale인데 tailscale 실행 파일을 찾지 못했습니다. 모든 요청이 거절됩니다. AETHER_TAILSCALE_CLI로 경로를 지정하세요");
   }

@@ -14,9 +14,12 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import bcrypt from "bcryptjs";
+import zlib from "node:zlib";
+import { inspect } from "node:util";
 
 const SERVER_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 8801;
+const cookieOf = (r: { headers: http.IncomingHttpHeaders }) => (r.headers["set-cookie"]?.[0] ?? "").split(";")[0];
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 let pass = 0;
@@ -132,11 +135,69 @@ async function unitTests() {
   clock = 60_000;
   check(lim.acquire() === 0, "E4 잠김 시간이 지나면 풀림");
   lim.release(false);
+
+  // E6 피어별 잠금: 한 기기가 잠겨도 다른 기기는 통과하고, 전체 상한에 닿으면 모두 거절
+  {
+    let t = 0;
+    const l = createLoginLimiter({ maxFailures: 2, lockMs: 60_000, globalMaxFailures: 5, now: () => t });
+    for (let i = 0; i < 2; i++) { l.acquire("100.64.0.9"); l.release(false); }
+    check(l.acquire("100.64.0.9") === 60, "E6 피어 A는 연속 실패로 잠김");
+    check(l.acquire("100.64.0.10") === 0, "E6 피어 B는 통과(다른 기기의 실패에 막히지 않음)");
+    l.release(false); // 전체 실패 3번째
+    for (let i = 0; i < 2; i++) { l.acquire("100.64.0.11"); l.release(false); } // 전체 실패 5번째
+    check(l.acquire("100.64.0.13") === 60, "E6 전체 상한 도달 뒤엔 새 피어도 거절");
+  }
+
+  // E7 전체 실패는 15분 창으로 센다: 한 기기가 잠금이 풀릴 때마다 5번씩 틀려도 전체가 잠기지 않는다
+  {
+    let t = 0;
+    const l = createLoginLimiter({ maxFailures: 5, lockMs: 60_000, now: () => t });
+    for (let cycle = 0; cycle < 6; cycle++) {
+      if (cycle) t += 60_001;
+      for (let i = 0; i < 5; i++) { l.acquire("100.64.0.9"); l.release(false); }
+    }
+    check(l.acquire("100.64.0.10") === 0, "E7 창 밖의 실패는 전체 상한에 쌓이지 않는다");
+    l.release(true);
+  }
+
+  // W limitWhois: 같은 ip 합치기·결과 기억·동시 조회 상한
+  {
+    const { limitWhois } = await import("../auth/tailscale");
+    let calls = 0, live = 0, peak = 0, t = 0;
+    const slow = limitWhois(async () => { calls++; live++; peak = Math.max(peak, live); await delay(20); live--; return null; }, { now: () => t });
+    await Promise.all(Array.from({ length: 20 }, (_, i) => slow("100.64.0.1", 1000 + i)));
+    check(calls === 1, "W1 같은 ip 동시 20개 → 조회 1번", `calls=${calls}`);
+    await slow("100.64.0.1", 1);
+    check(calls === 1, "W2 기억 시간 안의 재호출(실패 결과 포함)은 조회 0번", `calls=${calls}`);
+    t = 6000;
+    await slow("100.64.0.1", 1);
+    check(calls === 2, "W2 시간이 지나면 한 번 더 조회", `calls=${calls}`);
+    calls = 0; peak = 0;
+    const many = await Promise.all(Array.from({ length: 20 }, (_, i) => slow(`100.64.1.${i}`, 1)));
+    check(peak <= 8 && calls === 8 && many.every((m) => m === null), "W3 서로 다른 ip 20개 → 동시 조회 8개 이하, 넘은 호출은 null", `peak=${peak} calls=${calls}`);
+  }
+
+  // H 오류 핸들러는 파서 거절 시 로그를 남기지 않고, 그 밖에는 오류 속성(요청 본문 등)을 찍지 않는다
+  {
+    const { errorHandler } = await import("../middleware/hardening");
+    const run = (err: unknown) => {
+      const seen: string[] = [];
+      const orig = console.error;
+      console.error = (...a: unknown[]) => { seen.push(a.map((x) => inspect(x)).join(" ")); };
+      const res: any = { headersSent: false, locals: {}, setHeader() {}, status() { return this; }, json() { return this; } };
+      try { errorHandler(err, {} as any, res, () => {}); } finally { console.error = orig; }
+      return seen.join("\n");
+    };
+    const parserErr = Object.assign(new SyntaxError("bad json"), { type: "entity.parse.failed", status: 400, body: "예시표식-본문" });
+    check(!run(parserErr).includes("예시표식"), "H1 파서 거절은 요청 본문을 로그에 남기지 않는다");
+    const other = run(Object.assign(new Error("boom"), { body: "예시표식-본문" }));
+    check(other.includes("boom") && !other.includes("예시표식"), "H1 일반 오류는 메시지만 찍고 오류 속성은 찍지 않는다");
+  }
 }
 
 // ───────────────────────── 스모크(child process) ─────────────────────────
 type Res = { status: number; headers: http.IncomingHttpHeaders; body: string };
-function req(method: string, p: string, opts: { headers?: Record<string, string>; body?: string } = {}): Promise<Res> {
+function req(method: string, p: string, opts: { headers?: Record<string, string>; body?: string | Buffer } = {}): Promise<Res> {
   return new Promise((resolve, reject) => {
     const r = http.request({ host: "127.0.0.1", port: PORT, path: p, method, headers: opts.headers }, (res) => {
       let body = "";
@@ -198,6 +259,7 @@ async function smokeTests() {
     try { authOff = JSON.parse(healthOff.body)?.auth; } catch { authOff = undefined; }
     check(authOff === "off", "A3 off: health.auth===off");
     check((await req("POST", "/api/auth/password", { headers: { "content-type": "application/json" }, body: JSON.stringify({ current: "a", next: "bbbbbbbb" }) })).status === 404, "off: POST /api/auth/password 404");
+    check((await req("POST", "/api/auth/logout", { headers: { Cookie: "aether_session=stale-example" } })).status === 200, "off: 묵은 쿠키로 로그아웃해도 200");
     await stopServer(child);
   }
 
@@ -235,6 +297,19 @@ async function smokeTests() {
     const sseOk = await req("GET", "/api/sessions/dummy/stream?since=0", { headers: { Cookie: cookie } });
     check(sseOk.status === 404, "C5 SSE 쿠키 있으면 게이트 통과(세션없어 404)", `status=${sseOk.status}`);
 
+    // P 인증 전에는 본문을 풀거나 파싱하지 않는다(깨진 본문은 파싱했다면 400이 된다)
+    {
+      const J = { "content-type": "application/json" };
+      const broken = Buffer.from('{"a":');
+      const msg = "/api/sessions/nope/message";
+      check((await req("POST", msg, { headers: J, body: broken })).status === 401, "P1 쿠키 없음 + 깨진 JSON → 401");
+      check((await req("POST", msg, { headers: { ...J, "content-encoding": "gzip" }, body: zlib.gzipSync(broken) })).status === 401, "P2 쿠키 없음 + 깨진 JSON의 gzip → 401");
+      check((await req("POST", msg, { headers: { ...J, "content-encoding": "gzip", Cookie: cookie }, body: zlib.gzipSync(Buffer.from("{}")) })).status === 415, "P3 쿠키 + gzip 본문 → 415");
+      const big = (n: number) => Buffer.from(JSON.stringify({ x: "a".repeat(n) }));
+      check((await req("POST", msg, { headers: { ...J, Cookie: cookie }, body: big(1_000_000) })).status !== 413, "P4 쿠키 + 1MB 메시지 본문은 큰 한도로 파싱(413 아님)");
+      check((await req("POST", "/api/sessions", { headers: { ...J, Cookie: cookie }, body: big(300_000) })).status === 413, "P5 쿠키 + 300KB 다른 POST → 413(전역 한도 유지)");
+    }
+
     // Bearer 스모크(쿠키 헤더 없이). 목록이 워크스페이스 이유로 503이어도 게이트(비-401)면 통과.
     {
       const br = await req("GET", "/api/sessions", { headers: { Authorization: `Bearer ${bearerToken}` } });
@@ -250,10 +325,25 @@ async function smokeTests() {
     const logout = await req("POST", "/api/auth/logout", { headers: { Cookie: cookie } });
     const clearCookie = logout.headers["set-cookie"]?.[0] ?? "";
     check(logout.status === 200 && /aether_session=;|Expires=Thu, 01 Jan 1970|Max-Age=0/i.test(clearCookie), "C6 로그아웃 → 쿠키 clear", clearCookie.slice(0, 40));
+    check((await req("GET", "/api/sessions", { headers: { Cookie: cookie } })).status === 401, "R1 로그아웃한 토큰은 쿠키로 다시 쓸 수 없다(401)");
+    check((await req("GET", "/api/sessions", { headers: { Authorization: `Bearer ${bearerToken}` } })).status === 401, "R1 같은 토큰을 Bearer로 써도 401");
+
+    // L 로그인 잠금: JSON 아닌 요청은 실패 횟수에 들지 않고, 기기별로 따로 센다
+    const loginWith = (pw: string, extra: Record<string, string> = {}) =>
+      req("POST", "/api/auth/login", { headers: { "content-type": "application/json", ...extra }, body: JSON.stringify({ password: pw }) });
+    {
+      const plain: number[] = [];
+      for (let i = 0; i < 6; i++) plain.push((await req("POST", "/api/auth/login", { headers: { "content-type": "text/plain" }, body: "x" })).status);
+      check(plain.every((s) => s === 400), "L1 비밀번호 없는 요청 6번은 모두 400", plain.join(","));
+      check((await loginWith("testpw123")).status === 200, "L1 그 뒤에도 올바른 로그인은 200");
+      const xff = { "x-forwarded-for": "100.64.0.9" };
+      for (let i = 0; i < 5; i++) await loginWith("nope", xff);
+      check((await loginWith("testpw123", xff)).status === 429, "L2 같은 기기는 5번 틀리면 잠김");
+      check((await loginWith("testpw123", { "x-forwarded-for": "100.64.0.10" })).status === 200, "L2 다른 기기는 로그인된다");
+    }
+    const cookie2 = cookieOf(await loginWith("testpw123")); // E5 잠금 전에 받아 둔 쿠키(비밀번호 변경 경로 시험용)
 
     // E5 연속 5번 틀리면 잠김 — 맞는 비번도 429(위 로그인 성공으로 실패 수는 0에서 시작)
-    const loginWith = (pw: string) =>
-      req("POST", "/api/auth/login", { headers: { "content-type": "application/json" }, body: JSON.stringify({ password: pw }) });
     const fives: number[] = [];
     for (let i = 0; i < 5; i++) fives.push((await loginWith("nope")).status);
     check(fives.every((s) => s === 401), "E5 1~5번째 틀린 비번은 401", fives.join(","));
@@ -263,6 +353,9 @@ async function smokeTests() {
       "E5 잠긴 뒤엔 맞는 비번도 429 + Retry-After(쿠키 없음)",
       `status=${locked.status} retry=${locked.headers["retry-after"]}`,
     );
+    check((await req("POST", "/api/auth/login", { headers: { "content-type": "application/json", "content-encoding": "gzip" }, body: zlib.gzipSync(Buffer.from('{"password":"x"}')) })).status === 415, "P6 로그인 + gzip 본문 → 415");
+    const pwChange = await req("POST", "/api/auth/password", { headers: { "content-type": "application/json", Cookie: cookie2 }, body: JSON.stringify({ current: "nope-nope", next: "newpass-1234" }) });
+    check(pwChange.status === 403, "L3 로그인이 잠겨도 비밀번호 변경 경로는 따로 센다(틀린 현재 비밀번호 → 403)", `status=${pwChange.status}`);
     await stopServer(child);
   }
 
@@ -286,6 +379,13 @@ async function smokeTests() {
     const { child, logs } = startServer({ AETHER_AUTH_MODE: "password", AETHER_JWT_SECRET: "short", AETHER_PASSWORD_HASH: TEST_HASH });
     const up = await waitHealthy(5000);
     check(!up && /너무 짧/.test(logs()), "D3 약한 JWT 시크릿(<32B) → 부팅 실패", up ? "떴음(위험!)" : "안 뜸");
+    await stopServer(child);
+  }
+  // D4 인증 없이 루프백 밖에 묶으면 부팅 거부
+  {
+    const { child, logs } = startServer({ AETHER_AUTH_MODE: "off", AETHER_HOST: "0.0.0.0" });
+    const up = await waitHealthy(5000);
+    check(!up && /인증 없이 이 주소/.test(logs()), "D4 off + 루프백 밖 주소 → 부팅 거부", up ? "떴음(위험!)" : "안 뜸");
     await stopServer(child);
   }
 }

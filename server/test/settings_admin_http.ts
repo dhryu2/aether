@@ -19,11 +19,11 @@ function check(cond: boolean, name: string, extra = "") {
 }
 
 type Res = { status: number; headers: http.IncomingHttpHeaders; body: string };
-function req(method: string, p: string, opts: { cookie?: string; json?: unknown } = {}): Promise<Res> {
+function req(method: string, p: string, opts: { cookie?: string; json?: unknown; raw?: string } = {}): Promise<Res> {
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = {};
     if (opts.cookie) headers.Cookie = opts.cookie;
-    if (opts.json !== undefined) headers["content-type"] = "application/json";
+    if (opts.json !== undefined || opts.raw !== undefined) headers["content-type"] = "application/json";
     const r = http.request({ host: "127.0.0.1", port: PORT, path: p, method, headers }, (res) => {
       let body = "";
       res.setEncoding("utf8");
@@ -32,6 +32,7 @@ function req(method: string, p: string, opts: { cookie?: string; json?: unknown 
     });
     r.on("error", reject);
     if (opts.json !== undefined) r.write(JSON.stringify(opts.json));
+    if (opts.raw !== undefined) r.write(opts.raw);
     r.end();
   });
 }
@@ -105,9 +106,33 @@ try {
   const logText = fs.readFileSync(path.join(dataDir, "logs", "server.jsonl"), "utf8");
   check(!logText.includes(NEW_PW) && !logText.includes(JSON.parse(fs.readFileSync(file, "utf8")).hash), "비밀번호: 서버 로그에 새 비밀번호·해시가 없다");
 
-  // 파일을 지우면 env 비밀번호로 돌아간다(옛 토큰 키도 원래대로)
+  // 파서가 거절한 본문(깨진 JSON)의 내용은 서버 로그에 남지 않는다
+  const brokenBody = await req("POST", "/api/auth/login", { raw: '{"password":"예시표식-12345' });
+  await delay(300);
+  check(brokenBody.status === 400 && !fs.readFileSync(path.join(dataDir, "logs", "server.jsonl"), "utf8").includes("예시표식"), "깨진 JSON 본문은 400이고 로그에 본문이 남지 않는다");
+
+  // 파일을 지우면 env 비밀번호로 돌아가지만, 옛 토큰은 되살아나지 않는다(세대 값이 이미 바뀌었다)
   fs.rmSync(file);
   check((await login(ENV_PW)).status === 200, "비밀번호: 파일 삭제 시 env 비밀번호로 로그인");
+  check((await req("GET", "/api/system/info", { cookie })).status === 401 && (await req("GET", "/api/system/info", { cookie: newCookie })).status === 401, "비밀번호: 파일을 지워도 옛 토큰은 401(되살아나지 않는다)");
+
+  // 다른 프로세스(재설정 도구와 같은 방식)가 비밀번호를 바꾸면 열린 스트림이 다음 심장박동(15초)에 닫힌다
+  const streamCookie = cookieOf(await login(ENV_PW));
+  const streamEnded = new Promise<boolean>((resolve) => {
+    const r = http.get({ host: "127.0.0.1", port: PORT, path: "/api/notify/stream", headers: { Cookie: streamCookie } }, (res) => {
+      res.resume();
+      res.on("close", () => resolve(true));
+    });
+    r.on("error", () => resolve(true));
+    setTimeout(() => resolve(false), 18000);
+  });
+  await delay(300);
+  const { savePasswordHash } = await import("../auth/passwordHash");
+  const OTHER_PW = "다른 프로세스 12345";
+  savePasswordHash(bcrypt.hashSync(OTHER_PW, 4), dataDir);
+  check(await streamEnded, "다른 프로세스가 비밀번호를 바꾸면 열린 스트림이 18초 안에 닫힌다");
+  check((await req("GET", "/api/system/info", { cookie: streamCookie })).status === 401, "그때 옛 쿠키는 401");
+  check((await login(OTHER_PW)).status === 200, "새 비밀번호로 로그인된다");
 } finally {
   await stop();
   fs.rmSync(dataDir, { recursive: true, force: true });

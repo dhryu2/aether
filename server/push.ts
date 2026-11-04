@@ -10,9 +10,10 @@ import fs from "node:fs";
 import path from "node:path";
 import webpush from "web-push";
 import { config } from "./config";
+import { credentialStamp } from "./auth/jwt";
 import type { NotifyIntent } from "./notify/worthNotifying";
 
-type Sub = webpush.PushSubscription;
+type Sub = webpush.PushSubscription & { stamp?: string }; // stamp: 등록 때의 로그인 자격 지문(password 모드만)
 
 function vapidPublic(): string | undefined {
   const v = process.env.AETHER_VAPID_PUBLIC;
@@ -81,11 +82,20 @@ function save() {
 
 const MAX_SUBS = 50; // 구독 무제한 증식 방지(인증 off에서도 디스크/메모리 폭주 차단). 초과 시 오래된 것부터 제거.
 
+/** password 모드에서 지금 자격의 지문. 다른 모드는 자격 폐기가 없어 지문을 쓰지 않는다. */
+const currentStamp = () => (config.authMode === "password" ? credentialStamp() : undefined);
+
 export function addSubscription(sub: Sub) {
   if (!sub?.endpoint) return;
+  const stamp = currentStamp();
   const list = load();
-  if (list.some((s) => s.endpoint === sub.endpoint)) return; // dedup
-  list.push(sub);
+  const hit = list.find((s) => s.endpoint === sub.endpoint); // dedup
+  if (hit) {
+    // 같은 endpoint의 재등록: 자격이 바뀐 뒤라면 새 지문으로 갱신해야 다시 전송 대상이 된다.
+    if (hit.stamp !== stamp) { hit.stamp = stamp; save(); }
+    return;
+  }
+  list.push({ ...sub, stamp });
   if (list.length > MAX_SUBS) list.splice(0, list.length - MAX_SUBS);
   save();
 }
@@ -124,10 +134,32 @@ export function toBrowserPayload(intent: NotifyIntent): BrowserPushPayload {
   };
 }
 
+/**
+ * 지금 자격으로 등록된 구독만. 비밀번호가 바뀐 뒤 옛 로그인이 등록한 구독은 보낼 때 걸러 저장 파일에서도 뺀다.
+ * 재설정 도구처럼 다른 프로세스가 비밀번호를 바꿔도 지문이 달라지므로 같은 방식으로 걸러진다.
+ */
+function liveSubs(): Sub[] {
+  const list = load();
+  if (config.authMode !== "password") return list;
+  let stamp: string;
+  try {
+    stamp = credentialStamp();
+  } catch (e) {
+    void reportError(e, { component: "push", operation: "push.subscriptions.stamp" }); // 지문을 못 구하면 보내지 않는다
+    return [];
+  }
+  const keep = list.filter((s) => s.stamp === stamp);
+  if (keep.length !== list.length) {
+    subs = keep;
+    save();
+  }
+  return keep;
+}
+
 /** 모든 구독에 푸시 전송(fire-and-forget). 만료(404/410) 구독은 자동 제거. 키 미설정이면 no-op. */
 export function notifyPush(payload: BrowserPushPayload): PushSendResult {
   if (!pushEnabled()) return { attempted: 0, reason: "no-vapid" };
-  const list = load();
+  const list = liveSubs();
   if (!list.length) return { attempted: 0, reason: "no-subscribers" };
   if (!ensureVapid()) return { attempted: 0, reason: "no-vapid" };
   const data = JSON.stringify(payload);

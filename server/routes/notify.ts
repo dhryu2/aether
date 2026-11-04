@@ -4,6 +4,7 @@
  */
 import { Router, type Request, type Response } from "express";
 import { config } from "../config";
+import { endIfRevoked } from "../middleware/auth";
 import { subscribeDesktopNotify } from "../notify/desktop";
 import type { NotifyIntent } from "../notify/worthNotifying";
 
@@ -37,6 +38,7 @@ notifyRouter.get("/stream", (req: Request, res: Response) => {
   const unsub = subscribeDesktopNotify(send);
 
   const hb = setInterval(() => {
+    endIfRevoked(req, res, cleanup);
     if (closed) return;
     write("event: ping\ndata: {}\n\n");
   }, config.heartbeatMs);

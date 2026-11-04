@@ -96,5 +96,11 @@ const appSrc = fs.readFileSync(path.join(HERE, '../src/App.tsx'), 'utf8')
 check('App의 기존 init effect 제거', !/useEffect\(\(\)\s*=>\s*\{\s*actions\.init\(\)/.test(appSrc))
 check('App이 AuthGate로 감싼다', /<AuthGate>/.test(appSrc))
 
+const storeSrc = fs.readFileSync(path.join(HERE, '../src/lib/store.ts'), 'utf8')
+const refreshBody = /async refreshPushState\(\) \{[\s\S]*?\n  \},/.exec(storeSrc)?.[0] ?? ''
+check('refreshPushState가 브라우저 구독을 서버에 다시 등록한다', /api\.subscribePush\(/.test(refreshBody), refreshBody.length)
+const pwSrc = fs.readFileSync(path.join(HERE, '../src/components/settings/PasswordSection.tsx'), 'utf8')
+check('비밀번호를 바꾸면 알림 구독을 다시 등록한다', /changePassword\([\s\S]*?actions\.refreshPushState\(\)/.test(pwSrc))
+
 console.log(`\n${fail === 0 ? '✅' : '❌'} authGate: ${pass} PASS / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

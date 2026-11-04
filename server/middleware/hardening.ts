@@ -30,7 +30,8 @@ export function sseSafeCompression(): RequestHandler {
  */
 export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
   // 본문 파서가 명시한 입력 거절만 정상 사용자 행동이다. 임의의 4xx 예외는 수집한다.
-  if (err && typeof err === 'object' && ['entity.parse.failed', 'entity.too.large', 'encoding.unsupported', 'charset.unsupported', 'request.aborted', 'parameters.too.many'].includes(err.type)) {
+  const parserRejected = !!err && typeof err === 'object' && ['entity.parse.failed', 'entity.too.large', 'encoding.unsupported', 'charset.unsupported', 'request.aborted', 'parameters.too.many'].includes(err.type);
+  if (parserRejected) {
     classifyError(err, 'user_action');
   }
   void reportError(err, { component: "api", operation: "request.handle" });
@@ -41,6 +42,7 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
   if (res.headersSent) return next(err); // SSE 도중 → 기본 핸들러(연결 종료)
   const e = err as { status?: number; statusCode?: number; message?: string };
   const status = e.status ?? e.statusCode ?? 500;
-  console.error("[aether] error:", err);
+  // 오류 객체를 통째로 찍으면 파서 오류의 body 속성에 요청 본문(비밀번호 등)이 실려 로그에 남는다.
+  if (!parserRejected) console.error("[aether] error:", err instanceof Error ? (err.stack ?? err.message) : String(err));
   res.status(status).json({ error: status >= 500 ? st("routes.common.internalError") : String(e.message ?? err) });
 };

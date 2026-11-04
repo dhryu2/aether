@@ -87,6 +87,7 @@ export function PasswordSection() {
     try {
       const r = await api.changePassword(values.current, values.next)
       setClientToken(r.token)
+      void actions.refreshPushState() // 새 로그인 자격으로 이 기기의 알림 구독을 다시 등록
       setValues({ current: '', next: '', confirm: '' })
       setDone(true)
     } catch (err) {

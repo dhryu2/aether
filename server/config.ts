@@ -274,7 +274,7 @@ export const config = {
 
   // ── Phase 3 인증 (모두 비-시크릿. 시크릿 AETHER_JWT_SECRET·AETHER_PASSWORD_HASH는 .env에만, auth 모듈이 process.env로 직접 읽음) ──
 
-  /** 인증 모드. 기본 off(프론트 dev 무마찰). tailscale|password. (위에서 화이트리스트 검증됨) */
+  /** 인증 모드. 기본 off(프론트 dev 무마찰). tailscale|password. (위에서 화이트리스트 검증됨) 루프백 밖에 묶으려면 인증 필수 — off면 부팅 거부(index.ts). */
   authMode: AUTH_MODE as "off" | "tailscale" | "password",
 
   /** tailscale 모드 허용 login 화이트리스트(콤마구분). 비면 "검증된 신원 누구나"(단일망 전제). */

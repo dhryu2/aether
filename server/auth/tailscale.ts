@@ -26,7 +26,7 @@ let missAt = 0;
 let warned = false;
 
 /** 시험용: 찾은 결과와 경고 기억을 비운다. */
-export function resetTailscaleCliCache() { found = null; missAt = 0; warned = false; }
+export function resetTailscaleCliCache() { found = null; missAt = 0; warned = false; limited = limitWhois(runWhois); }
 
 /** tailscale 실행 파일 — 설정 경로 → PATH → 알려진 위치. 못 찾으면 null(10초간 기억). */
 export function resolveTailscaleCli(known: readonly string[] = KNOWN_LOCATIONS): string | null {
@@ -39,7 +39,34 @@ export function resolveTailscaleCli(known: readonly string[] = KNOWN_LOCATIONS):
   return null;
 }
 
-export const tailscaleResolver: IdentityResolver = async (ip, port) => {
+/**
+ * 조회를 ip 기준으로 합치고 결과(성공·실패 모두)를 ttlMs 기억하며, 동시 조회가 maxInFlight를 넘으면 null로 거절한다.
+ * 요청마다 프로세스를 띄우는 비용을 묶는 장치다. rejection은 기억하지 않고 그대로 넘긴다.
+ * shortcut: 신원 변경 반영이 ttlMs만큼 늦다, 더 빨리 반영해야 하면 ttl을 줄인다.
+ */
+export function limitWhois(resolve: IdentityResolver, opts: { ttlMs?: number; maxInFlight?: number; now?: () => number } = {}): IdentityResolver {
+  const ttlMs = opts.ttlMs ?? 5000;
+  const maxInFlight = opts.maxInFlight ?? 8;
+  const now = opts.now ?? Date.now;
+  const cache = new Map<string, { at: number; id: { login: string } | null }>();
+  const inflight = new Map<string, Promise<{ login: string } | null>>();
+  return async (ip, port) => {
+    const hit = cache.get(ip);
+    if (hit && now() - hit.at < ttlMs) return hit.id;
+    const pending = inflight.get(ip);
+    if (pending) return pending;
+    if (inflight.size >= maxInFlight) return null;
+    const run = resolve(ip, port).then((id) => {
+      if (cache.size >= 1024) cache.clear();
+      cache.set(ip, { at: now(), id });
+      return id;
+    }).finally(() => inflight.delete(ip));
+    inflight.set(ip, run);
+    return run;
+  };
+}
+
+const runWhois: IdentityResolver = async (ip, port) => {
   const cli = resolveTailscaleCli();
   if (!cli) {
     // 실행 파일이 없는 것은 설정 문제다. 요청마다 오류를 쌓지 않고 한 번만 알린다.
@@ -62,3 +89,7 @@ export const tailscaleResolver: IdentityResolver = async (ip, port) => {
     return null; // 노드 미발견/타임아웃/파싱 실패 → 인증 거부(게이트가 401)
   }
 };
+
+// 모듈에 한 벌만 둔다 — selectStrategy()가 라우트 묶음마다 불리므로 전략 안에 두면 상한이 전략 수만큼 곱해진다.
+let limited = limitWhois(runWhois);
+export const tailscaleResolver: IdentityResolver = (ip, port) => limited(ip, port);

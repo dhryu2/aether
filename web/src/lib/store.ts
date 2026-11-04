@@ -2715,6 +2715,8 @@ export const actions = {
       const reg = await swReady()
       const sub = await reg.pushManager.getSubscription()
       set({ pushEnabled: !!sub })
+      // 비밀번호가 바뀐 뒤에도 알림이 오도록 서버에 다시 등록한다(서버는 변화가 없으면 쓰지 않는다). 실패하면 다음 부팅에 다시 시도한다.
+      if (sub) await api.subscribePush(sub.toJSON()).catch(() => { /* 로그아웃 상태 등 */ })
     } catch {
       /* SW 미준비/타임아웃 — 무시 */
     }

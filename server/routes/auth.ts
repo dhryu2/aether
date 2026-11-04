@@ -1,7 +1,7 @@
 /**
  * 인증 라우트(password 모드용). 게이트 *앞에* 공개 mount(로그인해서 쿠키 받을 길 보장).
  *   POST /api/auth/login  { password } → bcrypt 검증 → httpOnly 쿠키에 JWT 발급
- *   POST /api/auth/logout → 동일 옵션으로 쿠키 clear
+ *   POST /api/auth/logout → 동일 옵션으로 쿠키 clear + 그 토큰을 서버에서 폐기(이 기기만)
  *   POST /api/auth/password { current, next } → 비밀번호 변경(게이트 통과 + password 모드만)
  * 로그인은 시도 제한(auth/loginLimiter.ts)을 거친다. 잠기면 429 + Retry-After(초).
  * ⚠️ 비번/해시를 로깅하지 않는다(시크릿 평문 금지).
@@ -9,9 +9,9 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { config } from "../config";
-import { signSession } from "../auth/jwt";
+import { revokeSession, signSession } from "../auth/jwt";
 import { currentPasswordHash, isValidNewPassword, savePasswordHash } from "../auth/passwordHash";
-import { createAuthMiddleware, selectStrategy } from "../middleware/auth";
+import { bearerToken, createAuthMiddleware, selectStrategy } from "../middleware/auth";
 import { reportError } from "../observability/report";
 import type { ChangePasswordResponse } from "../../shared/http";
 import { createLoginLimiter } from "../auth/loginLimiter";
@@ -32,9 +32,15 @@ function cookieOpts(secure: boolean) {
 }
 
 const limiter = createLoginLimiter();
+const passwordLimiter = createLoginLimiter(); // 비밀번호 변경 경로는 따로 센다 — 로그인 잠금이 이미 로그인한 소유자의 변경을 막지 않게
 
 authRouter.post("/login", async (req, res) => {
-  const wait = limiter.acquire();
+  // 비밀번호가 문자열이 아닌 요청은 실패 횟수에 넣지 않고 돌려보낸다(자격 없이 소유자의 로그인을 잠그지 못하게).
+  if (typeof req.body?.password !== "string") {
+    res.status(400).json({ error: st("routes.auth.failed") });
+    return;
+  }
+  const wait = limiter.acquire(req.ip ?? "");
   if (wait) {
     res.set("Retry-After", String(wait));
     res.status(429).json({ error: st("routes.auth.tooMany") });
@@ -42,7 +48,7 @@ authRouter.post("/login", async (req, res) => {
   }
   let ok = false;
   try {
-    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    const password: string = req.body.password;
     const stored = currentPasswordHash();
     const match = await bcrypt.compare(password, stored || await getDummyHash()); // 미설정 시 더미와 비교(항상 실패, 타이밍 일정)
     ok = match && !!stored;
@@ -58,9 +64,13 @@ authRouter.post("/login", async (req, res) => {
   res.json({ ok: true, token });
 });
 
-authRouter.post("/logout", (req, res) => {
+authRouter.post("/logout", async (req, res) => {
   const { maxAge: _omit, ...clearOpts } = cookieOpts(req.secure);
   res.clearCookie(COOKIE, clearOpts);
+  // 이 기기의 토큰만 서버에서도 무효로 만든다(쿠키와 Bearer 각각). 모드 조건: off 모드의 묵은 쿠키로 시크릿 검사가 throw하지 않게.
+  if (config.authMode === "password") {
+    for (const token of [req.cookies?.[COOKIE], bearerToken(req)]) if (typeof token === "string" && token) await revokeSession(token);
+  }
   res.json({ ok: true });
 });
 
@@ -75,7 +85,7 @@ authRouter.post("/password", createAuthMiddleware(selectStrategy()), async (req,
     res.status(400).json({ error: st("routes.auth.passwordInvalid") });
     return;
   }
-  const wait = limiter.acquire(); // 로그인과 같은 시도 제한을 나눠 쓴다
+  const wait = passwordLimiter.acquire(req.ip ?? ""); // 로그인과 따로 센다
   if (wait) {
     res.set("Retry-After", String(wait));
     res.status(429).json({ error: st("routes.auth.tooMany") });
@@ -101,6 +111,6 @@ authRouter.post("/password", createAuthMiddleware(selectStrategy()), async (req,
     res.json(body);
     ok = true;
   } finally {
-    limiter.release(ok);
+    passwordLimiter.release(ok);
   }
 });

@@ -2,6 +2,9 @@
 import assert from 'node:assert/strict';
 import type { SDKAssistantMessageError, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { claudeTurnFailure } from '../providers/claude/turnFailure';
+// 푸시 구독은 password 모드에서 로그인 자격 지문을 쓰므로 시험용 시크릿(실제 값 아님)이 필요하다.
+process.env.AETHER_JWT_SECRET ??= 'test-only-mock-secret-do-not-use-in-prod-xxxxxxxx';
+process.env.AETHER_PASSWORD_HASH ??= 'test-only-hash-placeholder';
 const result = (extra: Record<string, unknown>) => ({type:'result', subtype:'success', is_error:false, result:'ok', ...extra}) as SDKMessage;
 assert.equal(claudeTurnFailure(result({})),null);
 assert.equal(claudeTurnFailure(result({is_error:true, terminal_reason:'aborted_streaming'})),null);
@@ -266,9 +269,9 @@ try {
     try {
       config.tailscaleCli=cli;rows.length=0;
       fs.writeFileSync(cli,'#!/bin/sh\nprintf \'%s\' \'{}\'\n',{mode:0o700});
-      assert.equal(await tailscaleResolver('127.0.0.1',1),null);assert.equal(rows.length,0);
+      assert.equal(await tailscaleResolver('192.0.2.1',1),null);assert.equal(rows.length,0);
       fs.writeFileSync(cli,'#!/bin/sh\nprintf \'%s\' \'{broken\'\n');
-      for(let i=0;i<3;i++)assert.equal(await tailscaleResolver('127.0.0.1',1),null);
+      for(let i=0;i<3;i++)assert.equal(await tailscaleResolver(`192.0.2.${i+2}`,1),null); // 조회 결과는 ip별로 기억되므로 매번 다른 ip
       assert.equal(rows.length,1);assert.equal(rows[0].severity,'warning');
     } finally {config.tailscaleCli=original;fs.rmSync(cli,{force:true});}
   });

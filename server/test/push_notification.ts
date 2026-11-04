@@ -1,7 +1,7 @@
 /**
  * 알림 조립 골든 — 실제 web-push 설정·구독과 분리해 제목/본문/종류/중립 행동을 고정한다.
  * kind는 손길 칩과 같은 사건 종류다(Phase 13a, worthNotifying.ts).
- * 브라우저 tag·permissionId는 어댑터 테스트(notify_adapter)가 본다.
+ * 브라우저 tag는 어댑터 테스트(notify_adapter)가 본다.
  * 실행: tsx test/push_notification.ts
  */
 import assert from "node:assert";
@@ -96,9 +96,9 @@ eq(
 
 console.log("\n=== 기존 공통 알림 무회귀 ===");
 eq(
-  "권한 요청의 제목·본문·승인 대기 행동(채널 필드 없음)",
+  "권한 요청의 제목·본문(승인 행동 없음, 채널 필드 없음)",
   notify(raw({ kind: "permission_request", req: { id: "permission-7", toolName: "Bash", input: { command: "npm test" }, toolUseID: "tool-7", createdAt: 1 } }), [], { ...SESSION, permissionTarget: "npm test" }),
-  { ...base, title: "배포 작업 · 권한 요청", body: "Bash · npm test", action: { type: "await_permission", requestId: "permission-7" }, kind: "permission" },
+  { ...base, title: "배포 작업 · 권한 요청", body: "Bash · npm test", kind: "permission" },
 );
 eq(
   "계획 검토 대기",

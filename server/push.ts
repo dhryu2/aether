@@ -114,23 +114,18 @@ export type BrowserPushPayload = {
   title: string;
   body: string;
   sessionId?: string;
-  /** 승인 REST용 실행 id. 없으면 sessionId. */
-  executionId?: string;
   tag?: string;
-  permissionId?: string;
 };
 
 export type PushSendResult = { attempted: number; reason?: "no-vapid" | "no-subscribers" };
 
-/** 판정부 의도 → 브라우저 payload. 서비스워커 승인 버튼은 permissionId를 쓴다. */
+/** 판정부 의도 → 브라우저 payload. 알림에는 승인·거부 버튼이 없다 — 앱에서 카드의 전체 내용을 보고 결정한다. */
 export function toBrowserPayload(intent: NotifyIntent): BrowserPushPayload {
   return {
     title: intent.title,
     body: intent.body,
     sessionId: intent.sessionId,
-    executionId: intent.sessionId,
     tag: intent.topic === "context" ? `ctx-${intent.sessionId}` : intent.sessionId,
-    permissionId: intent.action?.type === "await_permission" ? intent.action.requestId : undefined,
   };
 }
 

@@ -18,7 +18,7 @@ function check(name: string, cond: boolean) {
 }
 
 check('클릭 이동은 roomId 우선', /roomId\s*\|\|\s*data\.sessionId/.test(src) || /const roomId = data\.roomId \|\| data\.sessionId/.test(src))
-check('승인 URL은 executionId 우선', /executionId\s*\|\|\s*data\.sessionId/.test(src) || /const executionId = data\.executionId \|\| data\.sessionId/.test(src))
+check('알림에 승인·거부 버튼이 없다', !/actions/.test(src) && !/permissionId/.test(src) && !/api\/sessions/.test(src))
 check('아이콘 경로 변경 없음(기존 icon)', src.includes('/icon-192.png'))
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} swNotify: ${pass} PASS / ${fail} FAIL`)

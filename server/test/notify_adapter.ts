@@ -1,6 +1,6 @@
 /**
  * 알림 어댑터·판정부 배선 — F4(키 없음)·F5(구독 0)·F6(어댑터 미장착)과
- * 브라우저 payload(tag·permissionId), 문맥 85% 히스테리시스.
+ * 브라우저 payload(tag), 문맥 85% 히스테리시스.
  * 모델 호출 0.
  */
 import assert from "node:assert";
@@ -45,20 +45,18 @@ const raw = (body: Record<string, unknown>) => ({ seq: 1, ts: 1, ...body }) as A
 
 console.log("\n=== 브라우저 payload 매핑 ===");
 eq(
-  "권한 의도가 permissionId와 세션 tag가 된다",
+  "권한 의도는 승인 정보 없이 세션 tag만 된다",
   toBrowserPayload({
     title: "배포 작업 · 권한 요청",
     body: "Bash · npm test",
     sessionId: "session-1",
-    action: { type: "await_permission", requestId: "permission-7" },
+    kind: "permission",
   }),
   {
     title: "배포 작업 · 권한 요청",
     body: "Bash · npm test",
     sessionId: "session-1",
-    executionId: "session-1",
     tag: "session-1",
-    permissionId: "permission-7",
   },
 );
 eq(
@@ -73,9 +71,7 @@ eq(
     title: "컨텍스트 한계 임박",
     body: "배포 작업 컨텍스트 90% 사용 — /compact 또는 정리를 권해요",
     sessionId: "session-1",
-    executionId: "session-1",
     tag: "ctx-session-1",
-    permissionId: undefined,
   },
 );
 
@@ -153,7 +149,8 @@ eq("F4 전송은 no-vapid", notifyPush({ title: "t", body: "b", sessionId: "s" }
     });
     const perm = seen.find((e) => e.kind === "permission_request");
     check(!!perm, "F4 세션은 권한 사건을 구독자에게 보낸다");
-    check(sent.length === 1 && sent[0]?.action?.type === "await_permission", "F4 판정부는 의도를 낸다(어댑터 no-op와 별개)");
+    check(sent.length === 1 && sent[0]?.kind === "permission" && !("action" in sent[0]), "F4 판정부는 승인 행동 없이 의도를 낸다(어댑터 no-op와 별개)");
+    check(!("permissionId" in toBrowserPayload(sent[0]!)), "F4 브라우저 payload에 승인 id가 없다");
     eq("F4 어댑터는 여전히 키 없음", notifyPush(toBrowserPayload(sent[0]!)), { attempted: 0, reason: "no-vapid" });
     sessionManager.delete(live.id);
   } finally {

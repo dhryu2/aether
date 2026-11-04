@@ -3,7 +3,7 @@
  *
  * provider 원본은 codec이 이미 AgentEvent로 흡수했다. 여기서는 Aether 공통 제어 사건과 정규화 사건만
  * 보므로, 실제 발송 설정·구독 유무와 무관하게 제목·본문을 결정적으로 검사할 수 있다.
- * 브라우저 payload 필드(tag·permissionId)는 붙이지 않는다. 웹 푸시 어댑터가 전송 때 만든다.
+ * 브라우저 payload 필드(tag)는 붙이지 않는다. 웹 푸시 어댑터가 전송 때 만든다.
  */
 import { isAuthError } from "../auth/loginParse";
 import { st } from "../i18n";
@@ -16,7 +16,6 @@ export type NotifyIntent = {
   title: string;
   body: string;
   sessionId: string;
-  action?: { type: "await_permission"; requestId: string };
   /** 같은 묶음끼리 알림을 덮어쓸지. 없으면 session. */
   topic?: "session" | "context";
   /** 손길 칩·주의 칸이 알림과 같은 사건을 쓰게. 문맥 경고에는 없다. */
@@ -120,7 +119,6 @@ export function worthNotifying(
       ...base,
       title: st("notify.permission.title", { name: session.name }),
       body: permissionPreview(ev.req),
-      action: { type: "await_permission", requestId: ev.req.id },
       kind: "permission",
     };
   }

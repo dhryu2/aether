@@ -107,6 +107,9 @@ async function spawnToolless(cwd: string): Promise<Spawned> {
       settingSources: [],
       tools: [],
       persistSession: false,
+      // 제목이 없으면 CLI가 첫 메시지(배경 프롬프트 전체)로 제목 호출을 한 번 더 보낸다. 실측(2026-11-04):
+      //   검색 요약 하나에 약 5,000~14,200토큰. 저장하지 않는 호출이라 이 제목은 화면에 나오지 않는다.
+      title: "Aether background task",
       canUseTool: async () => ({ behavior: "deny", message: pick({ ko: "distill 패스에선 도구 사용 금지", en: "tool use is forbidden in the distill pass" }) }),
     },
   });

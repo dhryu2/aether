@@ -286,6 +286,7 @@ const distillSource = stripComments(fs.readFileSync(path.join(SERVER_DIR, "provi
 check(/settingSources\s*:\s*\[\s*\]/.test(distillSource), "Claude distill은 설정 소스를 빈 목록으로 고정");
 check(/tools\s*:\s*\[\s*\]/.test(distillSource), "Claude distill은 노출 도구를 빈 목록으로 고정");
 check(/persistSession\s*:\s*false/.test(distillSource), "Claude distill은 보조 세션을 영속하지 않음");
+check(/title\s*:\s*"[^"]+"/.test(distillSource), "Claude distill은 제목을 넘겨 CLI 자체 제목 호출을 막음");
 // 위 셋만 검사하면 정작 도구 승인 콜백이 사라지거나 allow로 바뀌어도 초록불이 뜬다. 그 순간부터 보조 모델은
 //   사용자 작업 폴더에서 승인 없이 파일을 읽고 쓰고 명령을 실행할 수 있다 — 게다가 이 모델의 입력은
 //   사용자 대화 내용이라, 대화에 섞인 지시문이 그대로 실행되는 통로가 된다. 그래서 셋을 함께 검사한다.

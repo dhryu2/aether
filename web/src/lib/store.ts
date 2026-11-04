@@ -437,7 +437,7 @@ let state: State = {
   coarsePointer: typeof window !== 'undefined' ? window.matchMedia('(pointer: coarse)').matches : false,
   scrollBottom: null,
   brainOpen: false,
-  brainTab: 'hub',
+  brainTab: 'review',
   searchOpen: false,
   brainOpenNonce: 0,
   kSearchNonce: 0,
@@ -2839,7 +2839,7 @@ export const actions = {
   openBrain(tab?: BrainTab) {
     set({
       brainOpen: true,
-      brainTab: tab ?? 'hub',
+      brainTab: tab ?? 'review',
       brainOpenNonce: state.brainOpenNonce + 1,
       drawerOpen: false,
     })

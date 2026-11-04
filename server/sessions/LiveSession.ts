@@ -256,6 +256,7 @@ export class LiveSession {
   lastActivityAt: number; // 마지막 이벤트(턴 입력·응답·도구 등) 시각 — 사이드바 '마지막 사용' 표기용
   lastInputAt: number; // 사람이 마지막으로 글을 보낸 시각. 사이드바 순서가 응답마다 뒤바뀌지 않도록 정렬은 이 값을 쓴다
   lastViewedAt?: number; // 대화 통로가 따라잡은 시각. 폰·컴퓨터가 같은 "안 봄"을 본다.
+  reviewedSeq?: number; // 작업 검토함에서 검토 완료로 처리한 마지막 순번.
   archivedAt?: number; // 보관한 시각(ms). 없으면 보관 아님.
   attentionSticky?: AttentionSticky; // 마지막 완료·실패 사건. 잠든 세션 복원용.
   attentionHold?: AttentionHold; // 한도 막힘·끊긴 요청. 다음 턴이 열리면 지운다.
@@ -360,6 +361,7 @@ export class LiveSession {
     lastInputAt?: number;
     workspaceSource?: string;
     lastViewedAt?: number;
+    reviewedSeq?: number;
     archivedAt?: number;
     attentionSticky?: AttentionSticky;
     hiddenRanges?: HiddenRange[];
@@ -407,6 +409,7 @@ export class LiveSession {
     this.lastInputAt = opts.lastInputAt ?? store.lastUserInputTs(this.id) ?? this.createdAt;
     const prevMeta = store.loadMeta(this.id);
     this.lastViewedAt = opts.lastViewedAt ?? prevMeta?.lastViewedAt;
+    this.reviewedSeq = opts.reviewedSeq ?? prevMeta?.reviewedSeq;
     this.archivedAt = opts.archivedAt ?? prevMeta?.archivedAt;
     this.attentionSticky = opts.attentionSticky ?? prevMeta?.attentionSticky;
     this.attentionHold = prevMeta?.attentionHold;
@@ -846,6 +849,7 @@ export class LiveSession {
       lastInputAt: this.lastInputAt,
       workspaceSource: this.workspaceSource,
       lastViewedAt: this.lastViewedAt,
+      reviewedSeq: this.reviewedSeq,
       archivedAt: this.archivedAt,
       attentionSticky: this.attentionSticky,
       attentionHold: this.attentionHold,
@@ -962,6 +966,20 @@ export class LiveSession {
     if (this.lastViewedAt != null && this.lastViewedAt >= at) return;
     this.lastViewedAt = at;
     this.persistMeta("본 시각");
+  }
+
+  /** 검토 완료 위치를 저장한다. undefined면 지운다(되돌리기). */
+  setReviewedSeq(seq: number | undefined) {
+    if (this.reviewedSeq === seq) return;
+    const prev = this.reviewedSeq;
+    this.reviewedSeq = seq;
+    // persistMeta는 실패를 삼킨다. 사람이 누른 처리가 저장되지 않았는데 성공으로 답하지 않게 여기서는 던진다.
+    try {
+      store.saveMeta(this.metaSnapshot());
+    } catch (e) {
+      this.reviewedSeq = prev;
+      throw e;
+    }
   }
 
   setAttentionSticky(sticky: AttentionSticky) {

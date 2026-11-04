@@ -556,6 +556,7 @@ class SessionManager {
         lastInputAt: live.lastInputAt,
         workspaceSource: live.workspaceSource,
         lastViewedAt: live.lastViewedAt,
+        reviewedSeq: live.reviewedSeq,
         attentionSticky: live.attentionSticky,
         commandCatalog: live.commandCatalog,
         eventLog: adoptEventLog(id),
@@ -630,6 +631,7 @@ class SessionManager {
       lastInputAt: entry.meta.lastInputAt,
       workspaceSource,
       lastViewedAt: entry.meta.lastViewedAt,
+      reviewedSeq: entry.meta.reviewedSeq,
       attentionSticky: entry.meta.attentionSticky,
       commandCatalog: entry.meta.commandCatalog,
       eventLog: adoptEventLog(id),
@@ -1529,6 +1531,27 @@ class SessionManager {
     store.saveMeta(meta);
     entry.meta = meta;
     this.emitPresence(this.toPresenceFromDisk(id, entry));
+  }
+
+  /** 작업 검토함의 검토 완료 위치. 살아 있으면 세션이, 잠들었으면 메타 파일이 들고 있다. */
+  reviewedSeqOf(id: string): number | undefined {
+    const live = this.sessions.get(id);
+    return live ? live.reviewedSeq : this.disk.get(id)?.meta.reviewedSeq;
+  }
+
+  /** 검토 완료 위치를 저장한다(undefined면 지움). 저장할 수 없는 세션이면 false. */
+  setReviewedSeq(id: string, seq: number | undefined): boolean {
+    const live = this.sessions.get(id);
+    if (live) {
+      live.setReviewedSeq(seq);
+      return true;
+    }
+    const entry = this.disk.get(id);
+    if (!entry || entry.status === "corrupted" || !entry.meta.cwd) return false;
+    const meta = { ...entry.meta, reviewedSeq: seq } as SessionMeta;
+    store.saveMeta(meta);
+    entry.meta = meta;
+    return true;
   }
 
   addViewer(id: string) {

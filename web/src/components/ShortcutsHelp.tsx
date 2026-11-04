@@ -21,6 +21,10 @@ const ROWS: [string, string][] = [
   ['Ctrl+Enter', 'session.shortcuts.sendNow'],
   ['Alt+↑', 'session.shortcuts.jumpUser'],
   ['```', 'session.shortcuts.codeBox'],
+  ['↑/↓', 'session.shortcuts.reviewMove'],
+  ['Enter', 'session.shortcuts.reviewOpen'],
+  ['E', 'session.shortcuts.reviewDone'],
+  ['Z', 'session.shortcuts.reviewUndo'],
   ['Esc', 'session.shortcuts.escape'],
   ['?', 'session.shortcuts.help'],
 ]
@@ -66,7 +70,7 @@ export function ShortcutsHelp() {
         <div style={{ background: C.cell, borderRadius: R.field, overflow: 'hidden' }}>
           {ROWS.map(([keys, descKey], i) => (
             <div
-              key={keys}
+              key={descKey}
               className="flex items-center"
               style={{
                 minHeight: 44,

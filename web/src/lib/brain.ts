@@ -2,7 +2,7 @@
 
 export type { DeletedSessionRow, SearchHit } from '@shared/brain'
 
-export type BrainTab = 'hub'
+export type BrainTab = 'review'
 
 /** 오늘 0시(로컬 시각)의 밀리초. 검색 기간 "오늘"의 시작이다. */
 export function startOfLocalDay(now = Date.now()): number {

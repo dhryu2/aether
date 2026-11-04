@@ -27,6 +27,7 @@ import { fsRouter } from "./routes/fs";
 import { sessionsRouter } from "./routes/sessions";
 import { providersRouter } from "./routes/providers";
 import { searchRouter } from "./routes/search";
+import { reviewRouter } from "./routes/review";
 import { streamRouter } from "./routes/stream";
 import { presenceRouter } from "./routes/presence";
 import { pushRouter } from "./routes/push";
@@ -159,6 +160,10 @@ if (config.search) {
   app.use("/api/search", createAuthMiddleware(selectStrategy()));
   app.use("/api/search", searchRouter);
 }
+
+// 작업 검토함 — 끝난 세션의 변경·실패·할 일 요약(보호)
+app.use("/api/review", createAuthMiddleware(selectStrategy()));
+app.use("/api/review", reviewRouter);
 
 // 파일시스템 탐색(FolderPicker) — 동일 인증 게이트 뒤(보호)
 app.use("/api/fs", createAuthMiddleware(selectStrategy()));

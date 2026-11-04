@@ -222,6 +222,10 @@ export const session: Dict = {
   'session.rewind.moreFiles': { ko: '외 {n}개', en: 'and {n} more' },
   'session.rewind.chatOnly': { ko: '대화만', en: 'Chat only' },
   'session.rewind.chatAndFiles': { ko: '대화와 파일', en: 'Chat and files' },
+  'session.shortcuts.reviewMove': { ko: '검토함 목록에서 위아래로 이동', en: 'Move up and down in the Review list' },
+  'session.shortcuts.reviewOpen': { ko: '검토함에서 세션 열기', en: 'Open the session from Review' },
+  'session.shortcuts.reviewDone': { ko: '검토함에서 검토 완료', en: 'Mark reviewed in Review' },
+  'session.shortcuts.reviewUndo': { ko: '검토함에서 방금 한 검토 완료 되돌리기', en: 'Undo the last review in Review' },
   'session.shortcuts.escape': { ko: '두 번 눌러 응답 중단 · 열린 창 닫기', en: 'Press twice to stop the running turn · close open dialog' },
   'session.shortcuts.help': { ko: '이 도움말 열기/닫기', en: 'Open/close this help' },
 

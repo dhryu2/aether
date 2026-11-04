@@ -87,6 +87,14 @@ function claudeToolKind(name: string): ToolKind {
   }
 }
 
+/** 파일 변경 도구의 대상 경로 — 인자의 file_path(노트북은 notebook_path). */
+function changedPaths(name: string, input: unknown): { paths?: string[] } {
+  if (claudeToolKind(name) !== "file_change") return {};
+  const rec = toolInput(input);
+  const p = rec?.file_path ?? rec?.notebook_path;
+  return typeof p === "string" && p ? { paths: [p] } : {};
+}
+
 /** 도구 호출 인자 전체 — 객체일 때만 싣는다(카드가 키/값을 순회하므로). */
 function toolInput(input: unknown): Record<string, unknown> | undefined {
   return input && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>) : undefined;
@@ -127,6 +135,7 @@ function normalizeSdk(msg: unknown): AgentEventContent[] {
             // MCP 규약 이름(mcp__서버__도구)을 다른 provider와 같은 `서버.도구` 모양으로 보인다.
             ...(name.startsWith("mcp__") ? { displayName: name.replace(/^mcp__(.+?)__(.+)$/, "$1.$2") } : {}),
             target: toolTarget(blk.input),
+            ...changedPaths(name, blk.input),
             input: toolInput(blk.input),
           });
         }

@@ -599,6 +599,76 @@ app.get("/api/search", async (q, r) => {
   });
 });
 
+// ── 작업 검토함 ──
+//   세 provider 세션 하나씩. ?reviewEmpty=1이면 목록이 비어 있고, 완료·되돌리기는 메모리에서만 바뀐다.
+type ReviewFx = {
+  id: string; title: string; ago: number; projectPath: string; lastSeq: number;
+  files: { path: string; seq: number; state: "uncommitted" | "clean" | "unknown" }[];
+  failed: { text: string; seq: number }[];
+  todos: { text: string; seq: number }[];
+  unrecorded?: string[];
+  other?: { text: string; seq: number }[];
+  turnFailed?: "failed" | "interrupted";
+};
+const REVIEW_PROJECT = "/fixture/project";
+const REVIEW: ReviewFx[] = [
+  { id: "fixture-claude", title: "fixture · claude", ago: 12 * 60_000, projectPath: REVIEW_PROJECT, lastSeq: 40,
+    files: [
+      { path: `${REVIEW_PROJECT}/src/app.ts`, seq: 12, state: "uncommitted" },
+      { path: `${REVIEW_PROJECT}/src/very/deeply/nested/folder/with/a/long/path/that/keeps/going/component, final copy.tsx`, seq: 18, state: "uncommitted" },
+      { path: `${REVIEW_PROJECT}/README.md`, seq: 30, state: "clean" },
+      { path: `${REVIEW_PROJECT}/node_modules/.cache/build.json`, seq: 31, state: "unknown" },
+    ],
+    failed: [{ text: "npm test -- --run src/payments/retry.spec.ts --reporter=verbose --bail 1 --testTimeout=20000 && npm run lint -- --max-warnings 0", seq: 22 }],
+    todos: [],
+    other: [{ text: "grep -rn \"retryCount\" src/legacy", seq: 6 }, { text: "cat docs/missing-file.md", seq: 9 }],
+    unrecorded: ["scripts/tmp-notes.txt", "dist/"] },
+  { id: "fixture-codex", title: "fixture · second provider", ago: 3 * 3600_000, projectPath: REVIEW_PROJECT, lastSeq: 25,
+    files: [{ path: `${REVIEW_PROJECT}/server/routes/pay.ts`, seq: 8, state: "uncommitted" }, { path: `${REVIEW_PROJECT}/server/db.ts`, seq: 15, state: "clean" }],
+    failed: [], todos: [{ text: "결제 재시도 시험을 추가한다", seq: 20 }, { text: "문서의 오류 코드 표를 갱신한다", seq: 20 }], turnFailed: "interrupted" },
+  { id: "fixture-grok", title: "긴 제목이 말줄임으로 잘리는지 확인하는 아주 긴 세션 제목입니다 계속 이어집니다", ago: 26 * 3600_000, projectPath: "/fixture/other-project", lastSeq: 9,
+    files: [{ path: "/fixture/other-project/notes.md", seq: 5, state: "uncommitted" }], failed: [], todos: [] },
+];
+const reviewDone = new Set<string>();
+const reviewEmpty = (q: express.Request) => pageVariant(q).get("reviewEmpty") === "1";
+const reviewHead = (r: ReviewFx) => ({
+  id: r.id, title: r.title, projectPath: r.projectPath, projectName: path.basename(r.projectPath), cwd: r.projectPath,
+  lastActivityAt: Date.now() - r.ago, lastSeq: r.lastSeq, partial: false,
+});
+app.get("/api/review", (q, r) => {
+  const rows = reviewEmpty(q) ? [] : REVIEW.filter((x) => !reviewDone.has(x.id)).map((x) => ({
+    ...reviewHead(x), fileCount: x.files.length, failureCount: x.failed.length, todoCount: x.todos.length,
+    needsAttention: x.failed.length > 0 || x.todos.length > 0 || !!x.turnFailed,
+    ...(x.turnFailed ? { turnFailed: x.turnFailed } : {}),
+  }));
+  r.json({ rows });
+});
+app.get("/api/review/:id", async (q, r) => {
+  const x = REVIEW.find((v) => v.id === q.params.id);
+  if (!x) return r.status(404).json({ error: "Session not found" });
+  const skip = q.query.git === "0";
+  if (!skip) await new Promise((resolve) => setTimeout(resolve, 300)); // 저장소 상태는 늦게 와서 파일 상태가 나중에 채워진다
+  r.json({
+    ...reviewHead(x),
+    changedFiles: x.files.map(({ path: p, seq }) => ({ path: p, seq })),
+    failedCommands: x.failed, otherFailures: x.other ?? [], openTodos: x.todos,
+    ...(x.turnFailed ? { turnFailed: x.turnFailed } : {}),
+    git: skip ? "skipped" : "ok",
+    fileStates: skip ? [] : x.files.map((f) => f.state),
+    unrecorded: skip ? [] : x.unrecorded ?? [],
+  });
+});
+app.post("/api/review/:id/done", (q, r) => {
+  const x = REVIEW.find((v) => v.id === q.params.id);
+  if (!x) return r.status(404).json({ error: "Session not found" });
+  reviewDone.add(x.id);
+  r.json({ reviewedSeq: Number(q.body?.seq), previous: null });
+});
+app.post("/api/review/:id/undo", (q, r) => {
+  reviewDone.delete(String(q.params.id));
+  r.json({ reviewedSeq: null, previous: null });
+});
+
 const find = (id: string) => SESSIONS.find((s) => s.id === id);
 
 app.get("/api/sessions/:id/models", (q, r) => {

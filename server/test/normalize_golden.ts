@@ -72,7 +72,7 @@ function proj(ae: AgentEvent): string {
       return `${h}:${ae.items.map((i) => `${i.status}:${i.text}`).join("|")}`;
     case "tool_call":
       // 8d-3: 인자 전체(`input`)가 계약에 실린다 — 어떤 키가 살아남았는지까지 투영해야 카드 퇴화를 잡는다.
-      return `${h}:${ae.toolId}:${ae.name}/${ae.toolKind}/${ae.target ?? ""}${ae.input ? `{${Object.keys(ae.input).sort().join(",")}}` : ""}`;
+      return `${h}:${ae.toolId}:${ae.name}/${ae.toolKind}/${ae.target ?? ""}${ae.paths ? `<${ae.paths.join("|")}>` : ""}${ae.input ? `{${Object.keys(ae.input).sort().join(",")}}` : ""}`;
     case "tool_result":
       return `${h}:${ae.toolId}:${ae.isError ? "ERR:" : ""}${ae.output}`;
     case "turn_completed":
@@ -122,7 +122,7 @@ const EXPECT_CLAUDE: Record<number, string[]> = {
   3: ["reasoning#0:먼저 의존성부터 확인하자"],
   4: ["tool_call#0:toolu_01AA:Bash/bash/python A.py{command}"],
   5: ["tool_result#0:toolu_01AA:ImportError: No module named torch"],
-  6: ["text#0:line 12 타입오류를 고칩니다", "tool_call#1:toolu_01BB:Edit/file_change//p/A.py{file_path}"], // 다중 블록 → part 0,1
+  6: ["text#0:line 12 타입오류를 고칩니다", "tool_call#1:toolu_01BB:Edit/file_change//p/A.py</p/A.py>{file_path}"], // 다중 블록 → part 0,1
   7: ["tool_result#0:toolu_01CC:parallel result ALPHA", "tool_result#1:toolu_01DD:parallel result BETA"], // 병렬 → part 0,1
   8: ["tool_call#0:toolu_01EE:mcp__aether__session_search/mcp/배포 설정{query}"],
   9: ["tool_result#0:toolu_01EE:ERR:"], // 빈 결과 + is_error

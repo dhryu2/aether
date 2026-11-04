@@ -152,8 +152,8 @@ export const nav: Dict = {
   },
   'nav.topbar.brain': { ko: '워크스페이스', en: 'Workspace' },
   'nav.topbar.brainTitle': {
-    ko: '워크스페이스',
-    en: 'Workspace',
+    ko: '워크스페이스 — 끝난 작업의 변경과 실패를 모아 보기',
+    en: 'Workspace — review changes and failures from finished work',
   },
   'nav.sidebar.searchPast': { ko: '지난 대화 검색', en: 'Search past conversations' },
   'nav.topbar.openSessionList': { ko: '세션 목록 열기', en: 'Open work list' },

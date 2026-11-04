@@ -109,20 +109,22 @@ export function hideBoxes(text: string): { text: string; had: boolean } {
 
 /**
  * 진행 중인 턴의 경계 — 이 번호보다 큰 목록 위치의 글이 「진행 중」이다.
- * 마지막 사람 말 뒤에 끝 사건(턴 완료·오류·중단·사용자 Stop)이 하나라도 있으면 진행 중인 턴이 없다.
+ * 마지막 사람 말 뒤의 마지막 턴 완료까지는 끝난 글이다. 그 뒤의 글은 사람 말 없이 이어진 턴이다.
+ * 오류·중단·사용자 Stop이 있으면 진행 중인 턴이 없다.
  */
 function progressBoundary(items: readonly ConvoItem[]): number {
   let lastUser = -1
   for (let i = 0; i < items.length; i++) {
     if (items[i].kind === 'user_msg' || items[i].kind === 'local_user') lastUser = i
   }
+  let boundary = lastUser
   for (let i = lastUser + 1; i < items.length; i++) {
     const it = items[i]
     if (it.kind === 'status' && (it.status === 'crashed' || it.status === 'interrupted')) return Infinity
     if (it.kind === 'local_notice' && it.variant === 'stop') return Infinity
-    if (it.kind !== 'local_user' && it.kind !== 'local_notice' && turnCompletedOf(it)) return Infinity
+    if (it.kind !== 'local_user' && it.kind !== 'local_notice' && turnCompletedOf(it)) boundary = i
   }
-  return lastUser
+  return boundary
 }
 
 export type ShapedText = { text: string; box: boolean }

@@ -1796,18 +1796,21 @@ export class LiveSession {
 
   /**
    * 턴 끝에서 질문지를 읽어 사건으로 남긴다. 브리프 대화 중이고, 후보가 마지막 사람 입력 뒤의 글이고,
-   * 이 턴 말고 기다리는 입력이 없을 때(openTurns가 1)만 만든다. 후보 지우기와 계수기 감소도 여기서 한다.
-   * 같은 조건에서 마지막 글에 질문지 상자가 없으면 브리프 대화를 끝낸다. 형식이 틀린 상자도 물은 것으로 본다.
+   * 이 턴 말고 기다리는 입력이 없을 때(openTurns가 1 이하)만 만든다. 0은 사람 입력 없이 이어진 턴이다.
+   * 후보 지우기와 계수기 감소도 여기서 한다. 형식이 틀린 상자도 물은 것으로 본다.
+   * 상자 없는 턴은 사람 입력에 답을 마친 턴일 때만 브리프 대화를 끝낸다. 뒤에서 도는 작업을 기다리며 멈춘 턴,
+   * 사람 입력 없이 이어진 턴, 사람 입력 전에 쓴 글로 끝난 턴(그 입력의 답은 아직 안 왔다)은 끝이 아니다.
    */
   private settleTurnQuestionnaire() {
     const candidate = this.textCandidate;
     const open = this.openTurns;
     this.textCandidate = null;
     this.openTurns = Math.max(0, open - 1);
-    if (!this.briefOpen || open !== 1) return;
-    const block = candidate && candidate.seq > this.lastUserMsgSeq ? findQuestionnaireBlock(candidate.text) : null;
+    if (!this.briefOpen || open > 1) return;
+    const stale = !!candidate && candidate.seq <= this.lastUserMsgSeq;
+    const block = candidate && !stale ? findQuestionnaireBlock(candidate.text) : null;
     if (!candidate || block === null) {
-      this.briefOpen = false; // 메타 저장은 같은 턴 끝의 persistMeta가 한다
+      if (open === 1 && !stale && this.bgTasks.length === 0) this.briefOpen = false; // 메타 저장은 같은 턴 끝의 persistMeta가 한다
       return;
     }
     const parsed = parseQuestionnaire(block);

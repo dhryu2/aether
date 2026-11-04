@@ -158,6 +158,10 @@ async function main() {
     eq('진행 중: 상자 여는 줄이 완성되기 전 토큰은 그대로 보인다', kinds(r.segs).includes('questionnairePending'), false)
     r = build([userMsg(), delta('정리했어요.\n```aether-questions\n{"questions":[')], 'running')
     eq('진행 중: 흘러오는 글에 상자가 열리면 자리 표시', kinds(r.segs), ['user', 'live', 'questionnairePending'])
+    r = build([userMsg(), modelText('기다립니다.'), turnEnd(), modelText('정리했어요.\n' + BOX)], 'running')
+    eq('진행 중: 사람 말 없이 이어진 턴의 상자도 자리 표시로 바뀐다', kinds(r.segs).includes('questionnairePending'), true)
+    r = build([userMsg(), modelText('끝난 글\n' + BOX), turnEnd(), modelText('이어진 글')], 'running')
+    check('진행 중: 앞서 끝난 턴의 일반 상자는 원문 그대로다', textsOf(r.segs).some((x) => x.includes('aether-questions')))
 
     // 2) 성공 사건 — 마지막 상자를 지우고 그 글 뒤에 카드
     seq = 0

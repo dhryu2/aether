@@ -241,6 +241,57 @@ async function main(): Promise<void> {
       revived.dispose();
     }
 
+    // ── 뒤에서 도는 작업과 사람 입력 없이 이어진 턴 ──
+    {
+      const bgEmit = (r: Rig, tasks: string[]) => emitRaw(r, { t: "bg", tasks });
+      const { r } = await withQuestionnaire("작업");
+      await r.s.push("조사해", undefined, undefined, "bg-ans");
+      bgEmit(r, ["t1"]);
+      say(r, "에이전트를 띄웠다. 결과를 기다린다.");
+      done(r);
+      await sync(r);
+      check(store.loadMeta(r.s.id)?.briefOpen === true, tag("작업을 기다리며 멈춘 턴은 브리프 대화를 끝내지 않는다"));
+      bgEmit(r, []);
+      emitRaw(r, { t: "start" });
+      say(r, box("최종"));
+      done(r);
+      await sync(r);
+      check(qevs(r).length === 2 && (await r.s.openQuestionnaire())?.id === qevs(r)[1].id, tag("사람 입력 없이 이어진 턴의 상자도 질문지가 된다"), qevs(r).length);
+      await r.s.push("답", undefined, undefined, "bg-final");
+      say(r, "마쳤다.");
+      done(r);
+      await sync(r);
+      check(store.loadMeta(r.s.id)?.briefOpen === undefined, tag("작업이 없는 턴이 상자 없이 끝나면 브리프 대화가 끝난다"));
+
+      const held = mk();
+      await brief(held, "요청", "held-req");
+      bgEmit(held, ["t1"]);
+      say(held, box("먼저"));
+      done(held);
+      await sync(held);
+      bgEmit(held, []);
+      emitRaw(held, { t: "start" });
+      say(held, "남은 결과가 왔다.");
+      done(held);
+      emitRaw(held, { t: "start" });
+      done(held);
+      await sync(held);
+      check(store.loadMeta(held.s.id)?.briefOpen === true && (await held.s.openQuestionnaire())?.id === qevs(held)[0].id, tag("질문지를 낸 뒤 이어진 턴이 상자 없이 끝나도 카드에 답할 수 있다"));
+
+      const { r: cut } = await withQuestionnaire("끼어들기");
+      emitRaw(cut, { t: "start" });
+      say(cut, "이어진 턴의 글");
+      await sync(cut);
+      await cut.s.push("끼어든 말", undefined, undefined, "cut-in");
+      done(cut);
+      await sync(cut);
+      check(store.loadMeta(cut.s.id)?.briefOpen === true, tag("사람 입력 전에 쓴 글로 끝난 턴은 브리프 대화를 끝내지 않는다"));
+      say(cut, box("끼어든 답"));
+      done(cut);
+      await sync(cut);
+      check(qevs(cut).length === 2, tag("끼어든 말의 답에 쓴 상자도 질문지가 된다"), qevs(cut).length);
+    }
+
     // ── 브리프 대화의 끝 ──
     {
       const askHeld = async (r: Rig, id: string) => {

@@ -84,7 +84,8 @@ function splitChildren(children: ReactNode) {
 }
 
 export function ModalCard({ variant, maxWidth = 420, split, children, style, ...rest }: {
-  variant: 'sheet' | 'alert'
+  /** palette: 위쪽에 뜨는 검색 팝업. 폰은 전체 화면. 머리·발·본문 여백 없이 안쪽이 스크롤을 직접 맡는다. */
+  variant: 'sheet' | 'alert' | 'palette'
   maxWidth?: number
   /** 컴퓨터에서 높이를 고정하고 본문 스크롤 칸을 두지 않는다. 본문이 칸마다 따로 스크롤한다(설정 창의 목록+본문 배치). */
   split?: boolean
@@ -94,6 +95,8 @@ export function ModalCard({ variant, maxWidth = 420, split, children, style, ...
   const { titleId, descId, boxRef, narrow } = useModalFrame()
   const alert = variant === 'alert'
   const phoneSheet = variant === 'sheet' && narrow
+  const palette = variant === 'palette'
+  const phonePalette = palette && narrow
   const { header, footer, body } = splitChildren(children)
   const hasFooter = footer.length > 0
   const head = headerH(narrow)
@@ -109,17 +112,17 @@ export function ModalCard({ variant, maxWidth = 420, split, children, style, ...
       aria-modal="true"
       aria-labelledby={titleId}
       aria-describedby={alert ? descId : undefined}
-      className={phoneSheet ? 'window-frame window-phone sheet-up' : 'window-frame window-in'}
+      className={phoneSheet ? 'window-frame window-phone sheet-up' : palette ? (narrow ? 'window-frame window-palette window-palette-full window-in' : 'window-frame window-palette window-in') : 'window-frame window-in'}
       style={{
         ...style,
         width: alert ? 'min(360px, calc(100vw - 40px))' : '100%',
-        maxWidth: alert || phoneSheet ? undefined : maxWidth,
+        maxWidth: alert || phoneSheet || phonePalette ? undefined : maxWidth,
         // 폰 시트는 아래 8px와 안전 영역까지 빼야 위끝이 안전 영역 + 56에 닿는다.
         maxHeight: phoneSheet
           ? 'calc(100dvh - env(safe-area-inset-top) - 56px - 8px - env(safe-area-inset-bottom))'
-          : 'min(88vh, 760px)',
-        height: fixed ? 'min(600px, 88vh)' : phoneSplit ? 'calc(100dvh - env(safe-area-inset-top) - 56px - 8px - env(safe-area-inset-bottom))' : undefined,
-        borderRadius: R.modal,
+          : palette ? undefined : 'min(88vh, 760px)',
+        height: palette ? (narrow ? 'var(--app-h, 100%)' : 'min(560px, 80vh)') : fixed ? 'min(600px, 88vh)' : phoneSplit ? 'calc(100dvh - env(safe-area-inset-top) - 56px - 8px - env(safe-area-inset-bottom))' : undefined,
+        borderRadius: phonePalette ? 0 : R.modal,
         background: alert ? C.cellHi : C.bg,
         color: C.label,
         boxShadow: SH.modal,
@@ -132,8 +135,8 @@ export function ModalCard({ variant, maxWidth = 420, split, children, style, ...
       }}
     >
       <div
-        className={fixed ? undefined : 'scroll-area'}
-        style={fixed ? { display: 'flex', flex: 1, minHeight: 0, boxSizing: 'border-box', paddingTop: head } : {
+        className={fixed || palette ? undefined : 'scroll-area'}
+        style={palette ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' } : fixed ? { display: 'flex', flex: 1, minHeight: 0, boxSizing: 'border-box', paddingTop: head } : {
           overflowY: 'auto',
           overflowX: 'hidden',
           maxHeight: 'inherit',

@@ -250,7 +250,7 @@ footer{background:var(--tint);padding:0 0 28px}
         <div class="row"><b data-t="mS2">결제 화면 다듬기</b><small><svg class="i"><use href="#i-load"/></svg><span data-t="mS2s">작업 중</span></small><span class="model" data-t="mModel">모델 A</span></div>
         <div class="row"><b data-t="mS3">문서 정리</b><small><svg class="i"><use href="#i-load"/></svg><span data-t="mS3s">작업 중</span></small><span class="model" data-t="mModel">모델 A</span></div>
         <div class="row"><b data-t="mS4">배포 스크립트 확인</b><small><svg class="i"><use href="#i-clock"/></svg><span data-t="mS4s">쉼</span><em data-t="mDay">어제</em></small><span class="model" data-t="mModel">모델 A</span></div>
-        <div class="side-end"><img src="icon.png" alt="" width="28" height="28">Agent Brain<svg class="i"><use href="#i-gear"/></svg></div>
+        <div class="side-end"><img src="icon.png" alt="" width="28" height="28"><span data-t="mockWorkspace">워크스페이스</span><svg class="i"><use href="#i-gear"/></svg></div>
       </div>
       <div class="main">
         <div class="head">
@@ -363,6 +363,7 @@ var D=JSON.parse(document.getElementById('data').textContent);
 var ko=/^ko/i.test(navigator.language||'');
 // 한국어 글은 HTML에 그대로 있다. 한국어가 아닌 브라우저만 아래 영어로 바꾼다.
 var EN={
+ mockWorkspace:'Workspace',
  navFeatures:'Features',navInstall:'Install',navDl:'Download',tagline:'Run your AI agents from a chat',fProduct:'Product',fRes:'Resources',fChanges:'Changes',fIssues:'Report an issue',fTerms:'Terms of use',fProject:'Project',fLicense:'License',fOss:'Open source, Apache 2.0 License',
  h1:'AI agents in a chat, not a terminal',
  lead:'Aether is an app you install on your own computer. Hand work to an AI in a chat window and answer its approval requests right there. No account needed.',

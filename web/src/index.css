@@ -1042,6 +1042,11 @@ a,
   justify-content: center;
   padding: 20px;
 }
+.modal-scrim:has(.window-palette) {
+  align-items: flex-start;
+  padding-top: min(14vh, 120px);
+}
+.modal-scrim:has(.window-palette-full) { padding: 0; }
 .modal-scrim:has(.window-phone) {
   align-items: flex-end;
   padding: 0 8px calc(8px + env(safe-area-inset-bottom));

@@ -1,4 +1,4 @@
-// Agent Brain 화면 문자열. 화면에 보이는 문장은 여기만 고친다.
+// 워크스페이스(코드 이름 brain) 화면 문자열. 화면에 보이는 문장은 여기만 고친다.
 import type { Dict } from './types'
 
 export const brain: Dict = {
@@ -11,7 +11,10 @@ export const brain: Dict = {
   'brain.role.assistant': { ko: 'AI', en: 'AI' },
   'brain.role.tool': { ko: '도구', en: 'Tool' },
 
-  'brain.search.placeholder': { ko: '지난 대화, 명령, 에러 메시지 검색', en: 'Search past conversations, commands, errors' },
+  'brain.search.placeholder': { ko: '지난 대화 찾기', en: 'Search past conversations' },
+  'brain.search.filter': { ko: '필터', en: 'Filters' },
+  'brain.search.recent': { ko: '최근 세션', en: 'Recent sessions' },
+  'brain.search.recentEmpty': { ko: '아직 세션이 없어요', en: 'No sessions yet' },
   'brain.search.clear': { ko: '지우기', en: 'Clear' },
   'brain.search.sort.relevance': { ko: '관련도순', en: 'Relevance' },
   'brain.search.sort.recent': { ko: '최신순', en: 'Newest' },
@@ -32,14 +35,12 @@ export const brain: Dict = {
   'brain.search.deletedMore': { ko: '더 보기', en: 'Load more' },
   'brain.search.deletedFailed': { ko: '대화 내용을 불러오지 못했어요', en: "Couldn't load the conversation" },
   'brain.search.idleTitle': { ko: '지난 대화 찾기', en: 'Find past conversations' },
-  'brain.search.idleDesc': { ko: '세션 {n}개의 대화, 명령, 실행 결과에서 찾아요', en: 'Searches conversations, commands, and results across {n} sessions.' },
 
   'brain.env.label': { ko: '현재 프로젝트', en: 'Current environment' },
   'brain.hub.defaultEnvLabel': { ko: '프로젝트 없음', en: 'No project' },
 
   'brain.tabs.hub': { ko: '홈', en: 'Home' },
-  'brain.tabs.search': { ko: '검색', en: 'Search' },
 
-  'brain.header.title': { ko: 'Agent Brain', en: 'Agent Brain' },
+  'brain.header.title': { ko: '워크스페이스', en: 'Workspace' },
   'brain.aperture.ariaLabel': { ko: 'Aether 로고', en: 'Aether Aperture mark' },
 }

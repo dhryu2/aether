@@ -169,6 +169,8 @@ export const Z = {
     newSession: 50,
     /** 다음 작업으로 넘기기 */
     handoff: 52,
+    /** 지난 대화 검색 팝업 */
+    search: 54,
     /** 삭제 확인 */
     deleteConfirm: 55,
     /** 설정 */

@@ -197,8 +197,9 @@ export const session: Dict = {
 
   // ShortcutsHelp
   'session.shortcuts.title': { ko: '단축키', en: 'Shortcuts' },
+  'session.shortcuts.search': { ko: '지난 대화 검색 열기, 닫기', en: 'Open or close past-conversation search' },
   'session.shortcuts.find': { ko: '세션 안에서 찾기', en: 'Find in this work' },
-  'session.shortcuts.brain': { ko: 'Agent Brain 열기, 닫기', en: 'Open or close Agent Brain' },
+  'session.shortcuts.brain': { ko: '워크스페이스 열기, 닫기', en: 'Open or close Workspace' },
   'session.shortcuts.settings': { ko: '설정 열기', en: 'Open settings' },
   'session.shortcuts.send': { ko: '메시지 전송 (Shift+Enter 줄바꿈)', en: 'Send message (Shift+Enter for newline)' },
   'session.shortcuts.history': { ko: '빈 입력창에서 이전 메시지 불러오기', en: 'Recall a previous message from an empty box' },

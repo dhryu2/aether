@@ -319,6 +319,7 @@ export type State = {
   // ── Agent Brain(7e) ──
   brainOpen: boolean
   brainTab: BrainTab
+  searchOpen: boolean // 지난 대화 검색 팝업(세션 목록 머리의 검색 아이콘, Cmd/Ctrl+K)
   brainOpenNonce: number // 닫힘 애니메이션 중 재오픈해도 새 Draw를 구분하는 세대
   kSearchNonce: number // 실제 debounce를 통과한 검색 요청 세대 — Recall 180ms 지연 식별
   kSearch: {
@@ -330,7 +331,7 @@ export type State = {
     toTs?: string
   }
   jumpToSeq: { id: string; seq: number; nonce: number } | null // 검색 결과 → 세션 점프(Stream이 best-effort 스크롤)
-  findOpen: boolean // 세션 내 찾기 바(Ctrl+K) 열림 여부
+  findOpen: boolean // 세션 내 찾기 바(Cmd/Ctrl+F) 열림 여부
   /**
    * Esc를 한 번 눌러 "다음 Esc면 중단" 상태로 들어갔는가.
    *
@@ -421,6 +422,7 @@ let state: State = {
   scrollBottom: null,
   brainOpen: false,
   brainTab: 'hub',
+  searchOpen: false,
   brainOpenNonce: 0,
   kSearchNonce: 0,
   kSearch: { query: '', sort: 'relevance', results: [], status: 'idle', fromTs: '', toTs: '' },
@@ -2799,12 +2801,16 @@ export const actions = {
   },
   setBrainTab(tab: BrainTab) {
     if (tab === state.brainTab) return
-    if (state.brainTab === 'search') brainSearch.cancel()
+    set({ brainTab: tab })
+  },
+  openSearch() {
+    set({ searchOpen: true, drawerOpen: false, findOpen: false })
+  },
+  closeSearch() {
+    brainSearch.cancel()
     set({
-      brainTab: tab,
-      ...(state.kSearch.status === 'loading' && tab !== 'search'
-        ? { kSearch: { ...state.kSearch, status: 'idle' as const, results: [] } }
-        : {}),
+      searchOpen: false,
+      kSearch: { query: '', sort: 'relevance', results: [], status: 'idle', fromTs: '', toTs: '' },
     })
   },
 
@@ -2842,7 +2848,7 @@ export const actions = {
     // 결과 클릭으로 팝업이 닫히는 것도 '닫힘' — 검색도 초기화(닫으면 빈값 규칙과 일관).
     brainSearch.cancel()
     set({
-      brainOpen: false,
+      searchOpen: false,
       kSearch: { query: '', sort: 'relevance', results: [], status: 'idle', fromTs: '', toTs: '' },
     })
     const roomId = hit?.sessionId ?? sessionId
@@ -2850,7 +2856,7 @@ export const actions = {
     set({ jumpToSeq: { id: roomId, seq, nonce: Date.now() } })
   },
 
-  // 세션 내 찾기 바(Ctrl+K) — 지금 클릭한 세션 대화 안에서 검색·점프.
+  // 세션 내 찾기 바(Cmd/Ctrl+F) — 지금 클릭한 세션 대화 안에서 검색·점프.
   closeFind: () => set({ findOpen: false }),
   toggleFind: () => chromeId() && set({ findOpen: !state.findOpen }),
   // 사용자 말만 위·아래로 옮긴다. 더 위가 아직 안 불려 왔으면 한 페이지만 더 읽는다.

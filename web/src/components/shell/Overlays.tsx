@@ -11,6 +11,7 @@ import { actions, useStore } from '../../lib/store'
 import { reportClientError } from '../../lib/errorReporting'
 import { t } from '../../lib/i18n'
 import { BrainOverlay } from '../brain/BrainOverlay'
+import { SearchPalette } from '../brain/SearchPalette'
 import { FindBar } from '../FindBar'
 import { NewSessionModal } from '../NewSessionModal'
 import { DeleteConfirmModal } from '../DeleteConfirmModal'
@@ -59,6 +60,7 @@ export function Overlays() {
       <DeleteConfirmModal />
       <RenameModal />
       <BrainOverlay />
+      <SearchPalette />
       {s.handoffSheet && <HandoffSheet />}
       {s.settingsOpen && <SettingsModal />}
       {s.providerAuth.open && <ProviderAuthModal />}

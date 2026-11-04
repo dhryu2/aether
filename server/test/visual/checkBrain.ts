@@ -1,5 +1,5 @@
 /**
- * Phase F Agent Brain 회귀 검사.
+ * 워크스페이스(Agent Brain 코드 이름 brain) 창 회귀 검사. 탭이 하나뿐이라 탭 막대가 없어야 한다.
  *
  * 실행 전 fixtureServer와 CDP Chrome을 띄운다.
  * CDP_PORT=9444 node --import tsx test/visual/checkBrain.ts \
@@ -29,7 +29,7 @@ function mediaFeatures(reduced: boolean): { name: string; value: string }[] {
   features.push({ name: "prefers-reduced-motion", value: reduced ? "reduce" : "no-preference" });
   return features;
 }
-const { send, evaluate, key, clickTab, waitForAnimations, openBrain, assertTabTrapped, assertEscapeClosed, close } = await connectBrain(port, phone);
+const { send, evaluate, key, waitForAnimations, openBrain, assertTabTrapped, assertEscapeClosed, close } = await connectBrain(port, phone);
 
 await send("Emulation.setDeviceMetricsOverride", {
   width,
@@ -82,13 +82,10 @@ const shell = await evaluate<{
     overflow: doc.scrollWidth > doc.clientWidth + 1 || document.body.scrollWidth > document.body.clientWidth + 1 || (!!sheet && sheet.scrollWidth > sheet.clientWidth + 1),
   };
 })()`);
-assert(shell.modal === "true" && shell.title === "Agent Brain", `Dialog contract missing: ${JSON.stringify(shell)}`);
+assert(shell.modal === "true" && shell.title === "워크스페이스", `Dialog contract missing: ${JSON.stringify(shell)}`);
 assert(focusedClose, "Initial focus is not the close action");
-assert(shell.tabs.length === 2 && shell.tabs[0]?.id === "hub" && shell.tabs[0]?.selected === "true" && shell.tabs[0]?.text.includes("홈"), `Home tab contract missing: ${JSON.stringify(shell.tabs)}`);
-assert(shell.tabs.map((tab) => tab.id).join(",") === "hub,search", `Tab order changed: ${JSON.stringify(shell.tabs)}`);
-if (phone) assert(shell.orientation == null, `Phone tab list should not be vertical: ${shell.orientation}`);
-else assert(shell.orientation === "vertical", `Desktop tab list is not vertical: ${shell.orientation}`);
-assert(!shell.overflow, "Agent Brain has horizontal overflow");
+assert(shell.tabs.length === 0 && shell.orientation == null, `Tab bar must be hidden with a single tab: ${JSON.stringify(shell)}`);
+assert(!shell.overflow, "Workspace has horizontal overflow");
 if (width >= 1000) {
   assert(shell.width <= 1041 && shell.width >= 900, `Unexpected desktop sheet width ${shell.width}`);
 } else if (width >= 760) {
@@ -123,37 +120,10 @@ await assertTabTrapped();
 
 if (phone) {
   await waitForAnimations();
-  const bar = await evaluate<{ inside: boolean; top: number; bottom: number; left: number; right: number }>(`(() => {
-    const el = document.querySelector('[data-brain-tabbar]');
-    if (!(el instanceof HTMLElement)) return { inside: false, top: -1, bottom: -1, left: -1, right: -1 };
-    const rect = el.getBoundingClientRect();
-    return {
-      inside: rect.top >= 0 && rect.left >= -1 && rect.right <= window.innerWidth + 1 && rect.bottom <= window.innerHeight + 1 && rect.bottom > window.innerHeight - 120,
-      top: rect.top,
-      bottom: rect.bottom,
-      left: rect.left,
-      right: rect.right,
-    };
-  })()`);
-  assert(bar.inside, `Phone tab bar is outside the screen: ${JSON.stringify(bar)}`);
+  assert(await evaluate<boolean>(`!document.querySelector('[data-brain-tabbar]')`), "Phone tab bar must be absent with a single tab");
   const small = await evaluate<string[]>(HIT_SCRIPT);
   assert(small.length === 0, `Phone hit target below 44: ${small.join(", ")}`);
 }
-
-// 컴퓨터는 아래 화살표, 폰은 오른쪽 화살표. 화살표는 초점만 옮기고 Enter가 고른다.
-await clickTab("search");
-await evaluate(`document.querySelector('[role="tab"][aria-selected="true"]')?.focus()`);
-await key(phone ? "ArrowRight" : "ArrowDown");
-await sleep(120);
-const moved = await evaluate<{ focus: string | null; selected: string | null }>(`(() => ({
-  focus: document.activeElement?.getAttribute('data-brain-tab') || null,
-  selected: document.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('data-brain-tab') || null,
-}))()`);
-assert(moved.focus === "hub" && moved.selected === "search", `Arrow did not wrap focus to Home: ${JSON.stringify(moved)}`);
-await key("Enter");
-await sleep(120);
-const selectedHome = await evaluate<string | null>(`document.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('data-brain-tab') || null`);
-assert(selectedHome === "hub", `Enter did not select Home: ${selectedHome}`);
 
 if (captureDir) {
   fs.mkdirSync(captureDir, { recursive: true });
@@ -164,21 +134,100 @@ if (captureDir) {
   );
 }
 
-if (phone) {
-  await clickTab("search");
-  const searchTargets = await evaluate<string[]>(HIT_SCRIPT);
-  assert(searchTargets.length === 0, `Phone search hit target below 44: ${searchTargets.join(", ")}`);
-  const hidden = await evaluate<boolean>(`(() => {
-    const input = document.querySelector('#brain-tabpanel input.brain-input');
-    const bar = document.querySelector('[data-brain-tabbar]');
-    if (!(input instanceof HTMLElement) || !(bar instanceof HTMLElement)) return false;
-    input.focus();
-    return getComputedStyle(bar).display === 'none';
+await assertEscapeClosed(true);
+
+// ── 검색 팝업: 세션 목록 머리의 검색 아이콘과 Cmd/Ctrl+K ──
+// 맥은 ⌘, 그 밖은 Ctrl만 본다.
+const mac = await evaluate<boolean>(`/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)`);
+const modK = mac ? 4 : 2;
+const palette = `!!document.querySelector('[data-window="search"]')`;
+async function paletteOpen(): Promise<boolean> {
+  await sleep(250);
+  return evaluate<boolean>(palette);
+}
+// 이름 바꾸기 창 위에서는 Cmd/Ctrl+K가 팝업을 열지 않는다(데스크톱: 세션 줄 우클릭 메뉴로 연다).
+if (!phone) {
+  const renameOpen = await evaluate<boolean>(`(async () => {
+    const row = document.querySelector('[data-session-id]');
+    if (!row) return false;
+    row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 60, clientY: 200 }));
+    await new Promise((r) => setTimeout(r, 200));
+    const item = [...document.querySelectorAll('[role="menuitem"]')].find((el) => (el.textContent || '').includes('이름'));
+    if (!(item instanceof HTMLElement)) return false;
+    item.click();
+    await new Promise((r) => setTimeout(r, 400));
+    return !!document.querySelector('input[aria-label="세션 이름"]');
   })()`);
-  assert(hidden, "Phone tab bar stays visible while the search field is focused");
+  assert(renameOpen, "Rename dialog did not open");
+  await key("k", modK);
+  assert(!(await paletteOpen()), "Cmd/Ctrl+K opened the search palette over the rename dialog");
+  await key("Escape");
+  await sleep(500);
+}
+// 아이콘으로 열기. 빈 입력이면 최근 세션이 보이고, 입력창에 초점이 있다.
+const openedSearch = await evaluate<boolean>(`(() => {
+  if (${phone}) document.querySelector('button[aria-label="세션 목록 열기"]')?.click();
+  return true;
+})()`);
+assert(openedSearch, "unreachable");
+await sleep(400);
+const iconSize = await evaluate<{ w: number; h: number } | null>(`(() => {
+  const el = document.querySelector('button[aria-label="지난 대화 검색"]');
+  if (!(el instanceof HTMLElement)) return null;
+  const rect = el.getBoundingClientRect();
+  const after = getComputedStyle(el, '::after');
+  return { w: Math.max(rect.width, parseFloat(after.width) || 0), h: Math.max(rect.height, parseFloat(after.height) || 0) };
+})()`);
+assert(iconSize !== null, "Search icon not found");
+if (phone) assert(iconSize!.w >= 43.5 && iconSize!.h >= 43.5, `Phone search icon hit target below 44: ${JSON.stringify(iconSize)}`);
+await evaluate(`(() => { const el = document.querySelector('button[aria-label="지난 대화 검색"]'); el.focus(); el.click(); })()`);
+assert(await paletteOpen(), "Search icon did not open the palette");
+const recentCount = await evaluate<number>(`document.querySelectorAll('[data-window="search"] [role="option"]').length`);
+assert(recentCount > 0 && recentCount <= 8, `Recent sessions count ${recentCount}`);
+assert(await evaluate<boolean>(`document.activeElement?.getAttribute('role') === 'combobox'`), "Palette input is not focused");
+if (phone) {
+  const small = await evaluate<string[]>(`(() => {
+    const out = [];
+    for (const el of document.querySelectorAll('[data-window="search"] button')) {
+      if (!(el instanceof HTMLElement) || el.getClientRects().length === 0) continue;
+      const rect = el.getBoundingClientRect();
+      const after = getComputedStyle(el, '::after');
+      const w = Math.max(rect.width, parseFloat(after.width) || 0);
+      const h = Math.max(rect.height, parseFloat(after.height) || 0);
+      if (w < 43.5 || h < 43.5) out.push((el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 20) + ' ' + Math.round(w) + 'x' + Math.round(h));
+    }
+    return out;
+  })()`);
+  assert(small.length === 0, `Phone palette hit target below 44: ${small.join(", ")}`);
+}
+// 아래로 한 번 옮기면 둘째 행이 현재 행이다. Enter가 그 세션으로 간다.
+await key("ArrowDown");
+await sleep(80);
+const secondId = await evaluate<string | null>(`(() => {
+  const id = document.activeElement?.getAttribute('aria-activedescendant');
+  const el = id ? document.getElementById(id) : null;
+  return el && el.getAttribute('aria-selected') === 'true' ? el.textContent : null;
+})()`);
+assert(secondId !== null, "ArrowDown did not select a row");
+await key("Enter");
+await sleep(500);
+assert(!(await paletteOpen()), "Enter did not close the palette");
+// Esc로 닫고 열기 전 초점으로 돌아간다(컴퓨터).
+if (!phone) {
+  await evaluate(`(() => { const el = document.querySelector('button[aria-label="지난 대화 검색"]'); el.focus(); el.click(); })()`);
+  assert(await paletteOpen(), "Palette did not reopen");
+  await key("Escape");
+  await sleep(600);
+  assert(!(await paletteOpen()), "Escape did not close the palette");
+  assert(await evaluate<boolean>(`document.activeElement?.getAttribute('aria-label') === '지난 대화 검색'`), "Focus was not restored to the search icon");
+  // Cmd/Ctrl+K로 열고 다시 눌러 닫는다.
+  await key("k", modK);
+  assert(await paletteOpen(), "Cmd/Ctrl+K did not open the palette");
+  await key("k", modK);
+  await sleep(500);
+  assert(!(await paletteOpen()), "Cmd/Ctrl+K did not close the palette");
 }
 
-await assertEscapeClosed(true);
 await openBrain();
 
 await send("Emulation.setEmulatedMedia", {
@@ -193,12 +242,12 @@ const reduced = await evaluate<{ sheet: number; content: number }>(`(() => {
   };
   return {
     sheet: dur(document.querySelector('[data-brain-sheet]')),
-    content: dur(document.querySelector('#brain-tabpanel')),
+    content: dur(document.querySelector('.tab-in-r, .tab-in-l')),
   };
 })()`);
 assert(reduced.sheet <= 0.01 && reduced.content <= 0.01, `Reduced motion not respected: ${JSON.stringify(reduced)}`);
 await assertEscapeClosed(false);
 
 await close();
-console.log(`Agent Brain checks passed (${width}×${height})`);
+console.log(`Workspace checks passed (${width}×${height})`);
 process.exit(0);

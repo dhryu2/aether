@@ -1,11 +1,11 @@
-// 세션 내 찾기 바(Ctrl+K) — 활성 세션 대화(채팅)에서 텍스트 검색 → 매칭 메시지로 점프+플래시.
-//   Agent Brain 검색(전 세션 대상)과 별개로, "지금 이 세션" 안에서 빠르게 찾을 때 쓴다. 도구호출/결과는 제외(채팅만).
+// 세션 내 찾기 바(Cmd/Ctrl+F) — 활성 세션 대화(채팅)에서 텍스트 검색 → 매칭 메시지로 점프+플래시.
+//   검색 팝업(Cmd/Ctrl+K, 전 세션 대상)과 별개로, "지금 이 세션" 안에서 빠르게 찾을 때 쓴다. 도구호출/결과는 제외(채팅만).
 //
 //   ★ 검색 대상은 원본 이벤트가 아니라 **화면을 만드는 함수가 돌려준 목록**(buildStreamSegments의 searchable)이다.
 //     화면에 안 그려지는 말이 검색에 걸리면, 결과를 눌렀을 때 갈 곳이 없어 아무 일도 안 일어나거나 엉뚱한 곳으로
 //     튄다. 같은 출처를 쓰면 앞으로 렌더 규칙이 바뀌어도 둘이 어긋나지 않는다.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronUp, ChevronDown, X, Search } from 'lucide-react'
+import { ChevronUp, ChevronDown, X, TextSearch } from 'lucide-react'
 import { actions, chromeSessionId, focusedTurn, isSplit, useStore, type ConvoItem } from '../lib/store'
 import { useAutoFocus, useDismiss } from '../lib/hooks'
 import { useT } from '../lib/i18n'
@@ -101,7 +101,7 @@ export function FindBar({ pane }: { pane?: boolean }) {
           : { right: 'max(16px, env(safe-area-inset-right))', width: 'min(420px, calc(100vw - 340px))' }),
       }}
     >
-      <Search size={16} aria-hidden style={{ color: C.label3, flexShrink: 0 }} />
+      <TextSearch size={16} aria-hidden style={{ color: C.label3, flexShrink: 0 }} />
       <input
         ref={inputRef}
         value={q}

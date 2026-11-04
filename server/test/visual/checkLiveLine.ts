@@ -190,12 +190,12 @@ check(JSON.stringify(cut.order) === JSON.stringify(["user", "live", "tools", "li
 // ── 5. 찾기: 화면에 남는 말은 전부 걸리고, 걸린 결과는 그 자리로 점프한다 ──
 console.log("\n[5] 세션 내 찾기 (fixture-codex)");
 await open("fixture-codex");
-/** 찾기 바를 열고(이미 열려 있으면 그대로) 검색어를 넣는다 — Ctrl+K는 토글이라 두 번 누르면 닫힌다. */
+/** 찾기 바를 열고(이미 열려 있으면 그대로) 검색어를 넣는다 — Ctrl+F는 토글이라 두 번 누르면 닫힌다. */
 async function find(term: string) {
   const opened = await evaluate<boolean>(`(async () => {
     const bar = () => [...document.querySelectorAll('input')].find((n) => n.placeholder && n.getClientRects().length);
     if (!bar()) {
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, bubbles: true }));
       await new Promise((r) => setTimeout(r, 400));
     }
     const input = bar();

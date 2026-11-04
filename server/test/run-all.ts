@@ -46,6 +46,7 @@ const EXTRA_SUITES: { name: string; file: string }[] = [
   { name: "web:deriveTurn", file: path.join(TEST_DIR, "..", "..", "web", "test", "deriveTurn.test.ts") },
   { name: "web:modelLabel", file: path.join(TEST_DIR, "..", "..", "web", "test", "modelLabel.test.ts") },
   { name: "web:paneView", file: path.join(TEST_DIR, "..", "..", "web", "test", "paneView.test.ts") },
+  { name: "web:searchPalette", file: path.join(TEST_DIR, "..", "..", "web", "test", "searchPalette.test.ts") },
   { name: "web:contractVersion", file: path.join(TEST_DIR, "..", "..", "web", "test", "contractVersion.test.ts") },
   { name: "web:brief", file: path.join(TEST_DIR, "..", "..", "web", "test", "brief.test.ts") },
   { name: "web:streamSegments", file: path.join(TEST_DIR, "..", "..", "web", "test", "streamSegments.test.ts") },

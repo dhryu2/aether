@@ -1,4 +1,4 @@
-// Agent Brain 창. 컴퓨터는 왼쪽 유리 기둥, 폰은 위 섬과 아래 탭 막대.
+// 워크스페이스 창(코드 이름 brain). 컴퓨터는 왼쪽 유리 기둥, 폰은 위 섬과 아래 탭 막대. 탭이 하나뿐이면 탭 막대는 없다.
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKey, type RefObject } from 'react'
 import { ChevronLeft, X } from 'lucide-react'
 import markUrl from '../../assets/aether-chamding-mark.png'
@@ -13,7 +13,6 @@ import { BRAIN_TABS } from './brainTabList'
 import { BrainChrome } from './BrainChrome'
 import { useBrainChrome } from './useBrainChrome'
 import { HubView } from './HubView'
-import { SearchView } from './SearchView'
 import { projectLabel } from './helpers'
 
 const FOCUSABLE = 'button, a[href], input, select, textarea, [tabindex="0"]'
@@ -64,6 +63,7 @@ function BrainSheet({ openerRef, open, closing }: { openerRef: RefObject<HTMLEle
   const { back } = useBrainChrome()
   const narrow = s.isNarrow
   const tab = s.brainTab
+  const showTabs = BRAIN_TABS.length > 1
   const closeRef = useRef<HTMLButtonElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
   const scrollerRef = useRef<HTMLDivElement>(null)
@@ -158,7 +158,7 @@ function BrainSheet({ openerRef, open, closing }: { openerRef: RefObject<HTMLEle
           <div className="glass" style={{ width: 216, margin: 8, borderRadius: 16, display: 'flex', flexDirection: 'column', flexShrink: 0, padding: '14px 10px 12px' }}>
             <div className="flex items-center" style={{ gap: 8, padding: '2px 8px 14px' }}>{title}</div>
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-              <BrainTabs orientation="vertical" value={tab} onChange={actions.setBrainTab} />
+              {showTabs && <BrainTabs orientation="vertical" value={tab} onChange={actions.setBrainTab} />}
             </div>
             <div style={{ padding: '12px 8px 2px' }}>
               <div style={{ fontSize: 12.5, color: C.label3 }}>{t('brain.env.label')}</div>
@@ -176,21 +176,21 @@ function BrainSheet({ openerRef, open, closing }: { openerRef: RefObject<HTMLEle
             style={{
               flex: 1, minHeight: 0, overflow: 'auto',
               paddingTop: narrow ? 'calc(env(safe-area-inset-top) + 68px)' : 28,
-              paddingBottom: narrow ? 'calc(84px + env(safe-area-inset-bottom))' : 32,
+              paddingBottom: narrow ? (showTabs ? 'calc(84px + env(safe-area-inset-bottom))' : 'calc(16px + env(safe-area-inset-bottom))') : 32,
               paddingLeft: narrow ? 16 : 28,
               paddingRight: narrow ? 16 : 56,
             }}
           >
             <div style={{ maxWidth: narrow ? undefined : 720 }}>
               <PanelHead tab={tab} label={t(BRAIN_TABS.find((tb) => tb.id === tab)?.labelKey ?? 'brain.tabs.hub')} back={back} narrow={narrow} />
-              <div key={tab} className={dir} id="brain-tabpanel" role="tabpanel" aria-labelledby={`brain-tab-${tab}`}>
-                {tab === 'search' ? <SearchView /> : <HubView />}
+              <div key={tab} className={dir} {...(showTabs ? { id: 'brain-tabpanel', role: 'tabpanel', 'aria-labelledby': `brain-tab-${tab}` } : {})}>
+                <HubView />
               </div>
             </div>
           </div>
         </div>
 
-        {narrow && (
+        {narrow && showTabs && (
           <div className="glass brain-tabbar" data-brain-tabbar="" style={{ position: 'absolute', left: 12, right: 12, bottom: 'calc(8px + env(safe-area-inset-bottom))', height: 60, borderRadius: R.full, zIndex: 5, display: 'flex', padding: '0 6px' }}>
             <BrainTabs orientation="horizontal" value={tab} onChange={actions.setBrainTab} />
           </div>

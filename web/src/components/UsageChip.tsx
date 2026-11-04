@@ -7,7 +7,7 @@ import { C, R } from '../design/tokens'
 import { Meter, Skeleton } from './ui'
 import { ctxOf } from './ctxOf'
 
-/** 사용률이 이 값 이상이면 주황으로 바뀌고 넘기기 버튼이 보인다. */
+/** 사용률이 이 값 이상이면 주황으로 바뀐다. */
 export const CTX_WARN_PCT = 70
 
 // ctx 사용률 단계별 색상 — 100%에 가까울수록 경고(task6). 정상=회색 / 주의(70%+)=주황 / 경고(88%+)=빨강.
@@ -21,7 +21,7 @@ export function ctxTone(pct: number | null): { fill: string; text: string; track
 
 //   compact(폰 상단 도구 섬): "ctx" 낱말을 뺀다. 뜻은 title과 막대 모양으로 남긴다.
 //   막대는 컴퓨터보다 조금만 짧다. 24로 줄였을 때는 점처럼 보여 차오른 정도가 안 읽혔다(2026-10-06 사용자 지적).
-export function UsageChip({ items, loading, compact }: { items: ConvoItem[] | undefined; loading?: boolean; compact?: boolean }) {
+export function UsageChip({ items, loading, compact, hint }: { items: ConvoItem[] | undefined; loading?: boolean; compact?: boolean; hint?: string }) {
   const t = useT()
   // 초기 replay 중엔 ctx 이벤트가 과거 순서대로 흘러들어 %가 오르내림 → 스켈레톤으로 가리고 caught_up 후 최종값 표시.
   if (loading) {
@@ -44,7 +44,7 @@ export function UsageChip({ items, loading, compact }: { items: ConvoItem[] | un
     <span
       className="inline-flex items-center font-mono tabular-nums"
       style={{ fontSize: 11, color: tone.text, gap: 5 }}
-      title={title}
+      title={title + (hint ?? '')}
     >
       {!compact && <span style={{ color: tone.warn ? C.del : C.label2 }}>ctx</span>}
       {/* 경고일 때 숨쉬듯 깜빡이는 효과는 트랙이 아니라 채워진 부분에만 준다(가득 차지 않았을 때 빈 자리까지 깜빡이지 않게). */}

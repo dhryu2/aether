@@ -665,7 +665,7 @@ export function Composer({ sessionId }: { sessionId: string }) {
                   <PermissionPicker roomId={sessionId} direction="up" tight={chipsTight} />
                   {(paneW >= USAGE_MIN_W || (ctxOf(s.convos[execId]) ?? 0) >= CTX_WARN_PCT) && (
                     <span style={{ display: 'inline-flex', flexShrink: 0, padding: '0 6px' }}>
-                      <UsageHandoff roomId={sessionId} items={s.convos[execId]} loading={!!s.loadingConvo[execId]} compact direction="up" align="left" suggestion={paneW >= USAGE_MIN_W} />
+                      <UsageHandoff roomId={sessionId} items={s.convos[execId]} loading={!!s.loadingConvo[execId]} compact direction="up" align="left" />
                     </span>
                   )}
                 </>

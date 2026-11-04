@@ -507,10 +507,11 @@ a,
   -webkit-touch-callout: none;
   user-select: none;
 }
-/* 사용량 표시 자체가 넘기기 메뉴를 여는 버튼이다. 평소에는 표시처럼 보이고 올려야 면이 드러난다. */
+/* 사용량 표시 자체가 넘기기 메뉴를 여는 버튼이다. 화살표는 옆 칩과 같다. */
 .usage-menu-btn {
   display: inline-flex;
   align-items: center;
+  gap: 2px;
   height: 24px;
   padding: 0 4px;
   border: none;
@@ -518,28 +519,9 @@ a,
   background: transparent;
   cursor: pointer;
 }
-/* 사용률이 높을 때 사용량 표시 옆에 붙는 알약. 경고 색은 표시가 맡으므로 강조색은 쓰지 않는다. */
-.usage-handoff-btn {
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 10px;
-  border: none;
-  background: var(--c-fill);
-  color: var(--c-label);
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  flex-shrink: 0;
-  cursor: pointer;
-}
 @media (hover: hover) and (pointer: fine) {
   .usage-menu-btn:hover {
     background: var(--c-fill);
-  }
-  .usage-handoff-btn:hover {
-    background: var(--c-fill-hi);
   }
 }
 .response-copy-btn:hover {

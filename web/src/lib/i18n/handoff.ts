@@ -1,8 +1,9 @@
-// 새 세션으로 넘기기 문자열 — HandoffSheet.tsx, WorkMenu.tsx, PaneMenu.tsx, Sidebar.tsx, Composer.tsx, Bubbles.tsx, store.ts.
+// 새 세션으로 넘기기 문자열 — HandoffSheet.tsx, WorkMenu.tsx, PaneMenu.tsx, UsageHandoff.tsx, Sidebar.tsx, Composer.tsx, Bubbles.tsx, store.ts.
 import type { Dict } from './types'
 
 export const handoff: Dict = {
   // 메뉴
+  'handoff.usage.action': { ko: '넘기기', en: 'Hand off' },
   'handoff.menu.item': { ko: '새 세션으로 넘기기…', en: 'Hand off to a new session…' },
   'handoff.menu.busy': { ko: '작업 중이라 지금은 넘길 수 없어요', en: 'Working now, so it cannot be handed off yet' },
   'handoff.menu.inProgress': { ko: '이미 넘기는 중이에요', en: 'A handoff is already in progress' },

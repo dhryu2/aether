@@ -39,16 +39,3 @@ export function handoffTransition(prev: HandoffView | undefined, next: HandoffVi
   if (next.handoffState === 'writing') return null // 한도 대기가 끝났거나 질문에 답을 받아 다시 쓰는 중
   return next.handoffTo && next.handoffTo !== prev.handoffTo ? 'swap' : 'stopped'
 }
-
-/**
- * 넘기기 입구를 달 답변 말풍선의 위치. 턴이 끝났고 그 뒤에 사람이 보낸 말이 없을 때의 마지막 답변 하나뿐이다.
- * 없으면 -1. 도구 줄이나 안내가 답변 뒤에 와도 사람의 다음 말이 없으면 그 답변이 마지막이다.
- */
-export function lastAnswerIndex(segs: readonly { kind: string }[], turnOpen: boolean): number {
-  if (turnOpen) return -1
-  for (let i = segs.length - 1; i >= 0; i--) {
-    if (segs[i].kind === 'user') return -1
-    if (segs[i].kind === 'text') return i
-  }
-  return -1
-}

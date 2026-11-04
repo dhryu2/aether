@@ -96,7 +96,8 @@ test('넘기기 창이 아래 칸에서도 화면 안에 다 보인다', async (
   desktopOnly(info)
   await openFourPanes(page)
   for (const i of [0, 3]) {
-    await page.locator(`[data-split-pane="${i}"] .response-handoff-btn`).click()
+    await page.locator(`[data-split-pane="${i}"] [data-pane-menu-btn]`).click()
+    await page.locator(`[data-split-pane="${i}"] [data-session-opt="handoff"]`).click()
     const card = page.locator('[data-modal="handoff"]')
     await expect(card).toBeVisible()
     await expectInside(card, page.locator('.modal-scrim'))
@@ -104,6 +105,55 @@ test('넘기기 창이 아래 칸에서도 화면 안에 다 보인다', async (
     await page.keyboard.press('Escape')
     await expect(card).toBeHidden()
   }
+})
+
+test('넘기기는 답변이 아니라 사용량 표시에 있다', async ({ page }, info) => {
+  desktopOnly(info)
+  await openApp(page)
+  await createWork(page, `usage-${Date.now().toString(36)}`)
+  await page.getByPlaceholder(/메시지를 입력/).fill('CTX:높음')
+  await page.getByRole('button', { name: '전송', exact: true }).click()
+  await expect(page.locator('.bubble-assistant').last()).toBeVisible()
+  await expect(page.locator('.bubble-assistant').getByRole('button', { name: /넘기기/ })).toHaveCount(0)
+
+  const usage = page.locator('.top-bar [data-usage-menu-btn]')
+  const suggest = page.locator('.top-bar').getByRole('button', { name: '새 세션으로 넘기기', exact: true })
+  await expect(usage).toHaveAccessibleName('컨텍스트 사용률 80%')
+  await expect(suggest).toBeVisible()
+
+  await usage.click()
+  const item = page.locator('[data-usage-menu-btn] ~ .popover-surface [data-session-opt="handoff"]')
+  await expect(item).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(item).toBeHidden()
+  await expect(usage).toBeFocused()
+
+  await suggest.click()
+  const card = page.locator('[data-modal="handoff"]')
+  await expect(card).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(card).toBeHidden()
+
+  // 폰 폭에서도 제목과 버튼이 같이 들어가야 한다.
+  await page.setViewportSize({ width: 375, height: 800 })
+  await expect(suggest).toBeInViewport({ ratio: 1 })
+})
+
+test('좁은 칸에서도 사용량 메뉴가 잘리지 않는다', async ({ page }, info) => {
+  desktopOnly(info)
+  await openFourPanes(page)
+  const pane = page.locator('[data-split-pane="3"]')
+  await pane.getByPlaceholder(/메시지를 입력/).fill('CTX:높음')
+  await pane.getByRole('button', { name: '전송', exact: true }).click()
+  const usage = pane.locator('[data-usage-menu-btn]')
+  await expect(usage).toHaveAccessibleName('컨텍스트 사용률 80%')
+  // 글자 버튼을 더하면 칸 최소 폭에서 전송 버튼이 밀려 잘린다.
+  await expect(pane.getByRole('button', { name: '새 세션으로 넘기기', exact: true })).toHaveCount(0)
+  await pane.locator('.composer-box textarea').first().fill('글')
+  await expectInside(pane.getByRole('button', { name: '전송', exact: true }), pane)
+  await pane.locator('.composer-box textarea').first().fill('')
+  await usage.click()
+  await expectInside(pane.locator('[data-usage-menu-btn] ~ .popover-surface'), pane)
 })
 
 test('좁은 칸의 입력창은 글을 지워도 높아지지 않는다', async ({ page }, info) => {

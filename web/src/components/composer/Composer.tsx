@@ -29,7 +29,8 @@ import { reloadGuard } from '../../lib/contractReload'
 import { MAX_ATTACH, parseFiles, type Attachment } from '../../lib/attachments'
 import { buildSlashCmds, parseSlashCommand, withBriefAlias, type SlashCmd } from '../../lib/slashCommands'
 import { ctxOf } from '../ctxOf'
-import { UsageChip } from '../UsageChip'
+import { CTX_WARN_PCT } from '../UsageChip'
+import { UsageHandoff } from '../UsageHandoff'
 import { LimitChip } from './LimitChip'
 import { ModelPicker } from '../ModelPicker'
 import { EffortPicker } from '../EffortPicker'
@@ -57,7 +58,6 @@ const NO_TASKS: BackgroundTask[] = [] // 빈 목록을 렌더마다 새로 만�
 const CHIPS_TIGHT_W = 500
 /** 칸 폭이 이보다 좁으면 평소 사용량을 뺀다. 주황으로 바뀌는 경계(CTX_WARN_PCT)부터는 남긴다. */
 const USAGE_MIN_W = 600
-const CTX_WARN_PCT = 70
 /** 칸 높이가 이보다 낮으면 글 칸을 일찍 스크롤시킨다. 긴 글을 쓰는 동안에도 대화가 몇 줄은 보이게 하는 값이다. */
 const SHORT_PANE_H = 420
 const SHORT_PANE_TA = 88
@@ -665,7 +665,7 @@ export function Composer({ sessionId }: { sessionId: string }) {
                   <PermissionPicker roomId={sessionId} direction="up" tight={chipsTight} />
                   {(paneW >= USAGE_MIN_W || (ctxOf(s.convos[execId]) ?? 0) >= CTX_WARN_PCT) && (
                     <span style={{ display: 'inline-flex', flexShrink: 0, padding: '0 6px' }}>
-                      <UsageChip items={s.convos[execId]} loading={!!s.loadingConvo[execId]} compact />
+                      <UsageHandoff roomId={sessionId} items={s.convos[execId]} loading={!!s.loadingConvo[execId]} compact direction="up" align="left" suggestion={paneW >= USAGE_MIN_W} />
                     </span>
                   )}
                 </>

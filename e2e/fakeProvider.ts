@@ -50,6 +50,8 @@ function rawOf(ev: EventShape): E2eRaw | undefined {
 const codec: ProviderEventCodec = {
   provider: E2E_PROVIDER,
   normalize(ev: AetherEvent): AgentEvent[] {
+    // 실제 provider의 codec처럼 ctx 이벤트를 사용량 사건으로 바꾼다.
+    if (ev.kind === 'ctx') return buildAgentEvents(ev, E2E_PROVIDER, [{ type: 'usage_update', totalTokens: ev.totalTokens, maxTokens: ev.maxTokens }])
     const raw = rawOf(ev)
     if (!raw) return []
     if (raw.t === 'say') return buildAgentEvents(ev, E2E_PROVIDER, [{ type: 'text', text: raw.text ?? '' }])
@@ -92,6 +94,7 @@ class E2eRuntime implements AgentRuntime {
   model?: string
   effort?: SessionEffort
   permissionMode: PermissionMode
+  private ctxTokens = 10
 
   constructor(opts: RuntimeStartOptions) {
     this.opts = opts
@@ -123,6 +126,8 @@ class E2eRuntime implements AgentRuntime {
   push(input: NormalizedUserInput): void {
     const ticket = ++this.turn
     const text = input.text
+    // 사용량 경고 구간을 시험하는 말. 평소 값으로는 경고 화면을 볼 수 없다.
+    if (text.startsWith('CTX:')) this.ctxTokens = 800
     const brief = text.includes(BRIEF_SPLIT)
     void this.handle(text, ticket, brief).catch((err) => {
       console.error('[e2e] 입력 처리 실패:', err instanceof Error ? err.message : err)
@@ -240,7 +245,7 @@ class E2eRuntime implements AgentRuntime {
   }
 
   async contextUsage(): Promise<ContextUsage> {
-    return { totalTokens: 10, maxTokens: 1000 }
+    return { totalTokens: this.ctxTokens, maxTokens: 1000 }
   }
 
   async effectivePermissionPolicy(): Promise<PermissionPolicy> {

@@ -13,8 +13,6 @@ import { QuestionnaireCard, QuestionnairePendingCard } from '../QuestionnaireCar
 import { AuthExpiredBanner, CommandOperationBanner, NoticeBanner } from './Banners'
 import { AssistantBubble, ChoiceBubble, UserBubble } from './Bubbles'
 import { ResponseCopy, answerContextMenu } from './ResponseCopy'
-import { ResponseHandoff } from './ResponseHandoff'
-import { lastAnswerIndex } from '../../lib/handoff'
 import { PlanNote } from './PlanNote'
 import { ReasoningNote } from './ReasoningNote'
 import { ResultFooter } from './ResultFooter'
@@ -120,7 +118,6 @@ export function SegmentList({
   //   effect가 아니라 렌더 중에 고친다 — 한 번 움직인 뒤에 막으면 이미 늦다.
   const [base, setBase] = useState(() => quietBase(sessionId, segs))
   if (base.sessionId !== sessionId) setBase(quietBase(sessionId, segs))
-  const handoffAt = lastAnswerIndex(segs, !!running || !!waiting)
   return (
     <>
       {segs.map((seg, i) => {
@@ -129,12 +126,12 @@ export function SegmentList({
         const enter = sq > base.seq && !base.keys.has(seg.key) ? 'msg-in ' : ''
         if (seg.kind === 'text') {
           // 답이 흘러나오는 중(마지막 조각이 쓰이는 동안)에는 우클릭 메뉴를 만들지 않는다.
-          const menu = running && i === segs.length - 1 ? undefined : answerContextMenu(seg.text, sessionId, i === handoffAt)
+          const menu = running && i === segs.length - 1 ? undefined : answerContextMenu(seg.text)
           return (
             <div key={seg.key} data-seq={sq} data-seg="text" className={enter + 'self-start' + flash} style={{ display: 'contents' }}>
               <AssistantBubble onContextMenu={menu}>
                 <Markdown size={15.5}>{seg.text}</Markdown>
-                <ResponseCopy text={seg.text} menu={menu}>{i === handoffAt && <ResponseHandoff sessionId={sessionId} />}</ResponseCopy>
+                <ResponseCopy text={seg.text} menu={menu} />
               </AssistantBubble>
             </div>
           )

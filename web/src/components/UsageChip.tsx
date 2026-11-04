@@ -7,12 +7,15 @@ import { C, R } from '../design/tokens'
 import { Meter, Skeleton } from './ui'
 import { ctxOf } from './ctxOf'
 
+/** 사용률이 이 값 이상이면 주황으로 바뀌고 넘기기 버튼이 보인다. */
+export const CTX_WARN_PCT = 70
+
 // ctx 사용률 단계별 색상 — 100%에 가까울수록 경고(task6). 정상=회색 / 주의(70%+)=주황 / 경고(88%+)=빨강.
 //   정상일 때 시안을 쓰던 것을 회색으로 바꿨다 — 색은 신경 쓸 때만 켜지는 신호여야 해서다(감사 F5).
 export function ctxTone(pct: number | null): { fill: string; text: string; track: string; warn: boolean } {
   if (pct == null) return { fill: C.label3, text: C.label2, track: C.sep, warn: false }
   if (pct >= 88) return { fill: C.del, text: C.del, track: C.delSoft, warn: true }
-  if (pct >= 70) return { fill: C.attn, text: C.attn, track: C.attnSoft, warn: false }
+  if (pct >= CTX_WARN_PCT) return { fill: C.attn, text: C.attn, track: C.attnSoft, warn: false }
   return { fill: C.label3, text: C.label2, track: C.sep, warn: false }
 }
 

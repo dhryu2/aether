@@ -2,7 +2,7 @@
  * 새 세션으로 넘기기 화면 계산 테스트. 실행: npx tsx web/test/handoff.test.ts
  * 메뉴 상태, 앞뒤 모습으로 읽는 결과, 실시간 갱신 받아 들이기(옛 서버 모양 포함), 첫 말 조각.
  */
-import { handoffMenuState, handoffTransition, lastAnswerIndex } from '../src/lib/handoff'
+import { handoffMenuState, handoffTransition } from '../src/lib/handoff'
 import { parseAutoResume, parsePresenceSession, patchRoomFromPresence } from '../src/lib/attention'
 import { buildStreamSegments } from '../src/lib/streamSegments'
 import type { AetherEvent, WorkspaceRoom } from '../src/lib/types'
@@ -66,14 +66,6 @@ check('보통 말에는 없다', second?.kind === 'user' && !('handoffFrom' in s
 const local = build([{ seq: -1, ts: 1, kind: 'local_user', text: '임시', handoffFrom: 'prev' }])[0]
 check('보내는 순간의 임시 말에도 handoffFrom', local?.kind === 'user' && local.handoffFrom === 'prev', local)
 
-// 마지막 답변 아래 입구는 답변 하나에만
-const seq = (...kinds: string[]) => kinds.map((kind) => ({ kind }))
-check('턴이 끝나면 마지막 답변', lastAnswerIndex(seq('user', 'text', 'user', 'text'), false) === 3)
-check('이전 답변에는 달지 않는다', lastAnswerIndex(seq('text', 'text'), false) === 1)
-check('답변 뒤 도구 줄이 와도 그 답변', lastAnswerIndex(seq('user', 'text', 'tools'), false) === 1)
-check('턴이 도는 중에는 없다', lastAnswerIndex(seq('user', 'text'), true) === -1)
-check('사람의 다음 말이 뒤에 있으면 없다', lastAnswerIndex(seq('text', 'user'), false) === -1)
-check('답변이 없으면 없다', lastAnswerIndex(seq('user', 'tools'), false) === -1)
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} handoff: ${pass} PASS / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

@@ -507,25 +507,38 @@ a,
   -webkit-touch-callout: none;
   user-select: none;
 }
-/* 넘겨받은 쪽 카드의 버튼(HandoffCard)과 같은 알약. 가끔 쓰는 동작이라 강조색은 쓰지 않는다. */
-.response-handoff-btn {
-  position: relative;
-  height: 28px;
+/* 사용량 표시 자체가 넘기기 메뉴를 여는 버튼이다. 평소에는 표시처럼 보이고 올려야 면이 드러난다. */
+.usage-menu-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 12px;
+  height: 24px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+/* 사용률이 높을 때 사용량 표시 옆에 붙는 알약. 경고 색은 표시가 맡으므로 강조색은 쓰지 않는다. */
+.usage-handoff-btn {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
   border: none;
   background: var(--c-fill);
   color: var(--c-label);
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
+  flex-shrink: 0;
   cursor: pointer;
 }
 @media (hover: hover) and (pointer: fine) {
-  .response-handoff-btn:hover {
+  .usage-menu-btn:hover {
+    background: var(--c-fill);
+  }
+  .usage-handoff-btn:hover {
     background: var(--c-fill-hi);
   }
 }

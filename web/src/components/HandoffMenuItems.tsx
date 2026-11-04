@@ -1,4 +1,4 @@
-// 메뉴에 들어가는 「새 세션으로 넘기기」 묶음 — 작업 메뉴(WorkMenu)와 칸 머리 메뉴(PaneMenu)가 같이 쓴다.
+// 메뉴에 들어가는 「새 세션으로 넘기기」 묶음 — 작업 메뉴(WorkMenu), 칸 머리 메뉴(PaneMenu), 사용량 표시(UsageHandoff)가 같이 쓴다.
 //   항목 상태는 lib/handoff.ts가 정한다. 막힌 이유는 보관 항목처럼 항목 바로 밑에 글로 보인다.
 import { useId } from 'react'
 import { actions, useStore } from '../lib/store'

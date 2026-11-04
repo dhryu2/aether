@@ -16,7 +16,7 @@ import { useT } from '../lib/i18n'
 import { useDismiss } from '../lib/hooks'
 import { WaitAge } from './WaitAge'
 import { ConnectionIndicator } from './ConnectionIndicator'
-import { UsageChip } from './UsageChip'
+import { UsageHandoff } from './UsageHandoff'
 import { TodoChip } from './TodoChip'
 import { AutoResumeChip } from './AutoResumeChip'
 import { todoViewOf } from '../lib/todoView'
@@ -305,7 +305,7 @@ export function TopBar() {
             {s.isWide && active && <PermissionPicker />}
             {showUsage && (
               <span style={{ padding: narrow ? '0 6px 0 0' : '0 8px', display: 'inline-flex' }}>
-                <UsageChip items={convo} loading={loading} compact={narrow} />
+                <UsageHandoff roomId={roomId} items={convo} loading={loading} compact={narrow} />
               </span>
             )}
             <HandChip />

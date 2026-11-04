@@ -4,35 +4,28 @@
 //   길게 누르면 표식을 걷어 낸 보통 글로 옮긴다. 마우스 우클릭은 답변 메뉴(answerContextMenu)를 띄운다. 한때 이것이 따로 된 T 아이콘이었는데,
 //   아이콘만으로는 뜻이 안 읽혀서 버튼 하나로 합쳤다(2026-10-06 사용자 판단). 길게 누르기는 보내기 버튼과 같은 방식이다.
 //   클립보드를 못 쓰는 환경(보안이 아닌 주소)에서는 버튼을 그리지 않는다. 눌러도 안 되는 버튼은 함정이다.
-import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, type MouseEvent } from 'react'
 import { Check, Copy } from 'lucide-react'
-import { actions, getState } from '../../lib/store'
+import { getState } from '../../lib/store'
 import { useCopy } from '../../lib/hooks'
 import { markdownToPlain } from '../../lib/plainText'
 import { t as tNow, useT } from '../../lib/i18n'
-import { MenuItem } from '../WorkMenu'
 import { copyItem, menuOf, onContextMenuFor } from '../contextMenuFor'
-import { readyHandoffExecId } from './ResponseHandoff'
 
 /** 보내기 버튼(SendButton)의 길게 누르기와 같은 시간. */
 const LONG_PRESS_MS = 450
 
-/**
- * 끝난 답변의 우클릭 메뉴 — 답변 본문과 아래 복사 단추가 같은 메뉴를 쓴다(마우스에서만. 터치는 단추의 길게 누르기).
- * lastAnswer = 넘기기 단추가 붙는 마지막 답변. 지금 넘길 수 있을 때만 「다음 작업으로 넘기기」가 든다.
- */
-export function answerContextMenu(text: string, sessionId: string, lastAnswer: boolean) {
-  return onContextMenuFor(() => {
-    const exec = lastAnswer ? readyHandoffExecId(getState().rooms, sessionId) : null
-    return menuOf(
+/** 끝난 답변의 우클릭 메뉴 — 답변 본문과 아래 복사 단추가 같은 메뉴를 쓴다(마우스에서만. 터치는 단추의 길게 누르기). */
+export function answerContextMenu(text: string) {
+  return onContextMenuFor(() =>
+    menuOf(
       copyItem(text, tNow('menu.copyAnswer')),
       copyItem(markdownToPlain(text), tNow('menu.copyAnswerPlain')),
-      exec && <MenuItem onClick={() => actions.openHandoff(exec)}>{tNow('handoff.menu.item')}</MenuItem>,
-    )
-  })
+    ),
+  )
 }
 
-export function ResponseCopy({ text, menu, children }: { text: string; menu?: (e: MouseEvent<HTMLElement>) => void; children?: ReactNode }) {
+export function ResponseCopy({ text, menu }: { text: string; menu?: (e: MouseEvent<HTMLElement>) => void }) {
   const t = useT()
   const raw = useCopy()
   const plain = useCopy()
@@ -46,13 +39,13 @@ export function ResponseCopy({ text, menu, children }: { text: string; menu?: (e
   }
   useEffect(() => clearTimer, [])
   const canCopy = typeof navigator !== 'undefined' && !!navigator.clipboard && text.trim() !== ''
-  if (!canCopy && !children) return null
+  if (!canCopy) return null
   const copyPlain = () => plain.copy(markdownToPlain(text))
   const copied = raw.copied || plain.copied
   const tip = plain.copied ? t('stream.copiedPlain') : raw.copied ? t('stream.copied') : t('stream.copyHint')
   return (
     <div className="response-copy">
-      {canCopy && <button
+      <button
         type="button"
         className="response-copy-btn hit-44"
         data-copied={copied ? 'true' : undefined}
@@ -91,8 +84,7 @@ export function ResponseCopy({ text, menu, children }: { text: string; menu?: (e
         <span className="response-copy-tip" aria-hidden="true">
           {tip}
         </span>
-      </button>}
-      {children}
+      </button>
     </div>
   )
 }

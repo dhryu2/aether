@@ -142,7 +142,7 @@ export type QuestionnaireView = {
  *  - 성공 질문지의 `(sourceSeq, sourcePart)` 글: 마지막 상자를 지운다(카드는 그 글 뒤에 둔다).
  *  - 실패 질문지의 원문 글: 그대로 보인다.
  *  - 그 밖에 진행 중인 턴(마지막 사람 말 뒤, 턴 끝 전)의 글: 상자를 자리 표시로 바꾼다.
- *  - 나머지(끝난 턴의 글, 일반 세션의 상자): 원문 그대로.
+ *  - 나머지(끝난 턴의 글, 질문지 사건이 없는 옛 글): 원문 그대로.
  */
 export function questionnaireView(items: readonly ConvoItem[]): QuestionnaireView {
   const sources = new Map<string, boolean>()

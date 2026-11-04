@@ -1365,11 +1365,11 @@ class SessionManager {
     };
   }
 
-  /** 질문 대기 작업을 버린다. 열려 있던 질문지에는 더 답할 수 없게 질문지 판독도 끈다. */
+  /** 질문 대기 작업을 버린다. 열려 있던 질문지에는 더 답할 수 없게 닫는다. */
   private dropAskingHandoff(id: string) {
     this.unwatchHandoff(id);
     this.writeHandoff(id, { handoffJob: undefined });
-    this.sessions.get(id)?.setBriefOpen(false);
+    this.sessions.get(id)?.dismissQuestionnaire();
   }
 
   /** 질문 대기나 한도 대기를 취소하거나 복사 결과를 지운다. 쓰는 중이면 "busy"(멈추려면 멈추기 버튼). */

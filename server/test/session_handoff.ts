@@ -816,6 +816,12 @@ console.log("\n=== 질문 대기: 예외 경로 ===");
       eq("취소하면 질문지 판독이 꺼진다", store.loadMeta(live.id)?.briefOpen, undefined);
       const r = await live.submitQuestionnaireAnswer({ questionnaireId: q!.id, answers: { q1: { chosen: ["A"] } }, clientMessageId: "after-cancel", resendOnDuplicate: false });
       check(!r.ok && r.status === 409, "취소 뒤 그 카드에 답하면 409다", r);
+      await live.push("다른 말");
+      ask(rt);
+      await waitUntil(() => userMsgs(live.id).length > 0 && !live.hasPendingInput);
+      const next = await live.openQuestionnaire();
+      const again = await live.submitQuestionnaireAnswer({ questionnaireId: next!.id, answers: { q1: { chosen: ["A"] } }, clientMessageId: "after-new", resendOnDuplicate: false });
+      check(again.ok, "취소 뒤 새로 나온 카드에는 답할 수 있다", again);
     } finally {
       mock.mockState.manualReply = false;
       cleanup(live.id);

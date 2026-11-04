@@ -211,4 +211,6 @@ export type SessionMeta = {
   commandCatalog?: SlashCommandInfo[];
   /** 브리프 대화가 진행 중인 세션. 질문지 없이 끝난 턴에서 지운다. */
   briefOpen?: true;
+  /** 넘기기를 취소해서 지금 열린 질문지에 더 답할 수 없다. 새 질문지가 나오면 지운다. */
+  questionnaireDismissed?: true;
 };

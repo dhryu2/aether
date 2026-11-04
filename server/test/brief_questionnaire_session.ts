@@ -321,7 +321,8 @@ async function main(): Promise<void> {
       say(r, box("일반"));
       done(r);
       await sync(r);
-      check(qevs(r).length === 2, tag("브리프 대화가 끝난 뒤의 상자는 질문지가 되지 않는다"), qevs(r).length);
+      check(qevs(r).length === 3, tag("브리프 대화가 끝난 뒤의 상자도 질문지가 된다"), qevs(r).length);
+      check(store.loadMeta(r.s.id)?.briefOpen === undefined, tag("상자가 와도 꺼진 브리프 대화를 다시 켜지 않는다"));
 
       const bad = mk();
       await brief(bad, "틀린 상자 요청", "bad-1");
@@ -353,7 +354,10 @@ async function main(): Promise<void> {
       say(r, box("일반"));
       done(r);
       await sync(r);
-      check(qevs(r).length === 0, tag("일반 세션은 상자가 있어도 질문지가 없다"));
+      check(qevs(r).length === 1, tag("브리프를 쓰지 않은 세션의 상자도 질문지가 된다"), qevs(r).length);
+      const q = qevs(r)[0];
+      const answered = await r.s.submitQuestionnaireAnswer({ questionnaireId: q.id, answers: ANS, clientMessageId: "plain-card", resendOnDuplicate: false });
+      check(answered.ok, tag("브리프를 쓰지 않은 세션의 카드에도 답할 수 있다"), answered);
     }
     {
       const r = mk();

@@ -320,6 +320,8 @@ export class LiveSession {
   private openTurns = 0;
   /** 이번 턴에서 본 마지막 모델 글. 턴 끝에서 질문지 상자를 찾는 후보다. */
   private textCandidate: { seq: number; part: number; text: string } | null = null;
+  /** 넘기기를 취소해서 지금 열린 질문지에 더 답할 수 없다. 새 질문지가 나오면 지운다. */
+  private questionnaireDismissed = false;
   /** 세션별 입력 문. 앞 구간이 아직 안 끝났을 때만 약속이 있다. */
   private inputGate: Promise<void> | null = null;
   /** endsTurn 이후 ctx ingest(또는 실패) 대기. waitCtx가 소비한다. */
@@ -415,6 +417,7 @@ export class LiveSession {
     // 인계서를 쓰던 턴은 재시작으로 끊겼다. 한도 대기와 복사 결과만 남긴다.
     this.handoffJob = prevMeta?.handoffJob?.state === "writing" ? undefined : prevMeta?.handoffJob;
     this.briefOpen = prevMeta?.briefOpen === true;
+    this.questionnaireDismissed = prevMeta?.questionnaireDismissed === true;
 
     // 영속 축소기는 이벤트 간 상태를 들 수 있다(Claude: 시크릿 파일 Read의 tool_use id). 재시작 뒤 그 상태를
     // 되살리지 않으면 Read 직후 서버가 죽었을 때 다음 tool_result가 평문으로 저장될 수 있다. 최근 꼬리만
@@ -607,6 +610,13 @@ export class LiveSession {
     this.persistMeta("브리프 세션");
   }
 
+  /** 지금 열린 질문지를 닫는다. 더 답할 수 없고 질문 도구는 다시 카드를 만든다. */
+  dismissQuestionnaire() {
+    this.briefOpen = false;
+    this.questionnaireDismissed = true;
+    this.persistMeta("브리프 세션");
+  }
+
   /** 입력 문 안에서 도는 push 본체. */
   private pushInGate(
     text: string,
@@ -685,7 +695,7 @@ export class LiveSession {
       return { ok: true };
     }
     const open = await this.openQuestionnaire();
-    if (!open || open.id !== opts.questionnaireId || !this.briefOpen) {
+    if (!open || open.id !== opts.questionnaireId || this.questionnaireDismissed) {
       return { ok: false, status: 409, error: st("routes.sessions.questionnaire.notOpen") };
     }
     const checked = validateQuestionnaireAnswers(open.questions, answers);
@@ -824,6 +834,7 @@ export class LiveSession {
       reseedText: this.reseedText,
       rewound: this.rewound || undefined,
       briefOpen: this.briefOpen || undefined,
+      questionnaireDismissed: this.questionnaireDismissed || undefined,
       ...(this.commandCatalog ? { commandCatalog: this.commandCatalog } : {}),
     };
   }
@@ -1748,7 +1759,7 @@ export class LiveSession {
           this.turnOpen = false;
         }
         const ingested = this.ingest(ev);
-        if (ingested && !endsTurn && this.briefOpen) this.noteTextCandidate(ingested);
+        if (ingested && !endsTurn) this.noteTextCandidate(ingested);
         // 스트림이 알려 준 실제 모델은 계정 기본값과 다를 수 있다. 목록 카드는 이 값을 우선한다.
         if (ingested) this.noteObservedModel(ingested);
         // 인증 만료는 **모든 이벤트에서** 확인한다. 턴이 끝날 때만 보면, 만료를 별도 오류 알림으로 먼저
@@ -1795,7 +1806,7 @@ export class LiveSession {
   }
 
   /**
-   * 턴 끝에서 질문지를 읽어 사건으로 남긴다. 브리프 대화 중이고, 후보가 마지막 사람 입력 뒤의 글이고,
+   * 턴 끝에서 질문지를 읽어 사건으로 남긴다. 브리프 여부는 보지 않는다. 후보가 마지막 사람 입력 뒤의 글이고,
    * 이 턴 말고 기다리는 입력이 없을 때(openTurns가 1 이하)만 만든다. 0은 사람 입력 없이 이어진 턴이다.
    * 후보 지우기와 계수기 감소도 여기서 한다. 형식이 틀린 상자도 물은 것으로 본다.
    * 상자 없는 턴은 사람 입력에 답을 마친 턴일 때만 브리프 대화를 끝낸다. 뒤에서 도는 작업을 기다리며 멈춘 턴,
@@ -1806,13 +1817,14 @@ export class LiveSession {
     const open = this.openTurns;
     this.textCandidate = null;
     this.openTurns = Math.max(0, open - 1);
-    if (!this.briefOpen || open > 1) return;
+    if (open > 1) return;
     const stale = !!candidate && candidate.seq <= this.lastUserMsgSeq;
     const block = candidate && !stale ? findQuestionnaireBlock(candidate.text) : null;
     if (!candidate || block === null) {
-      if (open === 1 && !stale && this.bgTasks.length === 0) this.briefOpen = false; // 메타 저장은 같은 턴 끝의 persistMeta가 한다
+      if (this.briefOpen && open === 1 && !stale && this.bgTasks.length === 0) this.briefOpen = false; // 메타 저장은 같은 턴 끝의 persistMeta가 한다
       return;
     }
+    this.questionnaireDismissed = false; // 메타 저장은 같은 턴 끝의 persistMeta가 한다
     const parsed = parseQuestionnaire(block);
     const base = { kind: "questionnaire" as const, id: randomUUID(), sourceSeq: candidate.seq, sourcePart: candidate.part };
     const saved = this.ingest(parsed.ok ? { ...base, questions: parsed.questions } : { ...base, invalid: true, error: parsed.error });

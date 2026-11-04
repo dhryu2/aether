@@ -116,13 +116,13 @@ check(!leftover.trim(), "폐기 후 aether/ 브랜치도 지운다", leftover);
 
 {
   const iso2 = prepareIsolatedWorkspace(source, "sess-iso-2", "반영표시");
-  const clean = workspaceCopyState(iso2.cwd, source);
+  const clean = await workspaceCopyState(iso2.cwd, source);
   check(clean.needsApply === false && clean.applyBlocked === false, "깨끗한 복사본은 반영 필요가 없다", clean);
   fs.writeFileSync(path.join(iso2.cwd, "pending.txt"), "PENDING");
-  const dirtyCopy = workspaceCopyState(iso2.cwd, source);
+  const dirtyCopy = await workspaceCopyState(iso2.cwd, source);
   check(dirtyCopy.needsApply === true, "복사본이 더러우면 반영 필요", dirtyCopy);
   fs.writeFileSync(path.join(source, "source-dirty.txt"), "SRC");
-  const both = workspaceCopyState(iso2.cwd, source);
+  const both = await workspaceCopyState(iso2.cwd, source);
   check(both.needsApply === true && both.applyBlocked === true, "원 폴더가 더러우면 반영 거절과 복사본 dirty를 가른다", both);
   fs.rmSync(path.join(source, "source-dirty.txt"));
   check(isLinkedWorktree(iso2.cwd) === true, "복사본은 연결 작업 트리이다");
@@ -211,7 +211,7 @@ check(!leftover.trim(), "폐기 후 aether/ 브랜치도 지운다", leftover);
   sessionManager.restoreFromDisk();
   const dirtyBranch = git(["rev-parse", "--abbrev-ref", "HEAD"], dirtyIso.cwd);
   fs.writeFileSync(path.join(source, "blocked.txt"), "BLOCK");
-  const dirtyRow = sessionManager.list().find((s) => s.id === dirtyId);
+  const dirtyRow = (await sessionManager.listWithCopyState()).find((s) => s.id === dirtyId);
   check(dirtyRow?.needsApply === true, "목록에 복사본 반영 필요가 실린다", dirtyRow);
   check(dirtyRow?.applyBlocked === true, "원 폴더가 더러우면 반영이 막힌다", dirtyRow);
   let applyBlocked = false;
@@ -266,7 +266,7 @@ check(!leftover.trim(), "폐기 후 aether/ 브랜치도 지운다", leftover);
     try { discardIsolatedWorkspace(kept.cwd, source); } catch (e) { discardErr = e; }
     check(discardErr instanceof Error && discardErr.message === st("notice.workspace.gitCheckFailed"), "상태를 못 읽으면 강제가 아닌 버리기는 거부된다", String(discardErr));
     check(fs.existsSync(path.join(kept.cwd, "kept.txt")), "거부된 버리기 뒤에도 복사본이 남는다");
-    check(workspaceCopyState(kept.cwd, source).applyBlocked === true, "상태를 못 읽으면 applyBlocked는 true다");
+    check((await workspaceCopyState(kept.cwd, source)).applyBlocked === true, "상태를 못 읽으면 applyBlocked는 true다");
   } finally {
     process.env.PATH = originalPath;
     fs.rmSync(emptyBin, { recursive: true, force: true });

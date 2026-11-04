@@ -23,7 +23,7 @@ function copy(rel: string, root: string) {
 
 // 임시 저장소 모양: web/(vite.config 사본 + 최소 소스 + node_modules 링크), server/observability, shared/agentEvent.ts
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "aether-wbr-"));
-for (const f of ["web/vite.config.ts", "web/package.json", "server/observability/webBuildHash.ts", "server/observability/release.ts", "shared/agentEvent.ts"]) copy(f, root);
+for (const f of ["web/vite.config.ts", "web/package.json", "server/observability/webBuildHash.ts", "server/observability/release.ts", "server/providers/modelEnv.ts", "shared/agentEvent.ts"]) copy(f, root);
 fs.symlinkSync(path.join(REPO, "web", "node_modules"), path.join(root, "web", "node_modules"));
 fs.mkdirSync(path.join(root, "web", "src"), { recursive: true });
 fs.writeFileSync(path.join(root, "web", "index.html"), '<!doctype html><html><body><script type="module" src="/src/main.ts"></script></body></html>');

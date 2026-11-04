@@ -8,14 +8,17 @@ import { classifyError } from "../observability/event";
  *
  * 경로는 원 저장소 밖이어야 한다. 저장소 안에 만들면 git이 거절한다.
  */
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { promisify } from "node:util";
 import { config } from "../config";
 import { st } from "../i18n";
+import { modelEnv } from "../providers/modelEnv";
 import type { IsolatedWorkspace } from "../providers/types";
 
 const failures = new FailureTracker();
+const execFileP = promisify(execFile);
 
 /** 작업 복사본을 만들거나 다룰 수 없는 사정. 문구는 경로나 git 출력 없이 사용자에게 그대로 보여도 된다. */
 export class WorkspaceCopyError extends Error {
@@ -46,14 +49,76 @@ function isolatedPath(sessionId: string): string {
   return path.join(worktreeRoot(), sessionId);
 }
 
-function git(args: string[], cwd: string): string {
-  return execFileSync("git", args, { cwd, encoding: "utf8", timeout: 60_000 }).trim();
+/**
+ * 받은 폴더의 .git 설정(훅·fsmonitor·필터)이 허브의 git 호출에서 실행되지 않게 하는 고정 설정.
+ * aether.guard는 환경변수 설정이 실제로 먹는지 확인하는 표식이다.
+ */
+const GUARD_PAIRS: [string, string][] = [
+  ["aether.guard", "1"],
+  ["core.fsmonitor", "false"],
+  ["core.hooksPath", "/dev/null"],
+  ["safe.bareRepository", "explicit"],
+];
+
+/** 허브 비밀을 뺀 환경에 보호 설정을 실어 돌려준다. git -c는 이름에 =가 든 필터를 못 비우므로 환경변수 쌍(git 2.31 이상)을 쓴다. */
+function guardEnv(extra: [string, string][] = []): NodeJS.ProcessEnv {
+  const env = modelEnv();
+  const pairs = [...GUARD_PAIRS, ...extra];
+  env.GIT_ALLOW_PROTOCOL = "none"; // 저장소 설정의 protocol.<이름>.allow보다 우선한다. 지연 가져오기와 원격 도우미를 막는다.
+  env.GIT_CONFIG_COUNT = String(pairs.length);
+  pairs.forEach(([k, v], i) => { env[`GIT_CONFIG_KEY_${i}`] = k; env[`GIT_CONFIG_VALUE_${i}`] = v; });
+  return env;
+}
+
+const FILTER_LIST_ARGS = ["config", "--includes", "--show-scope", "--name-only", "--null", "--list"];
+
+/** 필터 목록 출력에서 비울 필터 설정을 뽑아 보호 환경을 만든다. 보호가 실제로 먹지 않으면(옛 git) 던진다. */
+function guardedEnvFrom(stdout: Buffer): NodeJS.ProcessEnv {
+  const f = new TextDecoder("utf-8", { fatal: true }).decode(stdout).split("\0").filter(Boolean);
+  let guarded = false;
+  const pairs: [string, string][] = [];
+  for (let i = 0; i + 1 < f.length; i += 2) {
+    const [scope, key] = [f[i], f[i + 1]];
+    if (key !== "aether.guard" && !key.startsWith("filter.")) continue; // 정규식 대신 전체 목록에서 거른다(UTF-8이 아닌 이름을 놓치지 않으려고)
+    if (scope === "command" && key === "aether.guard") guarded = true;
+    if (!key.startsWith("filter.")) continue;
+    if (scope === "global" || scope === "system") continue; // 사용자가 직접 켠 lfs 같은 필터는 둔다
+    const name = key.split(".").slice(1, -1).join(".");
+    for (const k of ["clean", "smudge", "process"]) pairs.push([`filter.${name}.${k}`, ""]);
+  }
+  if (!guarded) throw new Error("git environment config not applied");
+  return guardEnv(pairs);
+}
+
+/** cwd 기준으로 폴더의 필터 설정을 읽어, 그 필터를 비운 보호 환경을 만든다. */
+function gitEnv(cwd: string): NodeJS.ProcessEnv {
+  const listed = gitBytes(FILTER_LIST_ARGS, cwd, guardEnv(), { timeout: 15_000 });
+  if (listed.status !== 0) throw new Error("git config failed");
+  return guardedEnvFrom(listed.stdout);
+}
+
+/** 바이트 그대로 받는 git 실행. 실행 자체의 실패(없음·시간 초과·버퍼 초과)는 던진다. */
+function gitBytes(args: string[], cwd: string, env: NodeJS.ProcessEnv, opts: { input?: string; maxBuffer?: number; timeout?: number } = {}) {
+  const r = spawnSync("git", args, { cwd, env, input: opts.input, maxBuffer: opts.maxBuffer, timeout: opts.timeout ?? 60_000 });
+  if (r.error) throw r.error;
+  return r;
+}
+
+/** gitEnv의 비동기판. 읽기 경로(목록)가 이벤트 루프를 막지 않게 한다. */
+async function gitEnvAsync(cwd: string): Promise<NodeJS.ProcessEnv> {
+  const { stdout } = await execFileP("git", FILTER_LIST_ARGS, { cwd, timeout: 15_000, env: guardEnv(), encoding: "buffer" });
+  return guardedEnvFrom(stdout);
+}
+
+// configCwd: 조건부 include는 위치에 따라 달라지므로 필터가 실제로 도는 폴더 기준으로 목록을 읽는다.
+function git(args: string[], cwd: string, configCwd = cwd): string {
+  return execFileSync("git", args, { cwd, encoding: "utf8", timeout: 60_000, env: gitEnv(configCwd) }).trim();
 }
 
 /** git 저장소 상태. git 프로그램이 없는 것(no_git)과 저장소가 아닌 것(not_repo)을 구분한다. */
 function gitRepoState(cwd: string): "repo" | "not_repo" | "no_git" {
   try {
-    execFileSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd, encoding: "utf8", timeout: 15_000, stdio: ["ignore", "pipe", "ignore"] });
+    execFileSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd, encoding: "utf8", timeout: 15_000, stdio: ["ignore", "pipe", "ignore"], env: guardEnv() });
     return "repo";
   } catch (error) {
     // Git 저장소 여부를 탐지하는 정상 경로다.
@@ -65,12 +130,35 @@ export function isGitRepo(cwd: string): boolean {
   return gitRepoState(cwd) === "repo";
 }
 
+/** isGitRepo의 비동기판. 폴더 목록 응답이 이벤트 루프를 막지 않게 한다. */
+export async function isGitRepoAsync(cwd: string): Promise<boolean> {
+  try {
+    await execFileP("git", ["rev-parse", "--is-inside-work-tree"], { cwd, timeout: 15_000, env: guardEnv() });
+    return true;
+  } catch {
+    // Git 저장소 여부를 탐지하는 정상 경로다.
+    return false;
+  }
+}
+
 /** 변경 목록. null은 확인에 실패했다는 뜻이다. 호출하는 쪽이 막는 쪽으로 처리한다. */
 function porcelain(cwd: string): string | null {
   try {
-    const status = git(["status", "--porcelain"], cwd);
+    const status = git(["status", "--porcelain", "--ignore-submodules=dirty"], cwd);
     failures.clear(`status:${cwd}`);
     return status;
+  } catch (error) {
+    failures.report(error, { component: "session", operation: "session.workspace.inspect", severity: "warning" }, `status:${cwd}`);
+    return null;
+  }
+}
+
+/** porcelain의 비동기판. 실패 기록 키와 의미는 같다. */
+async function porcelainAsync(cwd: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileP("git", ["status", "--porcelain", "--ignore-submodules=dirty"], { cwd, encoding: "utf8", timeout: 60_000, env: await gitEnvAsync(cwd) });
+    failures.clear(`status:${cwd}`);
+    return stdout.trim();
   } catch (error) {
     failures.report(error, { component: "session", operation: "session.workspace.inspect", severity: "warning" }, `status:${cwd}`);
     return null;
@@ -110,12 +198,12 @@ function samePath(a: string, b: string): boolean {
 }
 
 /** 복사본·원 폴더에 아직 반영하지 않은 변경이 있는지. git 명령 이름은 밖으로 나가지 않는다. */
-export function workspaceCopyState(cwd: string, workspaceSource: string): { needsApply: boolean; applyBlocked: boolean } {
+export async function workspaceCopyState(cwd: string, workspaceSource: string): Promise<{ needsApply: boolean; applyBlocked: boolean }> {
   const copyReady = isolatedWorkspaceExists(cwd) && isLinkedWorktree(cwd) && !samePath(cwd, workspaceSource);
   return {
     // 상태를 모르면(null) 변경이 있다고 본다. 모르면 막는 쪽이 안전하다.
-    needsApply: copyReady && (porcelain(cwd)?.length ?? 1) > 0,
-    applyBlocked: fs.existsSync(workspaceSource) && (porcelain(workspaceSource)?.length ?? 1) > 0,
+    needsApply: copyReady && ((await porcelainAsync(cwd))?.length ?? 1) > 0,
+    applyBlocked: fs.existsSync(workspaceSource) && ((await porcelainAsync(workspaceSource))?.length ?? 1) > 0,
   };
 }
 
@@ -142,11 +230,86 @@ export function prepareIsolatedWorkspace(sourceCwd: string, sessionId: string, n
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const branch = branchNameForWork(sessionId, name);
   try {
-    git(["worktree", "add", "-b", branch, dest], sourceCwd);
+    let hasHead = true;
+    try { git(["rev-parse", "--verify", "-q", "HEAD"], sourceCwd); } catch { hasHead = false; }
+    if (hasHead) {
+      git(["worktree", "add", "--no-checkout", "-b", branch, dest], sourceCwd);
+      git(["reset", "--hard", "-q", "--no-recurse-submodules"], dest); // 체크아웃은 새 복사본 기준의 필터 목록으로 한다
+    } else {
+      git(["worktree", "add", "-b", branch, dest], sourceCwd); // 커밋이 없으면 --no-checkout과 --orphan이 충돌한다. 체크아웃할 파일도 없다.
+    }
   } catch (e) {
+    try { git(["worktree", "remove", "--force", dest], sourceCwd); git(["branch", "-D", branch], sourceCwd); } catch { /* 첫 명령이 실패했으면 치울 것이 없다 */ }
     throw new Error(st("notice.workspace.createFailed") + `: ${String((e as Error)?.message ?? e).slice(0, 200)}`);
   }
   return { cwd: fs.realpathSync(dest), workspaceSource: sourceCwd };
+}
+
+const APPLY_LIST_MAX = 64 * 1024 * 1024;
+const utf8 = new TextDecoder("utf-8", { fatal: true }); // UTF-8이 아닌 이름은 조용히 건너뛰지 않고 반영을 멈춘다
+
+/** git이 내놓은 상대 경로를 구간으로 나눈다. 윈도우에서는 \\도 구분자로 본다(가짜 색인의 .git\\config 같은 경로를 놓치지 않으려고). */
+export function splitListedPath(rel: string, win32 = process.platform === "win32"): string[] {
+  return win32 ? rel.split(/[\\/]/) : rel.split("/");
+}
+
+const hasGitSegment = (p: string) => p.split(/[\\/]/).some((seg) => seg.toLowerCase() === ".git");
+
+/** root부터 rel을 따라 내려가며 중간이 디렉터리가 아니거나(링크 포함) .git과 같은 항목이면 던진다. */
+function assertPlainPath(root: string, rel: string, gitStat?: fs.Stats | undefined): void {
+  const segs = splitListedPath(rel).filter(Boolean);
+  let p = root;
+  for (let i = 0; i < segs.length; i++) {
+    p = path.join(p, segs[i]);
+    const s = fs.lstatSync(p, { throwIfNoEntry: false });
+    if (!s) return;
+    if (gitStat && s.dev === gitStat.dev && s.ino === gitStat.ino) throw new Error(rel); // 윈도우의 git~1 같은 별칭까지 막는다
+    if (i < segs.length - 1 && !s.isDirectory()) throw new Error(rel);
+  }
+}
+
+/**
+ * 복사본에서 원 폴더로 옮길 [원본, 대상] 쌍을 모두 검사한 뒤 돌려준다. 하나라도 어긋나면 아무것도 쓰기 전에 던진다.
+ * 후보는 복사본의 git 목록(추적+미추적, 무시 제외)이고, 무시 판정은 원 폴더 기준이다.
+ * 복사본의 .gitignore·색인은 복사본 안의 모델이 바꿀 수 있어 판정에 쓰지 않는다.
+ */
+function collectApplyTargets(cwd: string, workspaceSource: string): [string, string][] {
+  const listing = gitBytes(["ls-files", "-z", "-c", "-o", "--exclude-standard"], cwd, gitEnv(cwd), { maxBuffer: APPLY_LIST_MAX });
+  if (listing.status !== 0) throw new Error("git ls-files failed");
+  const listed = utf8.decode(listing.stdout).split("\0").filter(Boolean).filter((rel) => {
+    const segs = splitListedPath(rel);
+    if (segs.includes("..")) throw new Error(rel); // 복사본 .git이 가짜 gitdir로 바뀌었으면 색인 내용도 믿을 수 없다
+    return !segs.some((seg) => seg.toLowerCase() === ".git");
+  });
+  const checked = gitBytes(["check-ignore", "-z", "--stdin"], workspaceSource, gitEnv(workspaceSource), { input: listed.map((r) => r + "\0").join(""), maxBuffer: APPLY_LIST_MAX });
+  if (checked.status !== 0 && checked.status !== 1) throw new Error(`git check-ignore failed: ${checked.stderr.toString().trim().slice(0, 80)}`);
+  const ignored = new Set(utf8.decode(checked.stdout).split("\0").filter(Boolean));
+  const gitStat = fs.lstatSync(path.join(workspaceSource, ".git"), { throwIfNoEntry: false });
+  const todo: [string, string][] = [];
+  for (const rel of listed) {
+    if (ignored.has(rel)) continue;
+    assertPlainPath(cwd, rel);
+    assertPlainPath(workspaceSource, rel, gitStat);
+    const from = path.join(cwd, rel);
+    const to = path.join(workspaceSource, rel);
+    const f = fs.lstatSync(from, { throwIfNoEntry: false });
+    if (!f) continue; // 복사본에서 지운 파일
+    if (f.isDirectory()) { // 서브모듈 자리: 복사본은 비운 채 만들어지므로 비어 있어야 정상이다
+      if (fs.readdirSync(from).length) throw new Error(rel);
+      continue;
+    }
+    const t = fs.lstatSync(to, { throwIfNoEntry: false });
+    if (f.isSymbolicLink()) {
+      const link = fs.readlinkSync(from);
+      if (t?.isSymbolicLink() && fs.readlinkSync(to) === link) continue; // 그대로인 링크
+      const r = path.relative(workspaceSource, path.resolve(path.dirname(to), link));
+      if (r === ".." || r.startsWith(`..${path.sep}`) || path.isAbsolute(r) || hasGitSegment(r)) throw new Error(rel);
+    } else if (!f.isFile()) throw new Error(rel); // FIFO 같은 특수 파일을 읽다 멈추지 않게
+    if (f.isSymbolicLink() && t) throw new Error(rel); // 값이 다른 링크로 바꾼 추적 파일: 복사 때 EEXIST로 실패해 앞선 파일만 쓰이는 것을 막는다
+    if (t && (t.isSymbolicLink() || t.isDirectory())) throw new Error(rel);
+    todo.push([from, to]);
+  }
+  return todo;
 }
 
 export function applyIsolatedWorkspace(cwd: string, workspaceSource: string): void {
@@ -156,10 +319,10 @@ export function applyIsolatedWorkspace(cwd: string, workspaceSource: string): vo
   if (sourceStatus === null) throw new Error(st("notice.workspace.gitCheckFailed"));
   if (sourceStatus.length) throw new Error(st("notice.workspace.sourceDirty"));
   try {
-    fs.cpSync(cwd, workspaceSource, {
-      recursive: true,
-      filter: (src) => path.basename(src) !== ".git",
-    });
+    for (const [from, to] of collectApplyTargets(cwd, workspaceSource)) {
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      fs.cpSync(from, to, { verbatimSymlinks: true }); // cpSync는 대상을 지우고 새로 써서 읽기 전용·실행 권한이 그대로 동작한다
+    }
   } catch (e) {
     throw new Error(st("notice.workspace.applyFailed") + `: ${String((e as Error)?.message ?? e).slice(0, 200)}`);
   }
@@ -188,7 +351,7 @@ export function discardIsolatedWorkspace(cwd: string, workspaceSource: string, o
   }
   const source = fs.existsSync(workspaceSource) ? workspaceSource : cwd;
   try {
-    git(force ? ["worktree", "remove", "--force", cwd] : ["worktree", "remove", cwd], source);
+    git(force ? ["worktree", "remove", "--force", cwd] : ["worktree", "remove", cwd], source, cwd);
   } catch (e) {
     throw new Error(st("notice.workspace.discardFailed") + `: ${String((e as Error)?.message ?? e).slice(0, 200)}`);
   }

@@ -159,15 +159,15 @@ try {
     const workspace = await import('../sessions/isolatedWorkspace');
     const { applyRestore, checkpointsForApproval } = await import('../sessions/rewind');
     const { resolveFileUnderCwd } = await import('../sessions/safePath');
-    const child = (await import('node:child_process')).default;
-    const { syncBuiltinESMExports } = await import('node:module');
-    const exec = child.execFileSync;
     const root = fs.mkdtempSync('/private/tmp/aether-path-owner-');
+    // 가짜 git: 보호 확인용 config 호출에는 표식만, 나머지는 빈 성공으로 답한다.
+    const bin = path.join(root, 'bin'); fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(bin, 'git'), '#!/bin/sh\n[ "$1" = config ] && printf \'command\\0aether.guard\\0\'\nexit 0\n', { mode: 0o755 });
+    const oldPath = process.env.PATH; process.env.PATH = `${bin}:${oldPath}`;
     const oldRoot = process.env.AETHER_WORKTREE_DIR;
     process.env.AETHER_WORKTREE_DIR = path.join(root, 'owned');
     const stat = fs.statSync, realpath = fs.realpathSync;
     try {
-      child.execFileSync = (() => '') as unknown as typeof exec; syncBuiltinESMExports();
       // startsWith로 소유 경계를 판정하면 owned-sibling도 소유 경로로 잘못 본다.
       for (const owner of ['owned', 'owned-sibling']) for (const code of ['EACCES', 'EPERM', 'EIO', 'TypeError']) {
         const error = () => code === 'TypeError' ? new TypeError('경로 확인 결함') : Object.assign(new Error('경로 확인 실패'), { code });
@@ -188,7 +188,7 @@ try {
           if (operation === 'linked') assert.equal(workspace.isLinkedWorktree(cwd), false);
           if (operation === 'exists') assert.equal(workspace.isolatedWorkspaceExists(cwd), false);
           // samePath에서 두 번째 인자의 소유도 판정한다.
-          if (operation === 'same') assert.equal(workspace.workspaceCopyState(copy, cwd).needsApply, false);
+          if (operation === 'same') assert.equal((await workspace.workspaceCopyState(copy, cwd)).needsApply, false);
           if (operation === 'approval') assert.equal(checkpointsForApproval(1, { kind: 'edit', path: 'file.txt', files: [{ path: 'file.txt' }] }, cwd)[0].ok, true);
           if (operation === 'restore') assert.deepEqual(applyRestore(cwd, []), { restored: [], failed: [] });
           if (operation === 'parent') assert.equal(resolveFileUnderCwd(cwd, 'missing/new.txt').real, path.join(parent, 'new.txt'));
@@ -204,7 +204,7 @@ try {
       assert(!workspace.isManagedWorkspacePath(path.join(root, 'owned-sibling', 'copy')));
     } finally {
       fs.statSync = stat; fs.realpathSync = realpath;
-      child.execFileSync = exec; syncBuiltinESMExports();
+      process.env.PATH = oldPath;
       if (oldRoot === undefined) delete process.env.AETHER_WORKTREE_DIR; else process.env.AETHER_WORKTREE_DIR = oldRoot;
       fs.rmSync(root, { recursive: true, force: true });
     }

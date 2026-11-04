@@ -225,7 +225,7 @@ sessionsRouter.post("/", async (req: Request, res: Response) => {
 sessionsRouter.get("/", async (_req: Request, res: Response) => {
   const { AGENT_EVENT_CONTRACT_VERSION } = await import("../../shared/agentEvent");
   try {
-    const sessions = sessionManager.list();
+    const sessions = await sessionManager.listWithCopyState();
     // 디스크 세션 → dm 방 투영.
     const rooms = sessions.map((item) => ({
       id: `dm:${item.id}`,

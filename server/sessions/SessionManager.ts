@@ -63,15 +63,10 @@ export class HandoffError extends Error {
   }
 }
 
-function copyListFields(cwd: string | undefined, workspaceSource: string | undefined): Pick<SessionListItem, "isolated" | "workspaceSource" | "needsApply" | "applyBlocked"> {
+/** git을 부르지 않는다. 반영 상태(needsApply·applyBlocked)는 listWithCopyState가 채운다. */
+function copyListFields(workspaceSource: string | undefined): Pick<SessionListItem, "isolated" | "workspaceSource"> {
   if (!workspaceSource) return { isolated: false };
-  const state = workspaceCopyState(cwd ?? "", workspaceSource);
-  return {
-    isolated: true,
-    workspaceSource,
-    needsApply: state.needsApply,
-    applyBlocked: state.applyBlocked,
-  };
+  return { isolated: true, workspaceSource };
 }
 
 function optionalName(raw: unknown): string | undefined {
@@ -744,6 +739,21 @@ class SessionManager {
     return false;
   }
 
+  /** list()에 복사본의 반영 상태를 더한다. git을 비동기로, 하나씩 돌려 프로세스가 몰리지 않게 한다. */
+  async listWithCopyState(): Promise<SessionListItem[]> {
+    const states = new Map<string, Awaited<ReturnType<typeof workspaceCopyState>>>();
+    for (const row of this.list()) {
+      if (row.isolated) states.set(row.id, await workspaceCopyState(row.cwd ?? "", row.workspaceSource!));
+    }
+    // 조회 중 지운 세션이 남지 않게, 상태를 모은 뒤 목록을 다시 읽어 합친다.
+    const rows = this.list();
+    for (const row of rows) {
+      const state = states.get(row.id);
+      if (state) Object.assign(row, state);
+    }
+    return rows;
+  }
+
   list(): SessionListItem[] {
     // 목록 제목 = 사람이 붙인 이름, 없으면 첫 말에서 뽑은 제목. 폴더 이름은 그룹 헤더가 맡는다.
     const live = [...this.sessions.values()].map((s) => ({
@@ -765,7 +775,7 @@ class SessionManager {
       createdAt: s.createdAt,
       lastActivityAt: s.lastActivityAt, // 마지막 활동시각(사이드바 '마지막 사용')
       lastInputAt: s.lastInputAt,
-      ...copyListFields(s.cwd, s.workspaceSource),
+      ...copyListFields(s.workspaceSource),
       preview: s.lastWorkPreview(),
       archivedAt: s.archivedAt,
       ...autoResumeField(s.autoResume),
@@ -791,7 +801,7 @@ class SessionManager {
         createdAt: e.meta.createdAt ?? 0,
         lastActivityAt: e.lastActivityAt ?? e.meta.createdAt ?? 0, // 디스크 꼬리 활동시각(tailInfo)
         lastInputAt: e.meta.lastInputAt ?? e.meta.createdAt ?? 0,
-        ...copyListFields(e.meta.cwd, e.meta.workspaceSource),
+        ...copyListFields(e.meta.workspaceSource),
         preview: (() => {
           try {
             const preview = lastWorkPreview(store.readRecentEvents(id), this.codecOf(id), id);

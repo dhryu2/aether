@@ -12,7 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { folderReasonOf, isSensitiveEntry, isSensitiveRealAsync, resolveWorkFolderAsync, sensitiveIdsAsync, type FolderReason } from "../sessions/safePath";
-import { isGitRepo } from "../sessions/isolatedWorkspace";
+import { isGitRepoAsync } from "../sessions/isolatedWorkspace";
 import { config } from "../config";
 import { defaultProbe, isHiddenName, listPlaces } from "./fsPlaces";
 import { st } from "../i18n";
@@ -131,7 +131,7 @@ fsRouter.get("/list", async (req: Request, res: Response) => {
       name: crumbs[crumbs.length - 1].name,
       parent: parent === real ? null : parent,
       crumbs,
-      canCopy: isGitRepo(real), // 이 폴더에서 복사본을 만들 수 있는지. git 명령 이름은 나가지 않는다.
+      canCopy: await isGitRepoAsync(real), // 이 폴더에서 복사본을 만들 수 있는지. git 명령 이름은 나가지 않는다.
       entries: folders.slice(0, MAX_ENTRIES).map((f) => ({ name: f.name, path: f.abs, hidden: isHiddenName(f.name) })),
       truncated,
     });

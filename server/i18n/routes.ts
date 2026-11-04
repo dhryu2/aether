@@ -289,8 +289,6 @@ export const routes: Dict = {
   "routes.autoResume.textInvalid": { ko: "메시지는 1~2000자여야 해요", en: "The text must be 1 to 2000 characters" },
   "routes.autoResume.nothing": { ko: "바꿀 시간이나 메시지가 필요해요", en: "A time or text to change is required" },
   "routes.autoResume.notFound": { ko: "자동 재개 예약이 없어요", en: "There is no auto-resume reservation" },
-  "routes.handoff.purposeInvalid": { ko: "목적은 이어서, 다시 논의, 다음 작업 중 하나여야 해요", en: "The purpose must be one of continue, re-discuss, or next task" },
-  "routes.handoff.focusRequired": { ko: "다음 작업에는 할 일을 적어야 해요", en: "The next task needs a focus text" },
   "routes.handoff.focusTooLong": { ko: "입력한 내용은 4000자 이하여야 해요", en: "The focus text must be 4000 characters or fewer" },
   "routes.handoff.bodyInvalid": { ko: "요청 값의 형식이 맞지 않습니다", en: "A request value has the wrong type" },
   "routes.handoff.busy": { ko: "작업 중이거나 응답을 기다리는 중이라 지금은 넘길 수 없어요", en: "This session is working or waiting for a reply, so it cannot be handed off now" },

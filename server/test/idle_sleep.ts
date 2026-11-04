@@ -153,7 +153,7 @@ async function main() {
       check((await sessionManager.sweepIdle(later())) === 0, "자동 재개를 보내고 결과를 기다리면 잠들지 않는다");
       live.setAutoResume(undefined);
 
-      live.setHandoff({ handoffJob: { purpose: "x", focus: "", includeMethod: false, provider, cwd, copyOnly: true, state: "writing", requestedAt: Date.now() } as never });
+      live.setHandoff({ handoffJob: { focus: "", provider, cwd, copyOnly: true, state: "writing", requestedAt: Date.now() } as never });
       check((await sessionManager.sweepIdle(later())) === 0, "인계서를 쓰는 중이면 잠들지 않는다");
       live.setHandoff({ handoffJob: undefined });
 

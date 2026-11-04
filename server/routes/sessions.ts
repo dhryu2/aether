@@ -23,9 +23,9 @@ import { reportError } from "../observability/report";
  *   POST   /api/sessions/:id/archive      보관·해제 {archived} — 일하는 중·대기 중이면 보관 409, 보관된 세션은 message·wake·commands 409
  *   PUT    /api/sessions/:id/auto-resume  자동 재개 예약의 시각·문장 바꾸기 {at?, text?} — 예약 없으면 404, 보관되면 409
  *   DELETE /api/sessions/:id/auto-resume  자동 재개 예약 취소
- *   POST   /api/sessions/:id/handoff      다음 작업으로 넘기기 시작 {purpose, focus?, includeMethod?, provider?, cwd?, copyOnly?} — 202 {state}, 일하는 중·이미 진행 중·보관·받을 곳 없음 409
+ *   POST   /api/sessions/:id/handoff      새 세션으로 넘기기 시작 {focus?, provider?, cwd?, copyOnly?} — 202 {state}, 일하는 중·이미 진행 중·보관·받을 곳 없음 409
  *   GET    /api/sessions/:id/handoff      새 세션의 인계서 초안 {incoming?} / 복사 결과 {result?}
- *   DELETE /api/sessions/:id/handoff      한도 대기 취소·복사 결과 지우기 — 쓰는 중이면 409
+ *   DELETE /api/sessions/:id/handoff      질문 대기·한도 대기 취소, 복사 결과 지우기 — 쓰는 중이면 409
  *   GET    /api/sessions/:id/events       이전 이벤트 페이지(무한스크롤) ?before=&limit=|from=
  *   DELETE /api/sessions/:id              세션 영구 삭제
  */
@@ -33,7 +33,7 @@ import { Router, type Request, type Response } from "express";
 import { briefModelText, isBriefRequest, stripBriefAlias } from "../agent-brief/rules";
 import { config } from "../config";
 import { HandoffError, ModelRejectedError, sessionManager } from "../sessions/SessionManager";
-import { HANDOFF_FOCUS_MAX, HANDOFF_PURPOSES, type HandoffPurpose } from "../sessions/handoff";
+import { HANDOFF_FOCUS_MAX } from "../sessions/handoff";
 import { resolveWorkFolder } from "../sessions/safePath";
 import { WorkspaceCopyError } from "../sessions/isolatedWorkspace";
 import { PermissionModeConflictError, PermissionModeUnavailableError, SessionReadyTimeoutError, type LiveSession } from "../sessions/LiveSession";
@@ -886,18 +886,15 @@ sessionsRouter.delete("/:id/auto-resume", (req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
-// 다음 작업으로 넘기기. 형식 → 존재·보관 → 받을 곳 확인 순으로 거르고, 모델은 마지막에 한 번 부른다.
+// 새 세션으로 넘기기. 형식 → 존재·보관 → 받을 곳 확인 순으로 거르고, 모델은 마지막에 한 번 부른다.
 sessionsRouter.post("/:id/handoff", async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const { purpose: rawPurpose, focus: rawFocus, includeMethod, provider: rawProvider, cwd: rawCwd, copyOnly: rawCopyOnly } = req.body ?? {};
+  const { focus: rawFocus, provider: rawProvider, cwd: rawCwd, copyOnly: rawCopyOnly } = req.body ?? {};
   const bad = (key: string) => res.status(400).json({ error: st(`routes.handoff.${key}`) });
-  if (typeof rawPurpose !== "string" || !HANDOFF_PURPOSES.includes(rawPurpose as HandoffPurpose)) return bad("purposeInvalid");
-  const purpose = rawPurpose as HandoffPurpose;
   for (const v of [rawFocus, rawProvider, rawCwd]) if (v !== undefined && typeof v !== "string") return bad("bodyInvalid");
-  for (const v of [includeMethod, rawCopyOnly]) if (v !== undefined && typeof v !== "boolean") return bad("bodyInvalid");
+  if (rawCopyOnly !== undefined && typeof rawCopyOnly !== "boolean") return bad("bodyInvalid");
   const focus = typeof rawFocus === "string" ? rawFocus.trim() : "";
   if (focus.length > HANDOFF_FOCUS_MAX) return bad("focusTooLong");
-  if (purpose === "next" && !focus) return bad("focusRequired");
   const provider = typeof rawProvider === "string" && rawProvider.trim() ? rawProvider.trim() : undefined;
   const cwd = typeof rawCwd === "string" && rawCwd.trim() ? rawCwd.trim() : undefined;
   const copyOnly = rawCopyOnly === true;
@@ -922,7 +919,7 @@ sessionsRouter.post("/:id/handoff", async (req: Request, res: Response) => {
     }
   }
   try {
-    const state = await sessionManager.startHandoff(id, { purpose, ...(focus ? { focus } : {}), includeMethod: includeMethod !== false, provider, cwd, copyOnly: copyOnly || undefined });
+    const state = await sessionManager.startHandoff(id, { ...(focus ? { focus } : {}), provider, cwd, copyOnly: copyOnly || undefined });
     res.status(202).json({ state });
   } catch (err) {
     if (err instanceof HandoffError) {

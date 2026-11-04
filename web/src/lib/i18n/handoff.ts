@@ -1,30 +1,20 @@
-// 다음 작업으로 넘기기 문자열 — HandoffSheet.tsx, WorkMenu.tsx, PaneMenu.tsx, Sidebar.tsx, Composer.tsx, Bubbles.tsx, store.ts.
+// 새 세션으로 넘기기 문자열 — HandoffSheet.tsx, WorkMenu.tsx, PaneMenu.tsx, Sidebar.tsx, Composer.tsx, Bubbles.tsx, store.ts.
 import type { Dict } from './types'
 
 export const handoff: Dict = {
   // 메뉴
-  'handoff.menu.item': { ko: '새 세션으로 넘기기…', en: 'Hand off to next task…' },
+  'handoff.menu.item': { ko: '새 세션으로 넘기기…', en: 'Hand off to a new session…' },
   'handoff.menu.busy': { ko: '작업 중이라 지금은 넘길 수 없어요', en: 'Working now, so it cannot be handed off yet' },
   'handoff.menu.inProgress': { ko: '이미 넘기는 중이에요', en: 'A handoff is already in progress' },
+  'handoff.menu.cancel': { ko: '넘기기 취소', en: 'Cancel handoff' },
   'handoff.menu.showResult': { ko: '넘기기 결과 열기', en: 'Open handoff result' },
   'handoff.menu.openPrev': { ko: '이전 세션 열기', en: 'Open previous session' },
   'handoff.menu.openNext': { ko: '다음 세션 열기', en: 'Open next session' },
 
   // 창
-  'handoff.title': { ko: '새 세션으로 넘기기', en: 'Hand off to next task' },
-  'handoff.purpose.label': { ko: '목적', en: 'Purpose' },
-  'handoff.purpose.continue': { ko: '이어서', en: 'Continue' },
-  'handoff.purpose.rediscuss': { ko: '다시 논의', en: 'Re-discuss' },
-  'handoff.purpose.next': { ko: '다음 작업', en: 'Next task' },
-  'handoff.focus.label.continue': { ko: '특히 챙길 내용 (선택)', en: 'Focus (optional)' },
-  'handoff.focus.label.rediscuss': { ko: '논의할 내용 (선택)', en: 'Issues to discuss (optional)' },
-  'handoff.focus.label.next': { ko: '다음에 할 일', en: 'What to do next' },
-  'handoff.focus.placeholder.continue': { ko: '이어서 특히 챙길 것이 있으면 적으세요', en: 'Note anything to emphasize when continuing' },
-  'handoff.focus.placeholder.rediscuss': { ko: '다시 논의할 내용을 적어 주세요', en: 'Write the issues you want to talk through again' },
-  'handoff.focus.placeholder.next': { ko: '새 세션이 맡을 일을 적으세요', en: 'Write the task the new session will take on' },
-  'handoff.needFocus': { ko: '다음 작업은 할 일을 적어야 넘길 수 있어요', en: 'Describe the next task to hand off' },
-  'handoff.method': { ko: '진행 방식도 넘기기', en: 'Also hand over how to work' },
-  'handoff.method.note': { ko: '이 세션에서 정한 일하는 방식과 지킬 것을 인계서에 넣어요', en: 'Includes the working style and rules settled in this session' },
+  'handoff.title': { ko: '새 세션으로 넘기기', en: 'Hand off to a new session' },
+  'handoff.focus.label': { ko: '다음에 할 일 (선택)', en: 'What to do next (optional)' },
+  'handoff.focus.placeholder': { ko: '비워 두면 AI가 대화를 보고 정해요. 결정할 것이 있으면 대화에서 먼저 물어봐요', en: 'Leave it empty and the AI decides from the conversation. If something needs your decision, it asks in the conversation first' },
   'handoff.to.label': { ko: '넘길 곳', en: 'Receiver' },
   'handoff.to.same': { ko: '같은 AI · 같은 폴더', en: 'Same AI · same folder' },
   'handoff.to.copyOnly': { ko: '다른 컴퓨터에서 쓰기 (복사만)', en: 'Use on another computer (copy only)' },
@@ -60,6 +50,7 @@ export const handoff: Dict = {
 
   // 알림
   'handoff.toast.waiting': { ko: '한도가 풀리면 인계서를 써요', en: 'The handoff will be written when the limit lifts' },
+  'handoff.toast.asking': { ko: '넘기기 전에 확인할 것이 있어요', en: 'There is something to confirm before the handoff' },
   'handoff.toast.stopped': { ko: '넘기기를 취소했어요. 새 세션은 만들지 않았어요', en: 'Handoff stopped. No new session was made' },
   'handoff.toast.swapped': { ko: '새 세션으로 넘겼어요. 인계서를 확인하고 보내세요', en: 'Handed off to a new session. Check the handoff and send it' },
   'handoff.toast.ready': { ko: '새 세션이 준비됐어요', en: 'The new session is ready' },

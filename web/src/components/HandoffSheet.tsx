@@ -1,5 +1,5 @@
-// 다음 작업으로 넘기기 창. 세 가지 모습이다.
-//   form    목적·초점·진행 방식·받는 곳을 정하고 [넘기기]를 누른다.
+// 새 세션으로 넘기기 창. 세 가지 모습이다.
+//   form    다음에 할 일(선택)과 받는 곳을 정하고 [넘기기]를 누른다. 글이 없으면 AI가 대화를 보고 정하고, 결정할 것이 있으면 대화에서 먼저 묻는다.
 //   waiting 이미 한도에 막혀 있어 풀릴 때까지 기다린다는 안내와 [확인]
 //   result  복사만 고른 결과, 또는 새 세션을 만들지 못했을 때 남은 인계서 글(읽기 전용 + [복사])
 // 서버가 인계서 쓰기부터 새 세션 만들기까지 끝까지 진행한다. 이 창은 시작을 알리고 결과를 보여 주기만 한다.
@@ -10,7 +10,7 @@ import { roomIdForExecution } from '../lib/workspaceRooms'
 import { api } from '../lib/api'
 import { errMsg } from '../lib/errors'
 import { useT } from '../lib/i18n'
-import { canSubmitHandoff, HANDOFF_FOCUS_MAX, HANDOFF_PURPOSES, type HandoffPurpose } from '../lib/handoff'
+import { HANDOFF_FOCUS_MAX } from '../lib/handoff'
 import { recentFolders } from '../lib/sessionGroups'
 import type { HandoffInfo } from '../lib/types'
 import { C, FONT, Z } from '../design/tokens'
@@ -71,11 +71,8 @@ function FormWindow({ sessionId }: { sessionId: string }) {
   const t = useT()
   const narrow = s.isNarrow
   const item = s.sessions.find((x) => x.id === sessionId)
-  const reasonId = useId()
   const errorId = useId()
-  const [purpose, setPurpose] = useState<HandoffPurpose>('continue')
   const [focus, setFocus] = useState('')
-  const [includeMethod, setIncludeMethod] = useState(true)
   const [recipientOpen, setRecipientOpen] = useState(false)
   const [copyOnly, setCopyOnly] = useState(false)
   const [providerId, setProviderId] = useState('')
@@ -85,7 +82,6 @@ function FormWindow({ sessionId }: { sessionId: string }) {
 
   // 복사본에서 일하던 세션은 원 폴더에서 이어 간다(복사본은 이 세션과 함께 사라진다).
   const defaultFolder = item?.workspaceSource || item?.cwd || ''
-  const can = canSubmitHandoff(purpose, focus)
   const otherProviders = (s.providers ?? []).filter((p) => p.id !== item?.provider)
   const sameLabel = t('handoff.to.same')
   const toSummary = copyOnly
@@ -98,13 +94,11 @@ function FormWindow({ sessionId }: { sessionId: string }) {
   const dirty = !!item?.isolated && !!item.needsApply
 
   async function submit() {
-    if (busy || !can) return
+    if (busy) return
     setBusy(true)
     setError('')
     const r = await actions.startHandoff(sessionId, {
-      purpose,
       ...(focus.trim() ? { focus: focus.trim() } : {}),
-      includeMethod,
       ...(copyOnly ? { copyOnly: true } : {}),
       ...(!copyOnly && providerId ? { provider: providerId } : {}),
       ...(!copyOnly && folder && folder !== defaultFolder ? { cwd: folder } : {}),
@@ -121,8 +115,8 @@ function FormWindow({ sessionId }: { sessionId: string }) {
       paddingX={18}
       fontSize={15}
       fullWidth={narrow}
-      disabled={busy || !can}
-      aria-describedby={!can ? reasonId : error ? errorId : undefined}
+      disabled={busy}
+      aria-describedby={error ? errorId : undefined}
       data-session-opt="handoff-submit"
       onClick={() => void submit()}
     >
@@ -142,39 +136,18 @@ function FormWindow({ sessionId }: { sessionId: string }) {
         <ModalHeader title={t('handoff.title')} onClose={actions.closeHandoff} closeLabel={t('common.close')} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 22, minWidth: 0 }}>
           <section>
-            <GroupTitle>{t('handoff.purpose.label')}</GroupTitle>
-            <SegmentedControl
-              items={HANDOFF_PURPOSES.map((p) => ({ value: p, label: t(`handoff.purpose.${p}`) }))}
-              value={purpose}
-              onChange={setPurpose}
-              fullWidth
-              fontSize={13.5}
-              itemHeight={narrow ? 44 : 32}
-            />
-          </section>
-
-          <section>
-            <GroupTitle>{t(`handoff.focus.label.${purpose}`)}</GroupTitle>
+            <GroupTitle>{t('handoff.focus.label')}</GroupTitle>
             <textarea
               className="sheet-field"
-              aria-label={t(`handoff.focus.label.${purpose}`)}
-              aria-required={purpose === 'next'}
+              aria-label={t('handoff.focus.label')}
               value={focus}
               maxLength={HANDOFF_FOCUS_MAX}
               rows={3}
               disabled={busy}
-              placeholder={t(`handoff.focus.placeholder.${purpose}`)}
+              placeholder={t('handoff.focus.placeholder')}
               onChange={(e) => setFocus(e.target.value)}
               style={{ ...fieldStyle(), minHeight: 88, padding: '12px 16px', resize: 'vertical', lineHeight: 1.45 }}
             />
-          </section>
-
-          <section>
-            <div className="flex items-center" style={{ gap: 12, padding: '0 16px', minHeight: narrow ? 44 : 32 }}>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 15, color: C.label }}>{t('handoff.method')}</span>
-              <Switch on={includeMethod} onChange={setIncludeMethod} label={t('handoff.method')} disabled={busy} data-session-opt="handoff-method" />
-            </div>
-            <p style={{ fontSize: 13, color: C.label2, lineHeight: 1.45, margin: '4px 0 0', padding: '0 16px' }}>{t('handoff.method.note')}</p>
           </section>
 
           <section>
@@ -225,12 +198,7 @@ function FormWindow({ sessionId }: { sessionId: string }) {
           </section>
         </div>
         <ModalFooter>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', alignItems: 'stretch', padding: error || !can ? '8px 0' : undefined }}>
-            {!can && (
-              <p id={reasonId} style={{ margin: 0, padding: '0 4px', fontSize: 13, lineHeight: 1.45, color: C.label2, textAlign: narrow ? 'center' : 'right' }}>
-                {t('handoff.needFocus')}
-              </p>
-            )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', alignItems: 'stretch', padding: error ? '8px 0' : undefined }}>
             {error && (
               <p id={errorId} role="alert" style={{ margin: 0, padding: '0 4px', fontSize: 13, lineHeight: 1.45, color: C.del, textAlign: 'left' }}>
                 {t('handoff.error', { error })}

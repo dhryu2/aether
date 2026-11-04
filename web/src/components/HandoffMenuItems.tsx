@@ -1,4 +1,4 @@
-// 메뉴에 들어가는 「다음 작업으로 넘기기」 묶음 — 작업 메뉴(WorkMenu)와 칸 머리 메뉴(PaneMenu)가 같이 쓴다.
+// 메뉴에 들어가는 「새 세션으로 넘기기」 묶음 — 작업 메뉴(WorkMenu)와 칸 머리 메뉴(PaneMenu)가 같이 쓴다.
 //   항목 상태는 lib/handoff.ts가 정한다. 막힌 이유는 보관 항목처럼 항목 바로 밑에 글로 보인다.
 import { useId } from 'react'
 import { actions, useStore } from '../lib/store'
@@ -34,6 +34,11 @@ export function HandoffMenuItems({ id, close }: { id: string; close: () => void 
             <span id={noteId} style={{ padding: '0 10px 4px', fontSize: 12, color: C.label3 }}>
               {t(state.reason === 'busy' ? 'handoff.menu.busy' : 'handoff.menu.inProgress')}
             </span>
+          )}
+          {room.handoffState === 'asking' && (
+            <MenuItem data-session-opt="handoff-cancel" onClick={go(() => void actions.cancelHandoff(execId))}>
+              {t('handoff.menu.cancel')}
+            </MenuItem>
           )}
           {room.handoffState === 'copy_ready' && (
             <MenuItem data-session-opt="handoff-result" onClick={go(() => actions.openHandoffResult(execId))}>

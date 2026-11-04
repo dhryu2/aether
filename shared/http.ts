@@ -217,27 +217,29 @@ export type SessionListItem = {
 
 /** 인계서가 만들어진 방식. skeleton은 모델이 쓰지 못해 Aether가 기록에서 모은 것이다. */
 export type HandoffSource = "model" | "skeleton";
-export type HandoffState = "writing" | "waiting_limit" | "copy_ready";
+/** asking은 이전 세션 AI가 넘기기 전에 사람에게 물어 답을 기다리는 중이다. */
+export type HandoffState = "writing" | "asking" | "waiting_limit" | "copy_ready";
 
 /** 넘기기 작업(이전 세션 쪽). 저장 파일에도 이 모양으로 남는다. */
 export type HandoffJob = {
-  purpose: "continue" | "rediscuss" | "next";
+  /** 사람이 적은 다음에 할 일(선택). */
   focus?: string;
-  includeMethod: boolean;
   provider?: string;
   cwd?: string;
   copyOnly?: boolean;
   state: HandoffState;
   requestedAt: number;
+  /** 지금까지 사람에게 물은 횟수. 없으면 0. */
+  askRounds?: number;
+  /** 더 묻지 말고 쓰라는 마지막 요청을 이미 보냈다. */
+  forced?: true;
   /** 다른 컴퓨터(복사만) 결과이거나, 새 세션을 만들지 못했을 때 남긴 글. */
   result?: { text: string; source: HandoffSource; error?: string };
 };
 
-/** POST /api/sessions/:id/handoff 본문. includeMethod는 생략하면 켜짐이다. */
+/** POST /api/sessions/:id/handoff 본문. 옛 화면이 보내는 purpose·includeMethod는 무시한다. */
 export type HandoffRequestBody = {
-  purpose: HandoffJob["purpose"];
   focus?: string;
-  includeMethod?: boolean;
   provider?: string;
   cwd?: string;
   copyOnly?: boolean;

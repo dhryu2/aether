@@ -95,9 +95,7 @@ const INPUT_TABLE: Record<string, Record<string, InputClass>> = {
     limit: "id",
     from: "id",
     seq: "id", // POST /:id/rewind. 서버가 매긴 사건 순번을 되돌려 받는다. 모델 입력이 아니다(730339d)
-    purpose: "B", // POST /:id/handoff. 이어서·다시 토의·다음 작업 세 값만 인정한다
-    focus: "A", // 넘기기에서 사람이 직접 적은 초점 글(4000자 이하). 모델에게는 사람 글로 전달한다
-    includeMethod: "C", // 넘기기 창의 진행 방식 토글. boolean만 받는다
+    focus: "A", // 넘기기에서 사람이 직접 적은 다음에 할 일 글(4000자 이하). 모델에게는 사람 글로 전달한다
     copyOnly: "C", // 넘기기 창의 다른 컴퓨터(복사만) 토글. boolean만 받는다
     force: "C", // POST /:id/workspace/discard. 확인 창을 통과한 요청만 true. 아니면 더러운 복사본을 거절한다
   },

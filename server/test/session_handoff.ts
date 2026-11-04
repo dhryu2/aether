@@ -1,6 +1,6 @@
 /**
- * 다음 작업으로 넘기기 — 가짜 provider, 모델 호출 0.
- * 인계서 집어내기·요청 글·형식 거절·정상 흐름·뼈대·한도 대기(A1 연결)·멈춤·복사만·첫 말 표시·복원.
+ * 새 세션으로 넘기기 — 가짜 provider, 모델 호출 0.
+ * 인계서 집어내기·요청 글·형식 거절·정상 흐름·질문 대기(asking)·뼈대·한도 대기(A1 연결)·멈춤·복사만·첫 말 표시·복원.
  */
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -65,27 +65,57 @@ console.log("\n=== 인계서 집어내기 ===");
   eq("바뀐 파일은 50개까지", ho.changedFiles(Array.from({ length: 80 }, (_, i) => ev(i + 1, { t: "edit", text: `f${i}.ts` })), codec).length, 50);
 }
 
+console.log("\n=== 질문 턴과 인계서 ===");
+{
+  const box = "```aether-questions\n{\"questions\":[{\"id\":\"q1\",\"text\":\"어느 쪽?\",\"kind\":\"single\",\"options\":[{\"label\":\"A\"},{\"label\":\"B\"}]}]}\n```";
+  eq("표식 없이 질문지 상자만 있으면 인계서가 아니다", ho.pickHandoffText([say(1, `정리\n${box}`)], codec), null);
+  eq("표식이 있으면 표식이 이긴다", ho.pickHandoffText([say(1, `${box}\n<aether-handoff>\n본문\n</aether-handoff>`)], codec), "본문");
+  eq("markerOnly: 표식 없는 평문은 null", ho.pickHandoffText([say(1, "딴말에 대한 답")], codec, true), null);
+  eq("markerOnly: 표식이 있으면 받는다", ho.pickHandoffText([say(1, "<aether-handoff>\nx\n</aether-handoff>")], codec, true), "x");
+  eq("표식 없는 평문 폴백은 그대로", ho.pickHandoffText([say(1, "그냥")], codec), "그냥");
+}
+
+console.log("\n=== 브리프 규칙 문자열 불변 ===");
+{
+  // 질문지 형식 안내를 상수로 뽑아도 브리프 규칙은 글자 하나 달라지면 안 된다(뽑기 전 지문).
+  const { createHash } = await import("node:crypto");
+  const { briefRules } = await import("../agent-brief/rules");
+  const want = { ko: "b49c43670ed980fd1c737a673f6a6db615ce9948", en: "d3ee8dcfdfcea32dc8a7d7d0261c983aeeb53115" };
+  for (const l of ["ko", "en"] as const) {
+    setLocale(l);
+    eq(`${l}: briefRules 지문`, createHash("sha1").update(briefRules()).digest("hex"), want[l]);
+  }
+  setLocale("ko");
+}
+
 console.log("\n=== 요청 글 ===");
 {
   const provider = /claude|codex|grok|ollama|anthropic|openai|xai|mock3/i;
   for (const locale of ["ko", "en"] as const) {
     setLocale(locale);
-    for (const purpose of ho.HANDOFF_PURPOSES) {
-      for (const includeMethod of [true, false]) {
-        const r = ho.handoffRequest(purpose, "초점 글", includeMethod);
-        const tag = `${locale}/${purpose}/${includeMethod ? "방식" : "방식없음"}`;
-        check(r.modelText.startsWith("<aether-handoff-request>") && r.modelText.endsWith(r.text), `${tag}: 규칙 블록 뒤에 사람용 요청문`);
-        check(!r.text.includes("<aether-handoff-request>"), `${tag}: 대화에 남는 글에는 규칙이 없다`);
-        check(!provider.test(r.modelText), `${tag}: provider 이름이 없다`);
-        const method = locale === "ko" ? "일하는 방식" : "How to work";
-        const heading = locale === "ko" ? { continue: "진행 상태", rediscuss: "미결 쟁점", next: "다음 작업 범위" }[purpose] : { continue: "Progress", rediscuss: "Open issues", next: "Scope of the next task" }[purpose];
-        check(r.modelText.includes(heading), `${tag}: 목적별 제목`);
-        check(includeMethod ? r.modelText.includes(`→ ${method}`) : r.modelText.includes(locale === "ko" ? "「일하는 방식」 절은 쓰지 않는다" : "Do not write a \"How to work\" section"), `${tag}: 진행 방식 지시`);
-        check((purpose === "rediscuss") === (r.modelText.includes("질문부터") || r.modelText.includes("asks the person about the open issues")), `${tag}: 질문부터 줄은 다시 토의에만`);
-      }
+    for (const focus of [undefined, "초점 글"]) {
+      const r = ho.handoffRequest(focus);
+      const tag = `${locale}/${focus ? "글 있음" : "글 없음"}`;
+      check(r.modelText.startsWith("<aether-handoff-request>") && r.modelText.endsWith(r.text), `${tag}: 규칙 블록 뒤에 사람용 요청문`);
+      check(!r.text.includes("<aether-handoff-request>"), `${tag}: 대화에 남는 글에는 규칙이 없다`);
+      check(!provider.test(r.modelText), `${tag}: provider 이름이 없다`);
+      check(focus ? r.text.includes(focus) : !r.text.includes(":"), `${tag}: 사람 글은 있을 때만 요청문에 든다`, r.text);
+      const toc = locale === "ko" ? "목표 → 지금 상태 → 정한 것과 이유 → 해 봤는데 안 된 것 → 다음 단계 → 먼저 읽을 파일 → 확인하지 못한 것" : "Goal → Current state → Decisions and reasons → Tried and failed → Next steps → Files to read first → Not confirmed";
+      check(r.modelText.includes(toc), `${tag}: 제목과 순서`);
+      check(r.modelText.includes("3,000"), `${tag}: 3,000자 권고`);
+      check(r.modelText.includes("aether-questions") && r.modelText.includes("<aether-handoff>"), `${tag}: 질문지 형식과 표식 규칙`);
+      check(r.modelText.includes(locale === "ko" ? "사람만 정할 수 있고" : "only the person can make"), `${tag}: 질문 조건`);
+      check(!r.modelText.includes("purpose") && !r.modelText.includes("목적:"), `${tag}: 목적 안내가 없다`);
     }
+    check(ho.handoffForceWriteText().length > 10 && !provider.test(ho.handoffForceWriteText()), `${locale}: 마지막 강제 요청 글`);
+    const framed = ho.withHandoffFrame("본문", { focus: "  내 글 원문  ", name: "이름", id: "abc-123-full" });
+    check(framed.startsWith(locale === "ko" ? "사람이 적은 요청 (원문)\n내 글 원문\n\n본문" : "Request written by the person (verbatim)\n내 글 원문\n\n본문"), `${locale}: 글 원문이 맨 위에 그대로`, framed);
+    check(framed.endsWith(locale === "ko" ? "이전 세션: 이름 (abc-123-full)\n과거 검색 도구가 있으면 세부 내용은 이 세션을 찾아 읽는다." : "Previous session: 이름 (abc-123-full)\nIf a past-search tool is available, find and read this session for details."), `${locale}: 이전 세션 전체 id가 끝에`, framed);
+    eq(`${locale}: 글이 없으면 맨 위 줄이 없다`, ho.withHandoffFrame("본문", { name: "n", id: "i" }).startsWith("본문"), true);
   }
   setLocale("ko");
+  const skel = ho.skeletonHandoff({ name: "n", id: "12345678-aaaa", cwd: "/x", focus: "다음 일", reason: "r", userTexts: [], todo: null, files: [], gitChanges: null });
+  check(skel.includes("다음 일") && !skel.includes("목적"), "뼈대에는 글만 있고 목적 줄이 없다");
 }
 
 // ── 통합 ──
@@ -125,16 +155,12 @@ console.log("\n=== 형식 오류는 400, 모델 호출 0번 ===");
   const { live } = mk();
   try {
     const before = mock.mockState.pushCalls;
-    eq("목적 모름", (await post(live.id, { purpose: "bogus" })).status, 400);
-    eq("목적 없음", (await post(live.id, {})).status, 400);
-    eq("다음 작업에 빈 초점", (await post(live.id, { purpose: "next", focus: "   " })).status, 400);
-    eq("초점 4001자", (await post(live.id, { purpose: "continue", focus: "x".repeat(4001) })).status, 400);
-    eq("초점 자리에 숫자", (await post(live.id, { purpose: "continue", focus: 3 })).status, 400);
-    eq("includeMethod 자리에 문자열", (await post(live.id, { purpose: "continue", includeMethod: "yes" })).status, 400);
-    eq("copyOnly 자리에 숫자", (await post(live.id, { purpose: "continue", copyOnly: 1 })).status, 400);
-    eq("없는 세션", (await post("no-such-session", { purpose: "continue" })).status, 404);
-    eq("받을 AI가 등록되지 않음", (await post(live.id, { purpose: "continue", provider: "no-such-ai" })).status, 409);
-    eq("받을 폴더가 없음", (await post(live.id, { purpose: "continue", cwd: path.join(ROOT, "nope-nope") })).status, 409);
+    eq("초점 4001자", (await post(live.id, { focus: "x".repeat(4001) })).status, 400);
+    eq("초점 자리에 숫자", (await post(live.id, { focus: 3 })).status, 400);
+    eq("copyOnly 자리에 숫자", (await post(live.id, { copyOnly: 1 })).status, 400);
+    eq("없는 세션", (await post("no-such-session", {})).status, 404);
+    eq("받을 AI가 등록되지 않음", (await post(live.id, { provider: "no-such-ai" })).status, 409);
+    eq("받을 폴더가 없음", (await post(live.id, { cwd: path.join(ROOT, "nope-nope") })).status, 409);
     eq("모델 호출 0번", mock.mockState.pushCalls - before, 0);
     eq("작업이 남지 않는다", item(live.id)?.handoffState, undefined);
   } finally {
@@ -149,14 +175,14 @@ console.log("\n=== 409: 보관·일하는 중·두 번째 요청 ===");
   const c = mk();
   try {
     sessionManager.setArchived(a.live.id, true);
-    eq("보관된 세션", (await post(a.live.id, { purpose: "continue" })).status, 409);
+    eq("보관된 세션", (await post(a.live.id, {})).status, 409);
     b.live.push("ASK:foo");
     check(await waitUntil(() => item(b.live.id)?.attention === "waiting"), "승인 대기에 들어갔다");
-    eq("승인을 기다리는 중", (await post(b.live.id, { purpose: "continue" })).status, 409);
+    eq("승인을 기다리는 중", (await post(b.live.id, {})).status, 409);
     mock.mockState.manualReply = true;
-    eq("첫 요청은 202", (await post(c.live.id, { purpose: "continue" })).status, 202);
+    eq("첫 요청은 202", (await post(c.live.id, {})).status, 202);
     eq("작업 상태는 writing", item(c.live.id)?.handoffState, "writing");
-    eq("두 번째 요청은 409", (await post(c.live.id, { purpose: "continue" })).status, 409);
+    eq("두 번째 요청은 409", (await post(c.live.id, {})).status, 409);
     eq("쓰는 중 DELETE는 409", (await del(c.live.id)).status, 409);
   } finally {
     mock.mockState.manualReply = false;
@@ -170,7 +196,7 @@ for (const [from, want] of [["manual", "manual"], ["edits", "edits"], ["auto", "
   try {
     await live.setPermissionMode(from);
     mock.mockState.manualReply = true;
-    await post(live.id, { purpose: "continue", focus: "초점", includeMethod: false });
+    await post(live.id, { focus: "초점" });
     rt.emitRaw({ t: "say", text: "<aether-handoff>\n본문\n</aether-handoff>" });
     rt.emitRaw({ t: "done" });
     await waitUntil(() => !!nextOf(live.id));
@@ -192,7 +218,7 @@ console.log("\n=== 정상 흐름 ===");
     live.setName("원래 작업");
     mock.mockState.manualReply = true;
     const before = mock.mockState.pushCalls;
-    const r = await post(live.id, { purpose: "continue", focus: "초점", includeMethod: false });
+    const r = await post(live.id, { focus: "초점" });
     eq("202 writing", [r.status, r.body.state], [202, "writing"]);
     eq("모델 호출은 한 번", mock.mockState.pushCalls - before, 1);
     const asked = userMsgs(live.id).at(-1);
@@ -209,7 +235,8 @@ console.log("\n=== 정상 흐름 ===");
     eq("저장 파일에 handoffFrom", store.loadMeta(next)?.handoffFrom, live.id);
     eq("목록에 handoffFrom과 초안 표시", [item(next)?.handoffFrom, item(next)?.handoffDraftPending], [live.id, true]);
     const info = await getInfo(next);
-    eq("초안은 표식 안쪽 글만", [info.incoming?.text, info.incoming?.source, info.incoming?.fromSessionId], ["본문 한 줄\n```\n코드\n```", "model", live.id]);
+    eq("초안은 표식 안쪽 글에 사람 글과 이전 세션 표시를 붙인 것", [info.incoming?.text, info.incoming?.source, info.incoming?.fromSessionId],
+      [`사람이 적은 요청 (원문)\n초점\n\n본문 한 줄\n\`\`\`\n코드\n\`\`\`\n\n이전 세션: 원래 작업 (${live.id})\n과거 검색 도구가 있으면 세부 내용은 이 세션을 찾아 읽는다.`, "model", live.id]);
     const n = sessionManager.get(next)!;
     eq("같은 AI·모델·폴더", [n.provider, n.model, n.cwd], [live.provider, live.model, live.cwd]);
     eq("권한 우회는 넘기지 않는다", n.permissionMode === "full", false);
@@ -243,12 +270,13 @@ console.log("\n=== 표식이 없는 답 ===");
   let next: string | undefined;
   try {
     mock.mockState.manualReply = true;
-    await post(live.id, { purpose: "next", focus: "로그인 화면을 만든다" });
+    await post(live.id, { focus: "로그인 화면을 만든다" });
     rt.emitRaw({ t: "say", text: "그냥 이렇게 씁니다" });
     rt.emitRaw({ t: "done" });
     check(await waitUntil(() => !!nextOf(live.id)), "새 세션이 생긴다");
     next = nextOf(live.id)!;
-    eq("마지막 글 전체가 초안", (await getInfo(next)).incoming?.text, "그냥 이렇게 씁니다");
+    const draft = (await getInfo(next)).incoming?.text ?? "";
+    check(draft.startsWith("사람이 적은 요청 (원문)\n로그인 화면을 만든다\n\n그냥 이렇게 씁니다\n\n이전 세션:"), "마지막 글 전체가 초안(앞뒤 틀 포함)", draft);
     eq("초점 글로 제목을 미리 정하지 않는다", resolveTitle(sessionManager.get(next)!), undefined);
   } finally {
     mock.mockState.manualReply = false;
@@ -277,7 +305,7 @@ console.log("\n=== 실패 턴은 뼈대 인계서 ===");
     rt.emitRaw({ t: "edit", text: "src/b.ts" });
     check(await waitUntil(() => store.readRecentEvents(live.id).filter((e) => e.kind === "mock3").length >= 4), "편집 사건이 쌓였다");
     mock.mockState.manualReply = true;
-    await post(live.id, { purpose: "continue" });
+    await post(live.id, {});
     rt.emitRaw({ t: "done", failed: true });
     check(await waitUntil(() => !!nextOf(live.id)), "새 세션이 생긴다");
     next = nextOf(live.id)!;
@@ -285,7 +313,8 @@ console.log("\n=== 실패 턴은 뼈대 인계서 ===");
     const text = info.incoming?.text ?? "";
     eq("source는 skeleton", info.incoming?.source, "skeleton");
     check(text.includes("첫 사람 말"), "최근 사용자 말 원문");
-    check(!text.includes("다음 작업으로 넘길 인계서를 써 줘"), "넘기기 요청은 뺀다");
+    check(!text.startsWith("사람이 적은 요청") && text.split("이전 세션:").length === 2 && !text.includes("과거 검색 도구가 있으면"), "뼈대에는 틀을 이중으로 붙이지 않는다");
+    check(!text.includes("새 세션으로 넘길 프롬프트를 써 줘"), "넘기기 요청은 뺀다");
     check(text.includes("src/a.ts") && text.includes("src/b.ts"), "기록에서 모은 두 경로");
     check(text.includes("뼈대 시험") && text.includes(live.id.slice(0, 8)), "이전 세션 이름과 id 앞 8자");
     check(text.includes("session_search"), "과거 검색 안내");
@@ -302,7 +331,7 @@ console.log("\n=== 한도: 쓰는 중 막힘, 이미 막힘, 취소 ===");
   const { live, rt } = mk();
   try {
     mock.mockState.manualReply = true;
-    await post(live.id, { purpose: "continue" });
+    await post(live.id, {});
     rt.emitRaw({ t: "limit" });
     rt.emitRaw({ t: "done", failed: true });
     check(await waitUntil(() => item(live.id)?.handoffState === "waiting_limit"), "상태가 waiting_limit", item(live.id));
@@ -322,7 +351,7 @@ console.log("\n=== 한도: 쓰는 중 막힘, 이미 막힘, 취소 ===");
     live.push("LIMIT:");
     check(await waitUntil(() => live.attentionHold?.kind === "rate_limit" && !live.isTurnOpen), "이미 한도에 막혔다");
     const before = mock.mockState.pushCalls;
-    const r = await post(live.id, { purpose: "continue" });
+    const r = await post(live.id, {});
     eq("바로 waiting_limit", [r.status, r.body.state], [202, "waiting_limit"]);
     eq("모델 호출 0번", mock.mockState.pushCalls - before, 0);
     eq("예약 종류는 handoff", item(live.id)?.autoResume?.action.type, "handoff");
@@ -339,7 +368,7 @@ console.log("\n=== 한도 대기 뒤 자동 실행과 포기 ===");
   try {
     live.push("LIMIT:");
     check(await waitUntil(() => live.attentionHold?.kind === "rate_limit" && !live.isTurnOpen), "이미 한도에 막혔다");
-    await post(live.id, { purpose: "continue" });
+    await post(live.id, {});
     const before = mock.mockState.pushCalls;
     mock.mockState.manualReply = true;
     live.setAutoResume({ action: { type: "handoff" }, attempts: 0, at: Date.now() - 1 });
@@ -367,7 +396,7 @@ console.log("\n=== 쓰는 중 멈춤 ===");
   const { live, rt } = mk();
   try {
     mock.mockState.manualReply = true;
-    await post(live.id, { purpose: "continue" });
+    await post(live.id, {});
     rt.emitRaw({ t: "done", interrupted: true });
     check(await waitUntil(() => item(live.id)?.handoffState === undefined), "작업이 지워진다");
     await sleep(50);
@@ -384,7 +413,7 @@ console.log("\n=== 멈춤 요청은 턴이 어떻게 끝나도 넘기기를 그�
   try {
     mock.mockState.manualReply = true;
     mock.mockState.interruptFails = true; // 멈춘 턴이 실패로 끝나는 provider
-    await post(live.id, { purpose: "continue" });
+    await post(live.id, {});
     await live.interrupt();
     check(await waitUntil(() => item(live.id)?.handoffState === undefined), "작업이 지워진다");
     await sleep(300);
@@ -401,7 +430,7 @@ console.log("\n=== 복사 결과가 남은 세션의 평범한 한도 턴은 문
   const { live, rt } = mk();
   try {
     mock.mockState.manualReply = true;
-    await post(live.id, { purpose: "continue", copyOnly: true });
+    await post(live.id, { copyOnly: true });
     rt.emitRaw({ t: "say", text: "<aether-handoff>\n글\n</aether-handoff>" });
     rt.emitRaw({ t: "done" });
     check(await waitUntil(() => item(live.id)?.handoffState === "copy_ready"), "copy_ready가 남았다");
@@ -422,7 +451,7 @@ console.log("\n=== 한도 알림이 실패 턴보다 늦게 와도 뼈대를 만
   try {
     sessionManager.handoffLimitGraceMs = 1500;
     mock.mockState.manualReply = true;
-    await post(live.id, { purpose: "continue" });
+    await post(live.id, {});
     rt.emitRaw({ t: "done", failed: true });
     await sleep(300);
     rt.emitRaw({ t: "limit" });
@@ -442,12 +471,12 @@ console.log("\n=== 복사만 ===");
   const { live, rt } = mk();
   try {
     mock.mockState.manualReply = true;
-    await post(live.id, { purpose: "continue", copyOnly: true });
+    await post(live.id, { copyOnly: true });
     rt.emitRaw({ t: "say", text: "<aether-handoff>\n복사할 글\n</aether-handoff>" });
     rt.emitRaw({ t: "done" });
     check(await waitUntil(() => item(live.id)?.handoffState === "copy_ready"), "copy_ready");
     eq("새 세션이 없다", nextOf(live.id), undefined);
-    eq("GET으로 글이 온다", (await getInfo(live.id)).result?.text, "복사할 글");
+    check((await getInfo(live.id)).result?.text.includes("복사할 글") === true, "GET으로 글이 온다");
     eq("DELETE 성공", (await del(live.id)).status, 200);
     eq("지워진다", [item(live.id)?.handoffState, (await getInfo(live.id)).result], [undefined, undefined]);
   } finally {
@@ -462,13 +491,13 @@ console.log("\n=== 새 세션 생성 실패 ===");
   const folder = fs.mkdtempSync(path.join(ROOT, "gone-"));
   try {
     mock.mockState.manualReply = true;
-    eq("폴더가 있을 때는 202", (await post(live.id, { purpose: "continue", cwd: folder })).status, 202);
+    eq("폴더가 있을 때는 202", (await post(live.id, { cwd: folder })).status, 202);
     fs.rmSync(folder, { recursive: true, force: true });
     rt.emitRaw({ t: "say", text: "<aether-handoff>\n잃으면 안 되는 글\n</aether-handoff>" });
     rt.emitRaw({ t: "done" });
     check(await waitUntil(() => item(live.id)?.handoffState === "copy_ready"), "copy_ready로 남는다");
     const res = (await getInfo(live.id)).result;
-    eq("글을 잃지 않는다", res?.text, "잃으면 안 되는 글");
+    check(res?.text?.includes("잃으면 안 되는 글") === true, "글을 잃지 않는다", res);
     check(!!res?.error, "result.error가 있다", res);
   } finally {
     mock.mockState.manualReply = false;
@@ -493,7 +522,7 @@ console.log("\n=== 복사본 세션은 원 폴더로 ===");
     let next: string | undefined;
     try {
       mock.mockState.manualReply = true;
-      await post(live.id, { purpose: "continue" });
+      await post(live.id, {});
       rt.emitRaw({ t: "say", text: "<aether-handoff>\n글\n</aether-handoff>" });
       rt.emitRaw({ t: "done" });
       check(await waitUntil(() => !!nextOf(live.id)), "새 세션이 생긴다");
@@ -506,20 +535,376 @@ console.log("\n=== 복사본 세션은 원 폴더로 ===");
   }
 }
 
+console.log("\n=== 질문 대기(asking) ===");
+{
+  const qbox = (n: number) => `정리\n\`\`\`aether-questions\n${JSON.stringify({ questions: [{ id: "q1", text: `질문${n}`, kind: "single", options: [{ label: "A" }, { label: "B" }], recommended: "A" }] })}\n\`\`\``;
+  const qevs = (id: string) => store.readRecentEvents(id).filter((e) => e.kind === "questionnaire") as unknown as { id: string }[];
+  const answerCard = async (live: ReturnType<typeof mk>["live"], tag: string) => {
+    const q = await live.openQuestionnaire();
+    if (!q) return { ok: false as const, status: 0, error: "열린 질문지 없음" };
+    return live.submitQuestionnaireAnswer({ questionnaireId: q.id, answers: { q1: { chosen: ["A"] } }, clientMessageId: tag, resendOnDuplicate: false });
+  };
+  const ask = (rt: ReturnType<typeof mk>["rt"], n: number) => {
+    rt.emitRaw({ t: "say", text: qbox(n) });
+    rt.emitRaw({ t: "done" });
+  };
+  const finishWith = (rt: ReturnType<typeof mk>["rt"], body: string) => {
+    rt.emitRaw({ t: "say", text: `<aether-handoff>\n${body}\n</aether-handoff>` });
+    rt.emitRaw({ t: "done" });
+  };
+
+  // 질문 → asking → 카드 답 → 인계서 → 새 세션
+  {
+    const { live, rt } = mk();
+    let next: string | undefined;
+    try {
+      live.setName("질문 시험");
+      mock.mockState.manualReply = true;
+      await post(live.id, { focus: "로그인 만들기" });
+      ask(rt, 1);
+      check(await waitUntil(() => item(live.id)?.handoffState === "asking"), "질문 턴이 끝나면 asking이다", item(live.id));
+      eq("질문 턴을 인계서로 착각하지 않는다", [nextOf(live.id), (await getInfo(live.id)).result], [undefined, undefined]);
+      eq("질문지 사건이 하나 생겼다", qevs(live.id).length, 1);
+      await sleep(250); // 뼈대 유예보다 길게 기다려도 asking이 유지된다
+      eq("asking은 유지된다", [item(live.id)?.handoffState, nextOf(live.id)], ["asking", undefined]);
+      eq("두 번째 요청은 already(409)", (await post(live.id, {})).status, 409);
+      const r = await answerCard(live, "ho-ans-1");
+      check(r.ok === true, "카드 답이 받아들여진다", r);
+      check(await waitUntil(() => item(live.id)?.handoffState === "writing"), "카드 답이 오면 writing으로 돌아온다");
+      finishWith(rt, "답을 반영한 본문");
+      check(await waitUntil(() => !!nextOf(live.id)), "인계서가 나오면 새 세션이 생긴다");
+      next = nextOf(live.id)!;
+      const text = (await getInfo(next)).incoming?.text ?? "";
+      check(text.startsWith("사람이 적은 요청 (원문)\n로그인 만들기\n\n답을 반영한 본문") && text.endsWith(`(${live.id})\n과거 검색 도구가 있으면 세부 내용은 이 세션을 찾아 읽는다.`), "초안 맨 위에 글 원문, 끝에 이전 세션 id", text);
+      eq("작업이 정리된다", item(live.id)?.handoffState, undefined);
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id, next);
+    }
+  }
+
+  // 물을 게 없으면 바로 인계서 + 요청은 질문지 판독을 켠다(briefOpen이 저장된다)
+  {
+    const { live, rt } = mk();
+    let next: string | undefined;
+    try {
+      mock.mockState.manualReply = true;
+      await post(live.id, {});
+      eq("요청을 보내면 질문지 판독이 켜진다", store.loadMeta(live.id)?.briefOpen, true);
+      finishWith(rt, "바로 쓴 본문");
+      check(await waitUntil(() => !!nextOf(live.id)), "질문 없이 바로 새 세션이 생긴다");
+      next = nextOf(live.id)!;
+      eq("글이 없으면 맨 위 줄이 없다", (await getInfo(next)).incoming?.text.startsWith("바로 쓴 본문"), true);
+      eq("질문지 판독은 턴 끝에 꺼진다", store.loadMeta(live.id)?.briefOpen, undefined);
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id, next);
+    }
+  }
+
+  // 질문은 2회까지. 세 번째 질문이면 강제 요청
+  {
+    const { live, rt } = mk();
+    let next: string | undefined;
+    try {
+      mock.mockState.manualReply = true;
+      await post(live.id, {});
+      ask(rt, 1);
+      check(await waitUntil(() => item(live.id)?.handoffState === "asking"), "1회째 질문");
+      await answerCard(live, "ho-r1");
+      await waitUntil(() => item(live.id)?.handoffState === "writing");
+      ask(rt, 2);
+      check(await waitUntil(() => item(live.id)?.handoffState === "asking" && qevs(live.id).length === 2), "2회째 질문");
+      await answerCard(live, "ho-r2");
+      await waitUntil(() => item(live.id)?.handoffState === "writing");
+      const before = mock.mockState.pushCalls;
+      ask(rt, 3);
+      check(await waitUntil(() => mock.mockState.pushCalls - before === 1), "3회째 질문이면 강제 요청을 보낸다");
+      const forced = userMsgs(live.id).at(-1);
+      check(forced?.text === ho.handoffForceWriteText() && forced?.sentBy === "aether" && forced?.clientMessageId?.startsWith("handoff-") === true, "강제 요청은 Aether 글이다", forced);
+      eq("상태는 writing", item(live.id)?.handoffState, "writing");
+      finishWith(rt, "마무리 본문");
+      check(await waitUntil(() => !!nextOf(live.id)), "강제 요청 뒤 인계서가 나온다");
+      next = nextOf(live.id)!;
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id, next);
+    }
+  }
+  // 강제 요청 뒤에도 또 물으면 뼈대로 넘긴다(무한 반복 없음)
+  {
+    const { live, rt } = mk();
+    let next: string | undefined;
+    try {
+      live.setName("끝없는 질문");
+      mock.mockState.manualReply = true;
+      await post(live.id, {});
+      for (let n = 1; n <= 2; n++) {
+        ask(rt, n);
+        await waitUntil(() => item(live.id)?.handoffState === "asking" && qevs(live.id).length === n);
+        await answerCard(live, `ho-loop-${n}`);
+        await waitUntil(() => item(live.id)?.handoffState === "writing");
+      }
+      ask(rt, 3); // 강제 요청이 나간다
+      await waitUntil(() => userMsgs(live.id).at(-1)?.sentBy === "aether");
+      ask(rt, 4); // 그래도 또 묻는다
+      check(await waitUntil(() => !!nextOf(live.id)), "또 물으면 뼈대로 넘긴다", item(live.id));
+      next = nextOf(live.id)!;
+      eq("초안은 skeleton", (await getInfo(next)).incoming?.source, "skeleton");
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id, next);
+    }
+  }
+
+  // 사람이 카드 대신 채팅으로 딴말
+  {
+    const { live, rt } = mk();
+    let next: string | undefined;
+    try {
+      mock.mockState.manualReply = true;
+      await post(live.id, {});
+      ask(rt, 1);
+      await waitUntil(() => item(live.id)?.handoffState === "asking");
+      await live.push("그런데 오늘 날씨 어때?");
+      check(await waitUntil(() => item(live.id)?.handoffState === "writing"), "채팅이 오면 writing");
+      rt.emitRaw({ t: "say", text: "날씨는 모릅니다" });
+      rt.emitRaw({ t: "done" });
+      check(await waitUntil(() => item(live.id)?.handoffState === "asking"), "딴말 턴은 asking으로 돌아온다", item(live.id));
+      await sleep(250);
+      eq("딴말에 대한 답을 인계서로 쓰지 않는다", [nextOf(live.id), item(live.id)?.handoffState], [undefined, "asking"]);
+      await live.push("그냥 알아서 써");
+      await waitUntil(() => item(live.id)?.handoffState === "writing");
+      finishWith(rt, "알아서 쓴 본문");
+      check(await waitUntil(() => !!nextOf(live.id)), "이어서 인계서가 나오면 새 세션이 생긴다");
+      next = nextOf(live.id)!;
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id, next);
+    }
+  }
+
+  // 취소
+  {
+    const { live, rt } = mk();
+    try {
+      mock.mockState.manualReply = true;
+      await post(live.id, {});
+      ask(rt, 1);
+      await waitUntil(() => item(live.id)?.handoffState === "asking");
+      eq("asking 취소는 200", (await del(live.id)).status, 200);
+      eq("작업이 지워진다", item(live.id)?.handoffState, undefined);
+      await live.push("취소 뒤 말");
+      rt.emitRaw({ t: "say", text: "<aether-handoff>\n취소 뒤 글\n</aether-handoff>" });
+      rt.emitRaw({ t: "done" });
+      await sleep(250);
+      eq("취소 뒤에는 인계서를 받지 않는다", [nextOf(live.id), item(live.id)?.handoffState], [undefined, undefined]);
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id);
+    }
+  }
+
+  // 질문 대기 중 세션이 끝나도 뼈대를 만들지 않는다
+  {
+    const { live, rt } = mk();
+    try {
+      mock.mockState.manualReply = true;
+      await post(live.id, {});
+      ask(rt, 1);
+      await waitUntil(() => item(live.id)?.handoffState === "asking");
+      rt.emitRaw({ t: "done", failed: true }); // 턴 끝 사건이 질문 대기 중에 와도 무시한다
+      await sleep(300);
+      eq("뼈대가 생기지 않는다", [nextOf(live.id), item(live.id)?.handoffState], [undefined, "asking"]);
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id);
+    }
+  }
+}
+
+console.log("\n=== 질문 대기: 예외 경로 ===");
+{
+  const qbox = (n: number) => `정리\n\`\`\`aether-questions\n${JSON.stringify({ questions: [{ id: "q1", text: `질문${n}`, kind: "single", options: [{ label: "A" }, { label: "B" }], recommended: "A" }] })}\n\`\`\``;
+  const ask = (rt: ReturnType<typeof mk>["rt"], n = 1) => {
+    rt.emitRaw({ t: "say", text: qbox(n) });
+    rt.emitRaw({ t: "done" });
+  };
+  const marker = (rt: ReturnType<typeof mk>["rt"], body: string) => {
+    rt.emitRaw({ t: "say", text: `<aether-handoff>\n${body}\n</aether-handoff>` });
+    rt.emitRaw({ t: "done" });
+  };
+
+  // 글 상한: 끝의 이전 세션 id가 잘리지 않는다
+  {
+    const framed = ho.withHandoffFrame("x".repeat(70_000), { focus: "글", name: "이름", id: "full-id-0001" });
+    check(framed.length <= ho.HANDOFF_TEXT_MAX && framed.endsWith("찾아 읽는다.") && framed.includes("(full-id-0001)"), "상한에 걸려도 끝의 이전 세션 id가 남는다", framed.length);
+  }
+
+  // 재전송: user_msg 없이 도는 턴
+  {
+    const { live, rt } = mk();
+    let next: string | undefined;
+    try {
+      mock.mockState.manualReply = true;
+      await post(live.id, {});
+      ask(rt);
+      await waitUntil(() => item(live.id)?.handoffState === "asking");
+      rt.emitRaw({ t: "say", text: "표식 없는 평문 답" });
+      rt.emitRaw({ t: "done" });
+      await sleep(300);
+      eq("user_msg 없는 턴이 표식 없이 끝나면 asking을 유지한다", [item(live.id)?.handoffState, nextOf(live.id)], ["asking", undefined]);
+      marker(rt, "재전송 턴의 본문");
+      check(await waitUntil(() => !!nextOf(live.id)), "user_msg 없는 턴에 표식 있는 글이 오면 넘긴다", item(live.id));
+      next = nextOf(live.id);
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id, next);
+    }
+  }
+
+  // 실패한 딴말
+  {
+    const { live, rt } = mk();
+    try {
+      mock.mockState.manualReply = true;
+      await post(live.id, {});
+      ask(rt);
+      await waitUntil(() => item(live.id)?.handoffState === "asking");
+      await live.push("딴말");
+      await waitUntil(() => item(live.id)?.handoffState === "writing");
+      rt.emitRaw({ t: "done", failed: true });
+      check(await waitUntil(() => item(live.id)?.handoffState === "asking"), "딴말 턴이 실패해도 asking으로 돌아온다", item(live.id));
+      await sleep(300);
+      eq("뼈대 새 세션이 생기지 않는다", nextOf(live.id), undefined);
+      eq("질문지 판독이 다시 켜져 있다", store.loadMeta(live.id)?.briefOpen, true);
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id);
+    }
+  }
+
+  // 딴말 턴에서 질문 상자가 오면 질문으로 센다
+  {
+    const { live, rt } = mk();
+    try {
+      mock.mockState.manualReply = true;
+      await post(live.id, {});
+      ask(rt, 1);
+      await waitUntil(() => item(live.id)?.handoffState === "asking");
+      await live.push("딴말");
+      await waitUntil(() => item(live.id)?.handoffState === "writing");
+      ask(rt, 2);
+      check(await waitUntil(() => store.readRecentEvents(live.id).filter((e) => e.kind === "questionnaire").length === 2), "딴말 뒤 질문도 질문지 사건이 된다");
+      eq("횟수가 늘고 asking이다", [item(live.id)?.handoffState, store.loadMeta(live.id)?.handoffJob?.askRounds], ["asking", 2]);
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id);
+    }
+  }
+
+  // 취소 뒤 카드 답은 409
+  {
+    const { live, rt } = mk();
+    try {
+      mock.mockState.manualReply = true;
+      await post(live.id, {});
+      ask(rt);
+      await waitUntil(() => item(live.id)?.handoffState === "asking");
+      const q = await live.openQuestionnaire();
+      await del(live.id);
+      eq("취소하면 질문지 판독이 꺼진다", store.loadMeta(live.id)?.briefOpen, undefined);
+      const r = await live.submitQuestionnaireAnswer({ questionnaireId: q!.id, answers: { q1: { chosen: ["A"] } }, clientMessageId: "after-cancel", resendOnDuplicate: false });
+      check(!r.ok && r.status === 409, "취소 뒤 그 카드에 답하면 409다", r);
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id);
+    }
+  }
+
+  // 되돌리기로 요청이 숨겨지면 작업을 지운다
+  {
+    const { live, rt } = mk();
+    try {
+      mock.mockState.manualReply = true;
+      await live.push("첫 말");
+      rt.emitRaw({ t: "done" });
+      await waitUntil(() => !live.isTurnOpen);
+      const first = userMsgs(live.id)[0] as unknown as { seq: number };
+      await post(live.id, {});
+      ask(rt);
+      await waitUntil(() => item(live.id)?.handoffState === "asking");
+      await sessionManager.rewind(live.id, first.seq);
+      eq("되돌리면 질문 대기 작업이 지워진다", [item(live.id)?.handoffState, store.loadMeta(live.id)?.briefOpen], [undefined, undefined]);
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id);
+    }
+  }
+
+  // 잠들었다 깨도 감시가 새 실행기에 걸린다
+  {
+    const { live, rt } = mk();
+    let next: string | undefined;
+    try {
+      mock.mockState.manualReply = true;
+      await live.push("첫 말");
+      rt.emitRaw({ t: "done" });
+      await waitUntil(() => !live.isTurnOpen);
+      await post(live.id, {});
+      ask(rt);
+      await waitUntil(() => item(live.id)?.handoffState === "asking");
+      const slept = await sessionManager.sweepIdle(Date.now() + 31 * 60_000);
+      check(slept >= 1 && !sessionManager.get(live.id), "질문 대기 중에는 잠들 수 있다", slept);
+      eq("작업은 남는다", item(live.id)?.handoffState, "asking");
+      const woke = sessionManager.getOrResume(live.id);
+      const wokeRt = mock.lastMockRuntime!;
+      await woke.push("그냥 써 줘");
+      check(await waitUntil(() => item(live.id)?.handoffState === "writing"), "깬 뒤 사람의 글이 오면 writing이 된다");
+      marker(wokeRt, "깬 뒤 본문");
+      check(await waitUntil(() => !!nextOf(live.id)), "깬 뒤에도 인계서가 새 세션으로 간다", item(live.id));
+      next = nextOf(live.id);
+    } finally {
+      mock.mockState.manualReply = false;
+      cleanup(live.id, next);
+    }
+  }
+
+  // 강제 문장을 붙인 재개 요청에는 질문지 판독을 켜지 않는다
+  {
+    const r = ho.handoffRequest("글", true);
+    check(r.modelText.endsWith(ho.handoffForceWriteText()), "forced 요청의 모델 입력 끝에 강제 문장이 붙는다");
+    check(!ho.handoffRequest("글").modelText.endsWith(ho.handoffForceWriteText()), "보통 요청에는 붙지 않는다");
+  }
+}
+
 console.log("\n=== 재시작 복원 ===");
 {
   const mkDisk = (id: string, job: unknown) => {
     const dir = path.join(DATA, id);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "meta.json"), JSON.stringify({ id, cwd: ROOT, createdAt: 1, resumeKey: "mock-thread-ho", handoffJob: job }));
+    fs.writeFileSync(path.join(dir, "meta.json"), JSON.stringify({ id, cwd: ROOT, provider: mock.MOCK_PROVIDER, createdAt: 1, resumeKey: "mock-thread-ho", handoffJob: job }));
     store.appendEvent(id, { seq: 1, ts: 1, kind: "status", status: "completed" } as never);
   };
   mkDisk("ho-writing-1", { purpose: "continue", includeMethod: true, state: "writing", requestedAt: 1 });
-  mkDisk("ho-waiting-1", { purpose: "continue", includeMethod: true, state: "waiting_limit", requestedAt: 1 });
+  mkDisk("ho-waiting-1", { purpose: "continue", includeMethod: true, state: "waiting_limit", requestedAt: 1 }); // 옛 저장 작업(purpose 포함)
+  mkDisk("ho-asking-1", { focus: "f", state: "asking", requestedAt: 1, askRounds: 1 });
   sessionManager.restoreFromDisk();
   eq("쓰던 작업은 버려진다", item("ho-writing-1")?.handoffState, undefined);
   eq("한도 대기는 남는다", item("ho-waiting-1")?.handoffState, "waiting_limit");
-  cleanup("ho-writing-1", "ho-waiting-1");
+  eq("질문 대기는 남는다", item("ho-asking-1")?.handoffState, "asking");
+  // 재시작 뒤 세션을 새로 띄우면 지켜보기가 다시 걸린다
+  mock.mockState.manualReply = true;
+  const woke = sessionManager.getOrResume("ho-asking-1");
+  const wokeRt = mock.lastMockRuntime!;
+  await woke.push("그냥 써 줘");
+  check(await waitUntil(() => item("ho-asking-1")?.handoffState === "writing"), "사람의 글이 오면 writing으로 바뀐다(감시 재무장)", item("ho-asking-1"));
+  wokeRt.emitRaw({ t: "say", text: "<aether-handoff>\n재시작 뒤 본문\n</aether-handoff>" });
+  wokeRt.emitRaw({ t: "done" });
+  check(await waitUntil(() => !!nextOf("ho-asking-1")), "재시작 뒤에도 인계서가 새 세션으로 간다");
+  const restartedNext = nextOf("ho-asking-1");
+  mock.mockState.manualReply = false;
+  cleanup("ho-writing-1", "ho-waiting-1", "ho-asking-1", restartedNext);
 }
 
 server.close();

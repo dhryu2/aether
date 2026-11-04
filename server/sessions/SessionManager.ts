@@ -27,7 +27,7 @@ import type { ProviderId } from "../providers/types";
 import type { AetherEvent, AetherEventBody, DerivedStatus, SessionEffort, SessionListItem, SessionMeta } from "../types";
 import { PERMISSION_MODES, type SlashCommandInfo, type AutoResumePlan, type HandoffFields, type HandoffJob, type HandoffSource, type PermissionMode, type PresenceSession } from "../../shared/http";
 import { computeAttention, isStickyAttentionKind } from "./attention";
-import { changedFiles, handoffRequest, handoffTurnOutcome, HANDOFF_CLIENT_ID_PREFIX, latestTodoItems, limitResetsAt, pickHandoffText, recentUserTexts, skeletonHandoff } from "./handoff";
+import { changedFiles, handoffForceWriteText, handoffRequest, handoffTurnOutcome, HANDOFF_ASK_ROUNDS_MAX, HANDOFF_CLIENT_ID_PREFIX, latestTodoItems, limitResetsAt, pickHandoffText, recentUserTexts, skeletonHandoff, withHandoffFrame } from "./handoff";
 import { autoResumeStoppedIntent, waitingFromPending, type NotifyIntent } from "../notify/worthNotifying";
 import { AUTO_RESUME_MAX_ATTEMPTS, AUTO_RESUME_TEXT_MAX, nextAttemptAt, readAutoResumeSettings, type AutoResumeVerdict } from "./autoResume";
 import { st } from "../i18n";
@@ -546,6 +546,7 @@ class SessionManager {
       this.sessions.set(id, session); // 종료 세션 교체
       this.onLive?.(session);
       this.armAttentionHold(session); // 복원된 hold의 끝 시각 타이머
+      this.rearmHandoffAsk(session);
       if (!rewound) session.noticeResumed(st("notice.session.resumedAfterEnd"));
       return session;
     }
@@ -620,6 +621,7 @@ class SessionManager {
     this.disk.delete(id);
     this.onLive?.(session);
     this.armAttentionHold(session);
+    this.rearmHandoffAsk(session);
     // 깨어난 것을 알린다. 안 알리면 잠듦 → 깨움 → 다시 잠듦에서 두 번째 잠듦 알림이 같은 내용이라 걸러져 탭이 '활성'에 머문다.
     this.emitPresence(this.toPresenceFromLive(session));
     // 진행 중이던 턴은 복원 불가 — 정직 표기. 되돌린 세션은 식별자가 없어도 빈 대화가 아니다.
@@ -646,7 +648,11 @@ class SessionManager {
   async rewind(id: string, seq: number): Promise<RewindOutcome> {
     if (!UUID_RE.test(id)) throw new RewindError("missing");
     const live = this.sessions.get(id);
-    if (live && !live.isDisposed) return live.rewind(seq);
+    if (live && !live.isDisposed) {
+      const out = await live.rewind(seq);
+      if (this.handoffMeta(id)?.handoffJob?.state === "asking") this.dropAskingHandoff(id); // 요청이나 질문 카드가 숨겨졌을 수 있다
+      return out;
+    }
     const meta = this.disk.get(id)?.meta ?? store.loadMeta(id);
     if (!meta?.cwd) throw new RewindError("missing");
     const codec = providerEntry(storedProviderId(meta.provider)).codec;
@@ -655,6 +661,7 @@ class SessionManager {
     const saved = store.loadMeta(id);
     const entry = this.disk.get(id);
     if (entry && saved) entry.meta = saved;
+    if (this.handoffMeta(id)?.handoffJob?.state === "asking") this.dropAskingHandoff(id);
     return result;
   }
 
@@ -997,7 +1004,8 @@ class SessionManager {
     if (live.pendingPermissions().length || live.pendingQuestionList().length || live.pendingPlanList().length) return false;
     if (live.backgroundTasks.length) return false; // 막 끝난 직후의 보류 시간도 포함한다
     // 인계서를 쓰는 중이거나, 자동 재개를 보내고 결과를 기다리는 중(시각 없이 포기도 아닌 예약)이다.
-    if (this.handoffWatch.has(live.id) || live.handoffJob?.state === "writing") return false;
+    // 사람의 답을 기다리는 중(asking)에는 지켜보기만 걸려 있으므로 잠들어도 된다. 깨어날 때 다시 건다.
+    if ((this.handoffWatch.has(live.id) && live.handoffJob?.state !== "asking") || live.handoffJob?.state === "writing") return false;
     const plan = live.autoResume;
     if (plan && plan.at === undefined && !plan.gaveUp) return false;
     return true;
@@ -1092,7 +1100,7 @@ class SessionManager {
    * 넘기기를 시작한다. 이미 한도에 막혀 있으면 모델을 부르지 않고 풀릴 때까지 기다린다.
    * 반환은 작업 상태. 시작하지 못하면 HandoffError(또는 깨우기 실패)를 던진다.
    */
-  async startHandoff(id: string, req: Pick<HandoffJob, "purpose" | "focus" | "includeMethod" | "provider" | "cwd" | "copyOnly">): Promise<"writing" | "waiting_limit"> {
+  async startHandoff(id: string, req: Pick<HandoffJob, "focus" | "provider" | "cwd" | "copyOnly">): Promise<"writing" | "waiting_limit"> {
     if (this.isArchived(id)) throw new HandoffError("archived");
     await this.settledSleep(id);
     const live = this.getOrResume(id);
@@ -1118,44 +1126,134 @@ class SessionManager {
   /** 인계서 요청을 보내고 그 턴이 끝나기를 지켜본다. auto는 한도 대기 뒤 Aether가 보내는 경우다. */
   private async askHandoff(live: LiveSession, job: HandoffJob, auto: boolean): Promise<void> {
     const id = live.id;
-    this.handoffWatch.get(id)?.();
     this.writeHandoff(id, { handoffJob: { ...job, state: "writing" } });
-    const events: AetherEvent[] = [];
-    const unsub = live.subscribe((ev) => {
-      events.push(ev);
-      // 구독 뒤 첫 턴 끝까지가 이번 턴이다. 세션 종료 사건이 먼저 오면 턴 끝 없이 닫는다.
-      const turnEnd = live.codec.endsTurn(ev);
-      if (!turnEnd && (ev as { kind?: string }).kind !== "status") return;
-      unsub();
-      this.handoffWatch.delete(id);
-      queueMicrotask(() => void this.settleHandoff(live, events, turnEnd));
-    });
-    this.handoffWatch.set(id, unsub);
-    const { text, modelText } = handoffRequest(job.purpose, job.focus, job.includeMethod);
+    this.watchHandoffTurn(live);
+    const { text, modelText } = handoffRequest(job.focus, job.forced === true);
     try {
-      await live.push(text, undefined, undefined, `${HANDOFF_CLIENT_ID_PREFIX}${randomUUID()}`, { modelText, ...(auto ? { sentBy: "aether" as const } : {}) });
+      // brief: 물을 것이 있으면 선택지 질문 도구 대신 질문지 상자로 묻게 하고, 턴 끝에서 질문지 사건을 만든다. 더 묻지 않는 재개(forced)는 켜지 않는다.
+      await live.push(text, undefined, undefined, `${HANDOFF_CLIENT_ID_PREFIX}${randomUUID()}`, { modelText, ...(job.forced ? {} : { brief: true }), ...(auto ? { sentBy: "aether" as const } : {}) });
     } catch (e) {
-      unsub();
-      this.handoffWatch.delete(id);
+      this.unwatchHandoff(id);
       throw e;
     }
   }
 
-  /** 인계서를 쓴 턴이 끝났다. 멈춘 턴이면 접고, 글이 있으면 넘기고, 한도면 기다리고, 아니면 뼈대로 넘긴다. */
-  private async settleHandoff(live: LiveSession, events: AetherEvent[], turnEnd: boolean) {
+  private unwatchHandoff(id: string) {
+    this.handoffWatch.get(id)?.();
+    this.handoffWatch.delete(id);
+  }
+
+  /**
+   * 세션을 새로 띄웠을 때 사람의 답을 기다리던 넘기기가 있으면 지켜보기를 다시 건다.
+   * 지켜보기는 메모리에만 있어서 재시작·잠들기로 사라진다.
+   */
+  private rearmHandoffAsk(live: LiveSession) {
+    // 옛 실행기의 구독이 지워지지 않고 남아 있을 수 있으므로 감시가 있어도 새 실행기에 다시 건다(옛 구독은 먼저 풀린다).
+    if (live.handoffJob?.state === "asking") this.watchHandoffTurn(live);
+  }
+
+  /**
+   * 인계서 턴을 지켜본다. 질문 대기(asking) 중에는 사람의 글(카드 답이든 채팅이든)이 와야 새 턴으로 보고 쓰기(writing)로 바꾼다.
+   * 질문 대기 중 세션이 잠들거나 끝나는 상태 사건은 무시한다. 쓰는 중에는 턴 끝(또는 세션 종료)에서 닫고 정리한다.
+   * chat은 이번 턴을 연 글이 사람이 채팅으로 쓴 말(요청·카드 답·Aether 글이 아님)이라는 뜻이다.
+   */
+  private watchHandoffTurn(live: LiveSession) {
+    const id = live.id;
+    this.unwatchHandoff(id);
+    let events: AetherEvent[] = [];
+    let chat = false;
+    const unsub = live.subscribe((ev) => {
+      const job = this.handoffMeta(id)?.handoffJob;
+      const kind = (ev as { kind?: string }).kind;
+      if (job?.state === "asking") {
+        if (kind === "user_msg") {
+          const u = ev as { clientMessageId?: string; sentBy?: string; questionnaireAnswer?: unknown };
+          events = [ev];
+          chat = !u.questionnaireAnswer && !u.sentBy && !u.clientMessageId?.startsWith(HANDOFF_CLIENT_ID_PREFIX);
+          live.setBriefOpen(true); // 이 답 뒤에도 물을 수 있게 질문지 판독을 켜 둔다
+          this.writeHandoff(id, { handoffJob: { ...job, state: "writing" } });
+          return;
+        }
+        // 같은 식별자로 재전송된 답은 user_msg 없이 턴이 돈다. 그 턴 끝에서 표식 있는 글만 받고, 아니면 질문 대기를 유지한다.
+        events.push(ev);
+        if (!live.codec.endsTurn(ev)) return;
+        unsub();
+        this.handoffWatch.delete(id);
+        const turn = events;
+        queueMicrotask(() => this.settleAskingStray(live, turn));
+        return;
+      }
+      events.push(ev);
+      // 구독 뒤 첫 턴 끝까지가 이번 턴이다. 세션 종료 사건이 먼저 오면 턴 끝 없이 닫는다.
+      const turnEnd = live.codec.endsTurn(ev);
+      if (!turnEnd && kind !== "status") return;
+      unsub();
+      this.handoffWatch.delete(id);
+      queueMicrotask(() => void this.settleHandoff(live, events, turnEnd, chat));
+    });
+    this.handoffWatch.set(id, unsub);
+  }
+
+  /** 질문 대기 중 user_msg 없이 턴이 끝났다. 표식 있는 인계서가 있으면 넘기고, 없으면 질문 대기를 이어 간다. */
+  private settleAskingStray(live: LiveSession, events: AetherEvent[]) {
+    const job = this.handoffMeta(live.id)?.handoffJob;
+    if (!job || job.state !== "asking") return;
+    const picked = handoffTurnOutcome(events, live.codec) === "ok" ? pickHandoffText(events, live.codec, true) : null;
+    if (picked) return this.finishHandoff(live, job, picked, "model");
+    this.watchHandoffTurn(live);
+  }
+
+  /** 인계서를 쓴 턴이 끝났다. 멈춘 턴이면 접고, 글이 있으면 넘기고, 물을 게 있으면 묻고, 한도면 기다리고, 아니면 뼈대로 넘긴다. */
+  private async settleHandoff(live: LiveSession, events: AetherEvent[], turnEnd: boolean, chat: boolean) {
     const id = live.id;
     const job = this.handoffMeta(id)?.handoffJob;
     if (!job || job.state === "copy_ready") return; // 그 사이 지워졌거나 포기 처리됐다
     const outcome = turnEnd ? handoffTurnOutcome(events, live.codec) : "failed";
     // 사람이 멈췄다 = 넘기기를 그만둔다. provider가 멈춘 턴을 어떻게 끝내든(성공·실패·멈춤) 멈춤 요청 표시가 먼저다.
     if (live.interruptRequested || outcome === "interrupted") return this.endHandoffJob(id, undefined);
-    const picked = pickHandoffText(events, live.codec);
+    // 사람이 채팅으로 딴말을 한 턴의 답은 표식이 있을 때만 인계서로 받는다(딴말에 대한 답을 인계서로 쓰지 않는다).
+    const picked = pickHandoffText(events, live.codec, chat);
     // 한도 대기로 바뀐 작업은 글이 온전히 끝난 턴(ok)의 글만 받는다. 한도로 끊긴 턴의 글은 쓰지 않는다.
     if (picked && (job.state === "writing" || outcome === "ok")) return this.finishHandoff(live, job, picked, "model");
     if (job.state === "waiting_limit") return;
     if (outcome === "limit") {
       this.writeHandoff(id, { handoffJob: { ...job, state: "waiting_limit" } });
       this.scheduleHandoffWait(id, limitResetsAt(events, live.codec));
+      return;
+    }
+    if (outcome === "ok") {
+      // 질문지는 턴 끝 사건보다 먼저 기록되므로 여기서 읽을 수 있다. 깨진 질문지는 null이라 아래 실패 흐름으로 간다.
+      const open = job.forced ? null : await live.openQuestionnaire();
+      const now = this.handoffMeta(id)?.handoffJob;
+      if (!now || now.state !== "writing") return; // 기다리는 사이 지워졌다
+      if (live.interruptRequested) return this.endHandoffJob(id, undefined);
+      if (open) {
+        const rounds = now.askRounds ?? 0;
+        if (rounds < HANDOFF_ASK_ROUNDS_MAX) {
+          this.writeHandoff(id, { handoffJob: { ...now, state: "asking", askRounds: rounds + 1 } });
+          this.watchHandoffTurn(live);
+          return;
+        }
+        // 물을 횟수를 다 썼다. 더 묻지 말고 쓰게 한다. 그 뒤에도 또 물으면 위의 forced 때문에 뼈대로 넘어간다.
+        this.writeHandoff(id, { handoffJob: { ...now, forced: true } });
+        this.watchHandoffTurn(live);
+        try {
+          await live.push(handoffForceWriteText(), undefined, undefined, `${HANDOFF_CLIENT_ID_PREFIX}${randomUUID()}`, { sentBy: "aether" });
+        } catch (e) {
+          this.unwatchHandoff(id);
+          void reportError(e, { component: "session", operation: "session.handoff.force", session_id: id });
+          this.finishHandoff(live, now, this.buildSkeleton(live, now, st("routes.handoff.reasonFailed")), "skeleton");
+        }
+        return;
+      }
+    }
+    if (chat) {
+      // 사람의 딴말에 모델이 답한 턴이다(결과가 실패여도). 뼈대로 넘기지 않고 질문 대기로 돌아가 다음 글을 기다린다.
+      const now = this.handoffMeta(id)?.handoffJob;
+      if (!now || now.state !== "writing") return;
+      live.setBriefOpen(true); // 턴 끝에서 꺼진 질문지 판독을 다시 켠다
+      this.writeHandoff(id, { handoffJob: { ...now, state: "asking" } });
+      this.watchHandoffTurn(live);
       return;
     }
     // 한도 알림이 실패한 턴보다 늦게 올 수 있다. 판정은 A1 한 곳이 하므로 잠깐 기다려 그 사이 대기로 바뀌었는지 본다.
@@ -1180,7 +1278,6 @@ class SessionManager {
       name: this.autoResumeNameOf(live.id).name,
       id: live.id,
       cwd: live.workspaceSource ?? live.cwd,
-      purpose: job.purpose,
       focus: job.focus,
       reason,
       userTexts: recentUserTexts(events),
@@ -1197,8 +1294,10 @@ class SessionManager {
   }
 
   /** 글이 정해졌다. 복사만이면 결과로 남기고, 아니면 새 세션을 만들어 초안으로 넣는다. 만들지 못하면 글을 잃지 않게 결과로 남긴다. */
-  private finishHandoff(live: LiveSession, job: HandoffJob, text: string, source: HandoffSource) {
+  private finishHandoff(live: LiveSession, job: HandoffJob, rawText: string, source: HandoffSource) {
     const id = live.id;
+    // 모델이 쓴 글에만 사람이 적은 글 원문과 이전 세션 표시를 붙인다. 뼈대는 이미 둘 다 담고 있다.
+    const text = source === "model" ? withHandoffFrame(rawText, { focus: job.focus, name: this.autoResumeNameOf(id).name, id }) : rawText;
     if (job.copyOnly) return this.endHandoffJob(id, { ...job, state: "copy_ready", result: { text, source } });
     try {
       const sameAi = !job.provider || job.provider === live.provider;
@@ -1256,12 +1355,21 @@ class SessionManager {
     };
   }
 
-  /** 한도 대기를 취소하거나 복사 결과를 지운다. 쓰는 중이면 "busy"(멈추려면 멈추기 버튼). */
+  /** 질문 대기 작업을 버린다. 열려 있던 질문지에는 더 답할 수 없게 질문지 판독도 끈다. */
+  private dropAskingHandoff(id: string) {
+    this.unwatchHandoff(id);
+    this.writeHandoff(id, { handoffJob: undefined });
+    this.sessions.get(id)?.setBriefOpen(false);
+  }
+
+  /** 질문 대기나 한도 대기를 취소하거나 복사 결과를 지운다. 쓰는 중이면 "busy"(멈추려면 멈추기 버튼). */
   clearHandoff(id: string): "none" | "busy" | "ok" {
     const job = this.handoffMeta(id)?.handoffJob;
     if (!job) return "none";
     if (job.state === "writing") return "busy";
-    if (job.state === "waiting_limit") this.cancelAutoResume(id);
+    if (job.state === "asking") {
+      this.dropAskingHandoff(id);
+    } else if (job.state === "waiting_limit") this.cancelAutoResume(id);
     else this.writeHandoff(id, { handoffJob: undefined });
     return "ok";
   }

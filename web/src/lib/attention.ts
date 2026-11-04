@@ -80,7 +80,7 @@ export function parsePresenceSession(raw: unknown): PresenceSession | null {
   return out
 }
 
-const HANDOFF_STATES: ReadonlySet<string> = new Set(['writing', 'waiting_limit', 'copy_ready'])
+const HANDOFF_STATES: ReadonlySet<string> = new Set(['writing', 'asking', 'waiting_limit', 'copy_ready'])
 
 /** 넘기기 연결 칸 검증 — 옛 서버에는 없고, 모양이 틀린 칸은 그 칸만 버린다. */
 export function parseHandoffFields(o: Record<string, unknown>): HandoffFields {

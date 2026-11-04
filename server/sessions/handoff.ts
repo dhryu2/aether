@@ -1,17 +1,17 @@
 /**
- * 다음 작업으로 넘기기 — 인계서 요청 글, 집어내기, 턴 결과 판정, 뼈대 인계서.
+ * 새 세션으로 넘기기 — 인계서 요청 글, 집어내기, 턴 결과 판정, 뼈대 인계서.
  *
  * 공통 계층은 중립 사건 넷만 본다: 모델 글(text), 파일 변경 도구 호출(tool_call file_change),
  * 한도 막힘 알림(provider_notice rate_limit blocked), 턴 종료(turn_completed). provider 이름·원본 모양은 모른다.
  * 규칙 문장에도 특정 AI의 도구 이름을 쓰지 않는다.
  */
 import { pick } from "../i18n";
+import { QUESTIONNAIRE_FORMAT_EN, QUESTIONNAIRE_FORMAT_KO } from "../agent-brief/rules";
+import { findQuestionnaireBlock } from "../agent-brief/questionnaire";
 import { isBlockedRateLimit, resetsAtMs } from "../notify/worthNotifying";
 import type { TodoItem } from "../../shared/agentEvent";
 import type { AetherEvent } from "../types";
 
-export type HandoffPurpose = "continue" | "rediscuss" | "next";
-export const HANDOFF_PURPOSES: readonly HandoffPurpose[] = ["continue", "rediscuss", "next"];
 export const HANDOFF_FOCUS_MAX = 4000;
 export const HANDOFF_TEXT_MAX = 60_000;
 export const HANDOFF_FILES_MAX = 50;
@@ -25,67 +25,89 @@ export const HANDOFF_CLIENT_ID_PREFIX = "handoff-";
 
 type Normalizer = { normalize(ev: AetherEvent): import("../../shared/agentEvent").AgentEvent[] };
 
-const PURPOSE_LABEL = {
-  continue: { ko: "이어서", en: "continue" },
-  rediscuss: { ko: "다시 토의", en: "re-discuss" },
-  next: { ko: "다음 작업", en: "next task" },
-} as const;
+/** 질문은 모두 이 횟수까지다. 그 뒤 남은 결정은 인계서의 「확인하지 못한 것」에 적게 한다. */
+export const HANDOFF_ASK_ROUNDS_MAX = 2;
 
-const SECTIONS_KO: Record<HandoffPurpose, string> = {
-  continue: "진행 상태 → 남은 일 → 정한 것 → 먼저 읽을 파일 → 일하는 방식 → 지킬 것",
-  rediscuss: "미결 쟁점 → 정한 것 → 버린 안과 이유 → 먼저 읽을 파일 → 일하는 방식 → 지킬 것. 마지막 줄에 「새 세션은 작업 전에 위 쟁점을 사람에게 질문부터 한다」를 쓴다",
-  next: "다음 작업 범위(사람이 준 초점 글 반영) → 이전에 정한 규칙 → 먼저 읽을 파일 → 일하는 방식 → 지킬 것",
-};
-const SECTIONS_EN: Record<HandoffPurpose, string> = {
-  continue: "Progress → Remaining work → Decisions → Files to read first → How to work → Constraints",
-  rediscuss: "Open issues → Decisions → Rejected options and why → Files to read first → How to work → Constraints. On the last line write \"The new session asks the person about the open issues above before any work\"",
-  next: "Scope of the next task (reflect the focus text from the person) → Rules decided earlier → Files to read first → How to work → Constraints",
-};
-
-function rulesKo(purpose: HandoffPurpose, includeMethod: boolean): string {
+function rulesKo(): string {
   return [
-    "사람이 이 대화를 다음 작업으로 넘기려 한다. 새 세션에게 줄 인계서를 쓴다.",
+    "사람이 이 대화의 일을 새 세션으로 넘기려 한다. 새 세션의 첫 프롬프트(인계서)를 쓴다.",
     "",
     "규칙",
     "- 파일을 만들거나 고치거나 지우지 않는다. 읽기와 상태를 바꾸지 않는 조회만 한다.",
-    "- 새 세션은 이 대화를 볼 수 없다. 인계서만 읽고도 일할 수 있게 쓴다.",
-    "- 파일은 경로와 줄 번호로 적는다.",
+    "- 사람이 다음에 할 일을 적었으면 그것을 따른다. 적지 않았으면 대화를 보고 다음 일을 스스로 판단한다.",
+    "- 사실은 코드와 기록에서 직접 찾아본다(파일 열기, 검색). 찾아도 없는 사실은 묻지 말고 「확인하지 못한 것」에 적는다.",
+    "- 결정은 다르다. 사람만 정할 수 있고 다음 일의 범위나 방법을 바꾸는 결정이 남아 있으면 반드시 질문한다. 대화에서 아직 안 정했다고 한 것이 여기에 든다. 새 세션이 묻도록 넘기지 않는다. 그런 결정이 없을 때만 바로 쓴다.",
+    `- 질문은 한 번에 모아서 묻는다. 답 때문에 새로 생긴 결정만 한 번 더 묻는다. 모두 ${HANDOFF_ASK_ROUNDS_MAX}회까지다. 그 뒤 남은 결정은 인계서의 「확인하지 못한 것」에 적는다.`,
+    "- 질문할 때는 질문지 상자만 쓰고 턴을 끝낸다. 인계서 표식을 함께 쓰지 않는다. 사람에게 선택지를 묻는 도구는 쓰지 않는다.",
+    QUESTIONNAIRE_FORMAT_KO,
+    "- 인계서는 새 세션이 이 대화를 볼 수 없다는 것을 전제로 쓴다. 파일이나 규칙 문서에서 읽을 수 있는 내용은 옮기지 않고 경로와 줄 번호만 적는다.",
+    "- 대화에서만 나온 것을 쓴다: 정한 것과 이유, 안 된 시도, 사람의 지시와 일하는 방식, 확인하지 못한 것.",
+    "- 다음 일과 무관한 내용은 뺀다. 범위 밖의 남은 일은 한 줄씩만 쓴다. 추측은 미확인이라고 표시한다.",
+    "- 할 일 목록이 있으면 남은 항목을 「다음 단계」에 옮긴다.",
     "- 받는 AI가 지금과 다를 수 있으니 특정 AI의 도구 이름을 쓰지 않는다.",
-    "- 할 일 목록이 있으면 남은 항목을 「남은 일」에 옮긴다.",
-    `- 제목과 순서: ${SECTIONS_KO[purpose]}.`,
-    ...(includeMethod ? [] : ["- 「일하는 방식」 절은 쓰지 않는다."]),
+    "- 3,000자 안쪽을 권한다. 꼭 필요한 사실을 빠뜨리는 것보다는 넘는 편이 낫다.",
+    "- 제목과 순서: 목표 → 지금 상태 → 정한 것과 이유 → 해 봤는데 안 된 것 → 다음 단계 → 먼저 읽을 파일 → 확인하지 못한 것. 쓸 내용이 없는 절은 뺀다.",
+    "- 사람이 적은 글은 Aether가 인계서 맨 위에 그대로 붙이므로 다시 옮기지 않는다.",
     "- 인계서 전문을 `<aether-handoff>`만 있는 줄과 `</aether-handoff>`만 있는 줄 사이에 쓴다. 그 앞뒤에는 아무것도 쓰지 않는다.",
     "- 이 규칙 본문은 인계서에 옮기지 않는다.",
   ].join("\n");
 }
 
-function rulesEn(purpose: HandoffPurpose, includeMethod: boolean): string {
+function rulesEn(): string {
   return [
-    "The person wants to hand this conversation over to the next task. Write a handoff document for a new session.",
+    "The person wants to hand the work of this conversation over to a new session. Write the first prompt (the handoff) for the new session.",
     "",
     "Rules",
     "- Do not create, edit, or delete files. Only read files and run lookups that do not change state.",
-    "- The new session cannot see this conversation. Write so that the handoff alone is enough to work from.",
-    "- Refer to files by path and line number.",
+    "- If the person wrote what to do next, follow it. If not, read the conversation and decide the next task yourself.",
+    "- Look up facts yourself in the code and records (open files, search). If you still cannot find a fact, do not ask; write it under \"Not confirmed\".",
+    "- Decisions are different. If a decision remains that only the person can make and that changes the scope or method of the next task, you must ask. Anything the conversation says is not decided yet counts. Do not leave it for the new session to ask. Write right away only when no such decision remains.",
+    `- Ask everything in one batch. Ask once more only about decisions that the answers newly created. Ask at most ${HANDOFF_ASK_ROUNDS_MAX} times in total. Write what is still undecided after that under \"Not confirmed\" in the handoff.`,
+    "- When you ask, write only the questionnaire block and end the turn. Do not write the handoff markers with it. Do not use a tool that asks the person to pick options.",
+    QUESTIONNAIRE_FORMAT_EN,
+    "- Write the handoff on the premise that the new session cannot see this conversation. Do not copy what it can read from files or rule documents; give only the path and line number.",
+    "- Write what appeared only in the conversation: decisions and their reasons, attempts that failed, the person's instructions and way of working, and what is not confirmed.",
+    "- Leave out anything unrelated to the next task. Give remaining work outside its scope one line each. Mark guesses as unconfirmed.",
+    "- If there is a to-do list, move the remaining items into \"Next steps\".",
     "- The receiving AI may differ from the current one, so do not use any specific AI's tool names.",
-    "- If there is a to-do list, move the remaining items into \"Remaining work\".",
-    `- Headings and order: ${SECTIONS_EN[purpose]}.`,
-    ...(includeMethod ? [] : ["- Do not write a \"How to work\" section."]),
+    "- Aim for about 3,000 characters or fewer. It is better to go over than to leave out a fact that is truly needed.",
+    "- Headings and order: Goal → Current state → Decisions and reasons → Tried and failed → Next steps → Files to read first → Not confirmed. Leave out a section with nothing to write.",
+    "- Aether puts the text the person wrote at the very top of the handoff as it is, so do not copy it again.",
     "- Write the whole handoff between a line containing only `<aether-handoff>` and a line containing only `</aether-handoff>`. Write nothing before or after them.",
     "- Do not copy the text of these rules into the handoff.",
   ].join("\n");
 }
 
 /** 요청 글. text는 대화에 남는 사람용 문장, modelText는 규칙을 앞에 붙인 모델 입력이다. */
-export function handoffRequest(purpose: HandoffPurpose, focus: string | undefined, includeMethod: boolean): { text: string; modelText: string } {
-  const label = pick({ ko: PURPOSE_LABEL[purpose].ko, en: PURPOSE_LABEL[purpose].en });
+export function handoffRequest(focus: string | undefined, forced = false): { text: string; modelText: string } {
   const trimmed = focus?.trim();
   const text = pick({
-    ko: `다음 작업으로 넘길 인계서를 써 줘. 목적: ${label}.${trimmed ? ` 초점: ${trimmed}.` : ""} 진행 방식도 넘기기: ${includeMethod ? "예" : "아니오"}`,
-    en: `Write a handoff for the next task. Purpose: ${label}.${trimmed ? ` Focus: ${trimmed}.` : ""} Include how to work: ${includeMethod ? "yes" : "no"}`,
+    ko: `새 세션으로 넘길 프롬프트를 써 줘.${trimmed ? ` 다음에 할 일: ${trimmed}` : ""}`,
+    en: `Write the prompt to hand off to a new session.${trimmed ? ` What to do next: ${trimmed}` : ""}`,
   });
-  const rules = pick({ ko: rulesKo(purpose, includeMethod), en: rulesEn(purpose, includeMethod) });
-  return { text, modelText: `<aether-handoff-request>\n${rules}\n</aether-handoff-request>\n\n${text}` };
+  const rules = pick({ ko: rulesKo(), en: rulesEn() });
+  // 더 묻지 않는 재개(forced)는 규칙이 "물어도 된다"고 하므로 끝에 강제 문장을 붙인다.
+  return { text, modelText: `<aether-handoff-request>\n${rules}\n</aether-handoff-request>\n\n${text}${forced ? `\n\n${handoffForceWriteText()}` : ""}` };
+}
+
+/** 질문을 더 받지 않고 지금 쓰게 하는 마지막 요청 글. */
+export function handoffForceWriteText(): string {
+  return pick({
+    ko: "더 묻지 말고 지금 프롬프트를 쓴다. 남은 결정은 「확인하지 못한 것」에 적는다.",
+    en: "Do not ask any more. Write the prompt now. Put the decisions still open under \"Not confirmed\".",
+  });
+}
+
+/** 모델이 쓴 인계서에 사람이 적은 글 원문(맨 위)과 이전 세션 표시(맨 끝)를 붙인다. */
+export function withHandoffFrame(text: string, i: { focus?: string; name: string; id: string }): string {
+  const focus = i.focus?.trim();
+  const head = focus ? pick({ ko: "사람이 적은 요청 (원문)", en: "Request written by the person (verbatim)" }) + "\n" + focus + "\n\n" : "";
+  const tail = pick({
+    ko: "\n\n이전 세션: " + i.name + " (" + i.id + ")\n과거 검색 도구가 있으면 세부 내용은 이 세션을 찾아 읽는다.",
+    en: "\n\nPrevious session: " + i.name + " (" + i.id + ")\nIf a past-search tool is available, find and read this session for details.",
+  });
+  // 상한은 본문에만 건다. 끝의 이전 세션 id가 잘리지 않게 머리와 꼬리 길이를 뺀다.
+  return head + text.slice(0, Math.max(0, HANDOFF_TEXT_MAX - head.length - tail.length)) + tail;
 }
 
 const cut = (s: string) => (s.length > HANDOFF_TEXT_MAX ? s.slice(0, HANDOFF_TEXT_MAX) : s);
@@ -93,9 +115,10 @@ const cut = (s: string) => (s.length > HANDOFF_TEXT_MAX ? s.slice(0, HANDOFF_TEX
 /**
  * 이번 턴 사건에서 인계서를 집어낸다. 모델 글을 이어 붙여 마지막으로 완전히 닫힌 표식 한 쌍의 안쪽을 쓴다.
  * 표식이 없으면 마지막 글 조각 전체. 글이 없으면 null.
+ * 표식 쌍이 없고 이어 붙인 글에 질문지 상자가 있으면 질문 턴이므로 null이다. markerOnly면 표식 쌍이 없을 때 항상 null이다.
  * 표식은 앞뒤 공백을 지운 한 줄이 정확히 같을 때만 인정한다(문장 속 언급·코드 상자 안의 글과 섞이지 않게).
  */
-export function pickHandoffText(events: readonly AetherEvent[], codec: Normalizer): string | null {
+export function pickHandoffText(events: readonly AetherEvent[], codec: Normalizer, markerOnly = false): string | null {
   const parts: string[] = [];
   for (const ev of events) for (const a of codec.normalize(ev)) if (a.type === "text" && !a.subtaskOf && a.text.trim()) parts.push(a.text);
   if (!parts.length) return null;
@@ -110,6 +133,7 @@ export function pickHandoffText(events: readonly AetherEvent[], codec: Normalize
       open = -1;
     }
   });
+  if (!pair && (markerOnly || findQuestionnaireBlock(parts.join("\n")) !== null)) return null;
   const body = pair ? lines.slice(pair[0] + 1, pair[1]).join("\n") : parts[parts.length - 1];
   const out = cut(body.trim());
   return out || null;
@@ -176,7 +200,6 @@ export type SkeletonInput = {
   name: string;
   id: string;
   cwd: string;
-  purpose: HandoffPurpose;
   focus?: string;
   /** 모델이 쓰지 못한 이유 한 줄. */
   reason: string;
@@ -191,7 +214,6 @@ const STATUS_MARK: Record<string, string> = { completed: "[x]", in_progress: "[~
 
 /** 모델 없이 기록에서 모은 뼈대 인계서. */
 export function skeletonHandoff(i: SkeletonInput): string {
-  const label = pick({ ko: PURPOSE_LABEL[i.purpose].ko, en: PURPOSE_LABEL[i.purpose].en });
   const L = (ko: string, en: string) => pick({ ko, en });
   const out: string[] = [
     L("AI가 인계서를 쓰지 못해 Aether가 기록에서 모았다.", "The AI could not write the handoff, so Aether collected this from the record."),
@@ -200,10 +222,8 @@ export function skeletonHandoff(i: SkeletonInput): string {
     `${L("이전 세션", "Previous session")}: ${i.name} (${i.id.slice(0, 8)})`,
     `${L("폴더", "Folder")}: ${i.cwd}`,
     L("과거 검색 도구(`session_search`)로 이전 세션을 찾아 읽고 시작하라.", "Start by finding and reading the previous session with the past-search tool (`session_search`)."),
-    "",
-    `${L("목적", "Purpose")}: ${label}`,
   ];
-  if (i.focus?.trim()) out.push(`${L("초점", "Focus")}: ${i.focus.trim()}`);
+  if (i.focus?.trim()) out.push("", `${L("다음에 할 일", "What to do next")}: ${i.focus.trim()}`);
   if (i.userTexts.length) {
     out.push("", L("사람의 최근 말 (원문)", "Recent messages from the person (verbatim)"));
     i.userTexts.forEach((t, n) => out.push(`${n + 1}. ${t}`));

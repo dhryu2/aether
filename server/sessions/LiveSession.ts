@@ -600,6 +600,13 @@ export class LiveSession {
     }
   }
 
+  /** 넘기기 질문 대기 중에 질문지 판독을 켜고 끈다. 브리프 표시와 같은 칸이다. */
+  setBriefOpen(open: boolean) {
+    if (this.briefOpen === open) return;
+    this.briefOpen = open;
+    this.persistMeta("브리프 세션");
+  }
+
   /** 입력 문 안에서 도는 push 본체. */
   private pushInGate(
     text: string,
@@ -678,7 +685,7 @@ export class LiveSession {
       return { ok: true };
     }
     const open = await this.openQuestionnaire();
-    if (!open || open.id !== opts.questionnaireId) {
+    if (!open || open.id !== opts.questionnaireId || !this.briefOpen) {
       return { ok: false, status: 409, error: st("routes.sessions.questionnaire.notOpen") };
     }
     const checked = validateQuestionnaireAnswers(open.questions, answers);

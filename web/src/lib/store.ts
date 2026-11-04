@@ -311,7 +311,7 @@ export type State = {
   modalCwd: string | null // 새 작업 창을 열 때 미리 고를 폴더. null이면 루트부터 고른다.
   deleteTarget: SessionListItem | null // 삭제/초기화 확인 다이얼로그 대상(null = 닫힘)
   deleteMode: 'delete' | 'reset' | 'discard' // deleteTarget이 null이 아닐 때만 의미 있음
-  handoffSheet: { sessionId: string; mode: 'form' | 'waiting' | 'result' } | null // 다음 작업으로 넘기기 창(null = 닫힘). sessionId는 실행 id.
+  handoffSheet: { sessionId: string; mode: 'form' | 'waiting' | 'result' } | null // 새 세션으로 넘기기 창(null = 닫힘). sessionId는 실행 id.
   dialog: DialogState | null // 범용 확인 다이얼로그(null = 닫힘)
   /**
    * 우클릭 메뉴(null = 닫힘). 한 벌만 shell/ContextMenu.tsx가 그린다. 위젯은 items(메뉴 항목 요소)만 넘긴다.
@@ -1243,7 +1243,7 @@ function reactToHandoff(before: WorkspaceRoom[], after: WorkspaceRoom[]) {
     if (!myHandoffs.has(exec)) continue
     const tr = handoffTransition(before.find((r) => r.id === room.id), room)
     if (!tr) continue
-    if (tr !== 'waiting') myHandoffs.delete(exec) // 한도 대기는 끝난 것이 아니다. 풀린 뒤의 결과도 이어서 본다
+    if (tr !== 'waiting' && tr !== 'asking') myHandoffs.delete(exec) // 한도 대기와 질문 대기는 끝난 것이 아니다. 풀린 뒤의 결과도 이어서 본다
     void onHandoffResult(tr, room, exec)
   }
 }
@@ -1252,6 +1252,12 @@ async function onHandoffResult(tr: Exclude<HandoffTransition, null>, room: Works
   if (state.handoffSheet?.sessionId === exec && tr !== 'copy') set({ handoffSheet: null })
   if (tr === 'waiting') {
     actions.showNotice({ title: t('handoff.toast.waiting') })
+    return
+  }
+  if (tr === 'asking') {
+    // 지금 보고 있는 세션이면 대화에 질문 카드가 떠 있으니 알림이 필요 없다.
+    if (visibleIds().includes(room.id)) return
+    actions.showNotice({ title: t('handoff.toast.asking'), action: { label: t('handoff.toast.open'), onClick: () => actions.selectSession(room.id) } })
     return
   }
   if (tr === 'stopped') {
@@ -2772,10 +2778,18 @@ export const actions = {
   openRename: (id: string, name: string) => set({ renameTarget: { id, name } }),
   closeRename: () => set({ renameTarget: null }),
 
-  // ── 다음 작업으로 넘기기 ── 서버가 끝까지 진행하고, 화면은 창을 띄우고 결과를 받아 칸을 바꾸기만 한다.
+  // ── 새 세션으로 넘기기 ── 서버가 끝까지 진행하고, 화면은 창을 띄우고 결과를 받아 칸을 바꾸기만 한다.
   openHandoff: (sessionId: string) => set({ handoffSheet: { sessionId, mode: 'form' } }),
   openHandoffResult: (sessionId: string) => set({ handoffSheet: { sessionId, mode: 'result' } }),
   closeHandoff: () => set({ handoffSheet: null }),
+  /** 사람의 답을 기다리는 넘기기를 취소한다(서버가 작업을 지운다). 결과 알림은 실시간 갱신으로 온다. */
+  async cancelHandoff(sessionId: string) {
+    try {
+      await api.clearHandoff(sessionId)
+    } catch (e) {
+      actions.showNotice({ title: errMsg(e) })
+    }
+  },
   /** 시작. 쓰는 중이면 창을 닫고, 한도 대기면 창을 '대기' 화면으로 바꾼다. 결과는 실시간 갱신으로 온다. */
   async startHandoff(sessionId: string, body: HandoffRequestBody): Promise<{ ok: true } | { ok: false; error: string }> {
     // 결과는 요청이 돌아오기 전에 실시간 갱신으로 먼저 올 수 있으니, 보내기 전에 이 탭이 시작했다고 적는다.

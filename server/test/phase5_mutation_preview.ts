@@ -5,7 +5,18 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { buildMutationPreview } from "../providers/claude/mutationPreview";
+import { previewFromDisk, readBefore } from "../sessions/mutationPreview";
+
+// 자식 모드: FIFO를 읽다 멈추는지 보려고 따로 띄운 프로세스. 멈추면 부모가 timeout으로 실패 처리한다.
+if (process.argv[2] === "fifo-child") {
+  const target = process.argv[3];
+  const b = readBefore(target);
+  const p = previewFromDisk("write", target, "x", path.dirname(target));
+  console.log("RESULT " + JSON.stringify({ binary: b.binary === true && b.before === null, previewBinary: p.binary === true }));
+  process.exit(0);
+}
 
 let pass = 0;
 let fail = 0;
@@ -81,6 +92,20 @@ try {
   fs.writeFileSync(path.join(cwd, "me2.txt"), "hello");
   const meInexact = buildMutationPreview("MultiEdit", { file_path: "me2.txt", edits: [{ old_string: "NOTFOUND", new_string: "z" }] }, cwd);
   check(meInexact?.inexact === true, "R5 MultiEdit 미발견 매치 → inexact 표기");
+
+  // R6 FIFO·디렉터리 같은 일반 파일이 아닌 경로는 열지 않고 binary로 돌려준다(예전엔 FIFO open이 이벤트 루프를 영원히 막음)
+  const mk = spawnSync("mkfifo", [path.join(cwd, "pipe")]);
+  if (mk.status !== 0) {
+    console.log("  ⏭️  R6 mkfifo 없음 — FIFO 시험 건너뜀");
+  } else {
+    const r = spawnSync(process.execPath, ["--import", "tsx", import.meta.filename, "fifo-child", path.join(cwd, "pipe")], { encoding: "utf8", timeout: 10_000 });
+    const line = r.stdout.split("\n").find((l) => l.startsWith("RESULT "));
+    const res = line ? (JSON.parse(line.slice(7)) as { binary: boolean; previewBinary: boolean }) : null;
+    check(res?.binary === true && res.previewBinary === true, "R6 FIFO는 멈추지 않고 binary로 즉시 돌려준다", `signal=${r.signal}`);
+  }
+  fs.mkdirSync(path.join(cwd, "adir"));
+  check(readBefore(path.join(cwd, "adir")).binary === true, "R6 디렉터리도 binary(열지 않음)");
+  check(readBefore(path.join(cwd, "exist.txt")).before === "old\n", "R6 일반 파일은 그대로 읽는다");
 } finally {
   fs.rmSync(cwd, { recursive: true, force: true });
 }

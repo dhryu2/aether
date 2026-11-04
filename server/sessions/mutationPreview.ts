@@ -39,8 +39,13 @@ export function readBefore(real: string): { before: string | null; truncated?: b
     if ((e as { code?: string }).code === "ENOENT") return { before: null, isCreate: true };
     throw e;
   }
-  const fd = fs.openSync(real, "r"); // 검증 직후 open → TOCTOU 완화
+  // 일반 파일이 아니면(FIFO·디렉터리·장치) 열지 않는다 — FIFO open은 쓰는 쪽이 올 때까지 이벤트 루프를 막는다.
+  const notFile = { before: null, binary: true, totalBytes: st.size, isCreate: false };
+  if (!st.isFile()) return notFile;
+  // 검증 직후 open → TOCTOU 완화. 검사와 열기 사이에 FIFO로 바뀌어도 막히지 않게 NONBLOCK으로 열고 다시 본다.
+  const fd = fs.openSync(real, fs.constants.O_RDONLY | (fs.constants.O_NONBLOCK ?? 0));
   try {
+    if (!fs.fstatSync(fd).isFile()) return notFile;
     const max = config.diffMaxBytes;
     const len = Math.min(st.size, max);
     const buf = Buffer.alloc(len);

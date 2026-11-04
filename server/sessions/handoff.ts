@@ -25,7 +25,7 @@ export const HANDOFF_CLIENT_ID_PREFIX = "handoff-";
 
 type Normalizer = { normalize(ev: AetherEvent): import("../../shared/agentEvent").AgentEvent[] };
 
-/** 질문은 모두 이 횟수까지다. 그 뒤 남은 결정은 인계서의 「확인하지 못한 것」에 적게 한다. */
+/** 질문은 모두 이 횟수까지다. 그 뒤 남은 결정만 인계서의 「확인하지 못한 것」에 적게 한다. */
 export const HANDOFF_ASK_ROUNDS_MAX = 2;
 
 function rulesKo(): string {
@@ -37,16 +37,18 @@ function rulesKo(): string {
     "- 사람이 다음에 할 일을 적었으면 그것을 따른다. 적지 않았으면 대화를 보고 다음 일을 스스로 판단한다.",
     "- 사실은 코드와 기록에서 직접 찾아본다(파일 열기, 검색). 찾아도 없는 사실은 묻지 말고 「확인하지 못한 것」에 적는다.",
     "- 결정은 다르다. 사람만 정할 수 있고 다음 일의 범위나 방법을 바꾸는 결정이 남아 있으면 반드시 질문한다. 대화에서 아직 안 정했다고 한 것이 여기에 든다. 새 세션이 묻도록 넘기지 않는다. 그런 결정이 없을 때만 바로 쓴다.",
-    `- 질문은 한 번에 모아서 묻는다. 답 때문에 새로 생긴 결정만 한 번 더 묻는다. 모두 ${HANDOFF_ASK_ROUNDS_MAX}회까지다. 그 뒤 남은 결정은 인계서의 「확인하지 못한 것」에 적는다.`,
+    `- 질문은 한 번에 모아서 묻는다. 답 때문에 새로 생긴 결정만 한 번 더 묻는다. 모두 ${HANDOFF_ASK_ROUNDS_MAX}회까지다. 「확인하지 못한 것」은 찾지 못한 사실을 쓰는 절이다. 결정은 이 횟수를 다 쓴 뒤 남은 것만 「아직 안 정함」이라고 표시해 적는다.`,
     "- 질문할 때는 질문지 상자만 쓰고 턴을 끝낸다. 인계서 표식을 함께 쓰지 않는다. 사람에게 선택지를 묻는 도구는 쓰지 않는다.",
     QUESTIONNAIRE_FORMAT_KO,
-    "- 인계서는 새 세션이 이 대화를 볼 수 없다는 것을 전제로 쓴다. 파일이나 규칙 문서에서 읽을 수 있는 내용은 옮기지 않고 경로와 줄 번호만 적는다.",
-    "- 대화에서만 나온 것을 쓴다: 정한 것과 이유, 안 된 시도, 사람의 지시와 일하는 방식, 확인하지 못한 것.",
+    "- 인계서는 새 세션이 이 대화를 볼 수 없다는 것을 전제로 쓴다. 파일이나 규칙 문서에서 읽을 수 있는 내용은 옮기지 않고 경로와 줄 번호만 적는다. 규칙 파일에 있는 지시는 요약도 옮기지 않는다. 규칙 파일 경로는 「먼저 읽을 파일」에 한 번만 적는다.",
+    "- 대화에서만 나온 것을 쓴다: 정한 것과 이유, 안 된 시도, 확인하지 못한 것. 사람의 지시와 일하는 방식은 「정한 것과 이유」에 쓴다.",
+    "- 숫자에는 무엇의 건수인지 함께 적는다. 다른 대상의 수가 같으면 구분이 드러나게 쓴다.",
+    "- 「주의할 점」에는 파일을 읽지 않으면 놓치는 것만 쓴다.",
     "- 다음 일과 무관한 내용은 뺀다. 범위 밖의 남은 일은 한 줄씩만 쓴다. 추측은 미확인이라고 표시한다.",
     "- 할 일 목록이 있으면 남은 항목을 「다음 단계」에 옮긴다.",
     "- 받는 AI가 지금과 다를 수 있으니 특정 AI의 도구 이름을 쓰지 않는다.",
     "- 3,000자 안쪽을 권한다. 꼭 필요한 사실을 빠뜨리는 것보다는 넘는 편이 낫다.",
-    "- 제목과 순서: 목표 → 지금 상태 → 정한 것과 이유 → 해 봤는데 안 된 것 → 다음 단계 → 먼저 읽을 파일 → 확인하지 못한 것. 쓸 내용이 없는 절은 뺀다.",
+    "- 제목과 순서: 목표 → 지금 상태 → 정한 것과 이유 → 해 봤는데 안 된 것 → 주의할 점 → 다음 단계 → 먼저 읽을 파일 → 확인하지 못한 것. 쓸 내용이 없는 절은 뺀다.",
     "- 사람이 적은 글은 Aether가 인계서 맨 위에 그대로 붙이므로 다시 옮기지 않는다.",
     "- 인계서 전문을 `<aether-handoff>`만 있는 줄과 `</aether-handoff>`만 있는 줄 사이에 쓴다. 그 앞뒤에는 아무것도 쓰지 않는다.",
     "- 이 규칙 본문은 인계서에 옮기지 않는다.",
@@ -62,16 +64,18 @@ function rulesEn(): string {
     "- If the person wrote what to do next, follow it. If not, read the conversation and decide the next task yourself.",
     "- Look up facts yourself in the code and records (open files, search). If you still cannot find a fact, do not ask; write it under \"Not confirmed\".",
     "- Decisions are different. If a decision remains that only the person can make and that changes the scope or method of the next task, you must ask. Anything the conversation says is not decided yet counts. Do not leave it for the new session to ask. Write right away only when no such decision remains.",
-    `- Ask everything in one batch. Ask once more only about decisions that the answers newly created. Ask at most ${HANDOFF_ASK_ROUNDS_MAX} times in total. Write what is still undecided after that under \"Not confirmed\" in the handoff.`,
+    `- Ask everything in one batch. Ask once more only about decisions that the answers newly created. Ask at most ${HANDOFF_ASK_ROUNDS_MAX} times in total. \"Not confirmed\" is for facts you could not find. For decisions, write only what remains after these rounds, marked \"not decided yet\".`,
     "- When you ask, write only the questionnaire block and end the turn. Do not write the handoff markers with it. Do not use a tool that asks the person to pick options.",
     QUESTIONNAIRE_FORMAT_EN,
-    "- Write the handoff on the premise that the new session cannot see this conversation. Do not copy what it can read from files or rule documents; give only the path and line number.",
-    "- Write what appeared only in the conversation: decisions and their reasons, attempts that failed, the person's instructions and way of working, and what is not confirmed.",
+    "- Write the handoff on the premise that the new session cannot see this conversation. Do not copy what it can read from files or rule documents; give only the path and line number. Do not copy or summarize instructions that are in a rule file. Give a rule file path once, under \"Files to read first\".",
+    "- Write what appeared only in the conversation: decisions and their reasons, attempts that failed, and what is not confirmed. Put the person's instructions and way of working under \"Decisions and reasons\".",
+    "- Say what each number counts. If counts of different things are equal, write them so the difference is clear.",
+    "- Under \"Watch out\", write only what would be missed without reading the files.",
     "- Leave out anything unrelated to the next task. Give remaining work outside its scope one line each. Mark guesses as unconfirmed.",
     "- If there is a to-do list, move the remaining items into \"Next steps\".",
     "- The receiving AI may differ from the current one, so do not use any specific AI's tool names.",
     "- Aim for about 3,000 characters or fewer. It is better to go over than to leave out a fact that is truly needed.",
-    "- Headings and order: Goal → Current state → Decisions and reasons → Tried and failed → Next steps → Files to read first → Not confirmed. Leave out a section with nothing to write.",
+    "- Headings and order: Goal → Current state → Decisions and reasons → Tried and failed → Watch out → Next steps → Files to read first → Not confirmed. Leave out a section with nothing to write.",
     "- Aether puts the text the person wrote at the very top of the handoff as it is, so do not copy it again.",
     "- Write the whole handoff between a line containing only `<aether-handoff>` and a line containing only `</aether-handoff>`. Write nothing before or after them.",
     "- Do not copy the text of these rules into the handoff.",

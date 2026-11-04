@@ -100,7 +100,7 @@ console.log("\n=== 요청 글 ===");
       check(!r.text.includes("<aether-handoff-request>"), `${tag}: 대화에 남는 글에는 규칙이 없다`);
       check(!provider.test(r.modelText), `${tag}: provider 이름이 없다`);
       check(focus ? r.text.includes(focus) : !r.text.includes(":"), `${tag}: 사람 글은 있을 때만 요청문에 든다`, r.text);
-      const toc = locale === "ko" ? "목표 → 지금 상태 → 정한 것과 이유 → 해 봤는데 안 된 것 → 다음 단계 → 먼저 읽을 파일 → 확인하지 못한 것" : "Goal → Current state → Decisions and reasons → Tried and failed → Next steps → Files to read first → Not confirmed";
+      const toc = locale === "ko" ? "목표 → 지금 상태 → 정한 것과 이유 → 해 봤는데 안 된 것 → 주의할 점 → 다음 단계 → 먼저 읽을 파일 → 확인하지 못한 것" : "Goal → Current state → Decisions and reasons → Tried and failed → Watch out → Next steps → Files to read first → Not confirmed";
       check(r.modelText.includes(toc), `${tag}: 제목과 순서`);
       check(r.modelText.includes("3,000"), `${tag}: 3,000자 권고`);
       check(r.modelText.includes("aether-questions") && r.modelText.includes("<aether-handoff>"), `${tag}: 질문지 형식과 표식 규칙`);

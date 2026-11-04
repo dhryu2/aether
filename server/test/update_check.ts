@@ -162,6 +162,34 @@ check(sres.status === 404, "설정 서버의 /api/system/update는 404", sres.st
 const setupSrc = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), "../setup/app.ts"), "utf8");
 check(!/systemRouter|update\/check/.test(setupSrc), "설정 서버 소스가 system 라우터와 확인기를 쓰지 않는다");
 
+// 7. 공개키가 있으면 서명이 맞는 값만 받아들인다
+{
+  const crypto = await import("node:crypto");
+  const { publicKey, privateKey } = crypto.generateKeyPairSync("ed25519");
+  const pubB64 = publicKey.export({ type: "spki", format: "der" }).toString("base64");
+  const bodyOf = (version: string) => Buffer.from(JSON.stringify({ ...good, version }));
+  let served = { json: bodyOf("0.0.5"), sig: "" as string | null };
+  const sign = (buf: Buffer, key = privateKey) => crypto.sign(null, buf, key).toString("base64");
+  const site = (async (u: string | URL | Request) => {
+    const x = String(u);
+    if (x.endsWith("/version.json")) return new Response(new Uint8Array(served.json));
+    return served.sig === null ? new Response("", { status: 404 }) : new Response(served.sig);
+  }) as typeof fetch;
+  const kc = createUpdateChecker({ url: "https://dl.example", current: "0.0.1", fetchFn: site, publicKey: pubB64, warn: () => undefined });
+  served = { json: bodyOf("0.0.5"), sig: sign(bodyOf("0.0.5")) };
+  await kc.checkNow();
+  check(kc.status().available && kc.status().latest === "0.0.5", "올바른 서명은 새 버전으로 표시된다", kc.status());
+  served = { json: bodyOf("9.9.9"), sig: null };
+  await kc.checkNow();
+  check(kc.status().latest === "0.0.5", "서명 없는 9.9.9는 받아들이지 않고 앞선 값을 유지한다", kc.status());
+  served = { json: bodyOf("9.9.9"), sig: sign(bodyOf("9.9.9"), crypto.generateKeyPairSync("ed25519").privateKey) };
+  await kc.checkNow();
+  check(kc.status().latest === "0.0.5", "틀린 서명의 9.9.9도 받아들이지 않는다", kc.status());
+  const fresh = createUpdateChecker({ url: "https://dl.example", current: "0.0.1", fetchFn: site, publicKey: pubB64, warn: () => undefined });
+  await fresh.checkNow();
+  check(!fresh.status().available && fresh.status().latest === undefined, "처음부터 서명이 틀리면 새 버전이 없다", fresh.status());
+}
+
 srv.close(); ss.close(); origin.close();
 console.log(`\n${fail === 0 ? "✅" : "❌"} update_check: ${pass} PASS / ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

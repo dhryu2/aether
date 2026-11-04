@@ -62,10 +62,15 @@ systemRouter.post("/update/check", async (_req: Request, res: Response) => {
   res.json(updateStatus());
 });
 
-systemRouter.post("/update/install", (_req: Request, res: Response) => {
+systemRouter.post("/update/install", async (req: Request, res: Response) => {
+  const version = (req.body as { version?: unknown } | undefined)?.version;
+  if (typeof version !== "string") return void res.status(400).json(updateStatus());
+  // 화면이 보여 준 버전이 서명된 최신 값과 같을 때만 설치한다. 먼저 최신 값으로 맞춘다.
+  await updateChecker.checkNow();
   const s = updateStatus();
   if (!s.canInstall || !s.available) return void res.status(400).json(s);
-  if (!updateInstaller.start()) return void res.status(409).json(updateStatus());
+  if (s.latest !== version) return void res.status(409).json({ ...s, error: st("routes.system.updateVersionChanged") });
+  if (!updateInstaller.start(version)) return void res.status(409).json(updateStatus());
   res.status(202).json(updateStatus());
 });
 

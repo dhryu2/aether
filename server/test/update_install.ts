@@ -66,7 +66,7 @@ const settled = async (inst: ReturnType<typeof make>["inst"]) => {
 };
 const failedWith = async (s: Site, reason: string, name: string) => {
   const m = make(site(s));
-  m.inst.start();
+  m.inst.start(s.version ?? "0.0.3");
   const st = await settled(m.inst);
   check(st.phase === "failed" && st.reason === reason && m.handoffs.length === 0, name, st);
   check(!fs.existsSync(path.join(m.updatesDir, "Aether-update.exe")) && !fs.existsSync(path.join(m.updatesDir, "Aether-update.exe.part")), `${name}: 받은 파일이 남지 않는다`);
@@ -79,7 +79,7 @@ check(!make(site(), { supervised: false }).inst.status().canInstall, "자동 실
 check(!make(site(), { publicKey: undefined }).inst.status().canInstall, "공개키가 없으면 꺼진다");
 check(!make(site(), { url: "" }).inst.status().canInstall, "배포 주소가 없으면 꺼진다");
 const off = make(site(), { supervised: false });
-check(off.inst.start() === false && off.inst.status().install.phase === "idle", "꺼져 있으면 시작하지 않는다");
+check(off.inst.start("0.0.3") === false && off.inst.status().install.phase === "idle", "꺼져 있으면 시작하지 않는다");
 
 // 2. 서명 함수
 const sample = Buffer.from("x");
@@ -90,8 +90,8 @@ check(!verifySignature(sample, "!!!", pub) && !verifySignature(sample, "", "not-
 // 3. 정상 흐름
 {
   const m = make(site());
-  check(m.inst.start() === true, "시작");
-  check(m.inst.start() === false, "진행 중에는 다시 시작하지 않는다");
+  check(m.inst.start("0.0.3") === true, "시작");
+  check(m.inst.start("0.0.3") === false, "진행 중에는 다시 시작하지 않는다");
   const st = await settled(m.inst);
   check(st.phase === "installing" && st.version === "0.0.3", "설치 단계까지 간다", st);
   check(fs.readFileSync(path.join(m.updatesDir, "Aether-update.exe")).equals(payload), "받은 파일 내용이 같다");
@@ -112,10 +112,20 @@ await failedWith({ fileSha: "0".repeat(64) }, "verify", "지문이 다르면 거
 await failedWith({ size: payload.length - 1 }, "verify", "선언보다 크면 거절");
 await failedWith({ size: payload.length + 1 }, "verify", "선언보다 작으면 거절");
 
+// 사용자가 동의한 버전과 서명된 최신 값이 다르면 설치 파일을 요청하지 않는다
+{
+  const requested: string[] = [];
+  const inner = site({ version: "0.0.4" });
+  const m = make(((u: string | URL | Request, init?: RequestInit) => (requested.push(String(u)), inner(u, init))) as typeof fetch);
+  m.inst.start("0.0.3");
+  const st = await settled(m.inst);
+  check(st.phase === "failed" && st.reason === "signature" && !requested.some((u) => u.endsWith(".exe")) && m.handoffs.length === 0, "동의한 버전과 서명된 버전이 다르면 파일을 받지 않고 거절", { st, requested });
+}
+
 // 5. 실패 처리
 {
   const m = make(site(), { beforeHandoff: async () => { throw new Error("디스크"); } });
-  m.inst.start();
+  m.inst.start("0.0.3");
   const st = await settled(m.inst);
   // 설치 단계로 잠깐 간 뒤 실패로 바뀌므로 다시 기다린다.
   await new Promise((r) => setTimeout(r, 50));
@@ -123,19 +133,19 @@ await failedWith({ size: payload.length + 1 }, "verify", "선언보다 작으면
 }
 {
   const m = make(site(), { handoff: async () => { throw new Error("launchctl"); } });
-  m.inst.start();
+  m.inst.start("0.0.3");
   await settled(m.inst);
   await new Promise((r) => setTimeout(r, 50));
   const st = m.inst.status().install;
   check(st.phase === "failed" && st.reason === "handoff" && m.exits.length === 0, "넘기기 실패면 서버는 계속 돈다", st);
-  check(m.inst.start() === true, "실패 뒤 다시 시작할 수 있다");
+  check(m.inst.start("0.0.3") === true, "실패 뒤 다시 시작할 수 있다");
   await settled(m.inst);
 }
 
 // 6. 취소와 멈춤
 {
   const m = make(site({ hang: true }));
-  m.inst.start();
+  m.inst.start("0.0.3");
   for (let i = 0; i < 200 && m.inst.status().install.phase !== "downloading"; i++) await new Promise((r) => setTimeout(r, 5));
   check(m.inst.status().install.phase === "downloading", "다운로드 중 상태");
   check(m.inst.cancel() === true, "다운로드 중 취소");
@@ -145,7 +155,7 @@ await failedWith({ size: payload.length + 1 }, "verify", "선언보다 작으면
 }
 {
   const m = make(site({ hang: true }), { stallMs: 50 });
-  m.inst.start();
+  m.inst.start("0.0.3");
   const st = await settled(m.inst);
   check(st.phase === "failed" && st.reason === "network", "받기가 멈추면 실패", st);
 }
@@ -162,7 +172,7 @@ await failedWith({ size: payload.length + 1 }, "verify", "선언보다 작으면
   check(m.inst.status().rolledBackVersion === "0.0.3", "되돌림을 알린다");
   fs.writeFileSync(path.join(m.updatesDir, "rolled-back"), "0.0.2");
   check(m.inst.status().rolledBackVersion === undefined, "이미 지난 버전의 되돌림은 무시한다");
-  m.inst.start();
+  m.inst.start("0.0.3");
   check(await settled(m.inst).then(() => !fs.existsSync(path.join(m.updatesDir, "rolled-back"))), "다시 시도하면 되돌림 표시를 지운다");
 }
 

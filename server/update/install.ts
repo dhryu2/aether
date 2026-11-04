@@ -15,7 +15,7 @@ import { createBackup } from "../db/backups";
 import { restoreStatus } from "../db/restore";
 import { database } from "../db/sqlite";
 import { appPaths, bundleProgramDir } from "../setup/paths";
-import { FETCH_TIMEOUT_MS, MAX_BODY_BYTES, isNewerVersion, normalizeUpdateUrl, readLimitedBytes, versionJson } from "./check";
+import { VersionMetaError, fetchVerifiedMeta, isNewerVersion, normalizeUpdateUrl, verifySignature } from "./check";
 import type { UpdateInstallFailure, UpdateInstallState } from "../../shared/http";
 
 /** 윈도우 감시 프로그램(host.nsi)과 맞춘 종료 코드. 이 코드로 끝나면 감시 프로그램이 설치 파일을 실행한다. */
@@ -26,7 +26,6 @@ const EXIT_DELAY_MS = 800;
 const CLEANUP_DELAY_MS = 2 * 60_000;
 const ROLLED_BACK = "rolled-back";
 const UPDATE_LOG = "update.log"; // 되돌린 뒤 원인을 볼 수 있게 남긴다
-const SIGNATURE_MAX_BYTES = 1024;
 
 type Target = { os: "win" | "mac"; arch: "x64" | "arm64"; staged: string; pattern: RegExp };
 
@@ -37,15 +36,8 @@ export function targetFor(platform: NodeJS.Platform, arch: string): Target | nul
   return null;
 }
 
-/** 공개키(SPKI DER, base64)로 서명을 확인한다. 키나 서명 모양이 잘못돼도 false다. */
-export function verifySignature(data: Buffer, signatureBase64: string, publicKeyBase64: string): boolean {
-  try {
-    const key = crypto.createPublicKey({ key: Buffer.from(publicKeyBase64, "base64"), format: "der", type: "spki" });
-    return crypto.verify(null, data, key, Buffer.from(signatureBase64.trim(), "base64"));
-  } catch {
-    return false;
-  }
-}
+// 시험이 이 경로로 불러온다.
+export { verifySignature };
 
 class InstallError extends Error {
   constructor(readonly reason: UpdateInstallFailure) {
@@ -87,19 +79,10 @@ export function createUpdateInstaller(opts: UpdateInstallerOptions) {
   const staged = target ? path.join(opts.updatesDir, target.staged) : "";
   const part = `${staged}.part`;
 
-  async function fetchSigned(signal: AbortSignal) {
-    const get = async (name: string, max: number) => {
-      const res = await fetchFn(`${base}/${name}`, { signal: AbortSignal.any([signal, AbortSignal.timeout(FETCH_TIMEOUT_MS)]), redirect: "error" });
-      if (!res.ok) throw new InstallError(res.status === 404 && name.endsWith(".sig") ? "signature" : "network");
-      return readLimitedBytes(res, max);
-    };
-    const raw = await get("version.json", MAX_BODY_BYTES);
-    const sig = await get("version.json.sig", SIGNATURE_MAX_BYTES);
-    // 지문이 든 version.json을 먼저 믿을 수 있어야 하므로 내용을 해석하기 전에 서명부터 본다.
-    if (!verifySignature(raw, sig.toString("utf8"), opts.publicKey!)) throw new InstallError("signature");
-    const parsed = versionJson.safeParse(JSON.parse(raw.toString("utf8")));
-    if (!parsed.success) throw new InstallError("signature");
-    const meta = parsed.data;
+  async function fetchSigned(signal: AbortSignal, expected: string) {
+    const meta = await fetchVerifiedMeta(base!, opts.publicKey!, fetchFn, signal);
+    // 사용자가 동의한 버전이 서명된 최신 값과 같을 때만 받는다.
+    if (meta.version !== expected) throw new InstallError("signature");
     if (!isNewerVersion(meta.version, opts.current)) throw new InstallError("signature");
     const file = meta.files.find((f) => f.os === target!.os && f.arch === target!.arch);
     // 저장 위치는 고정 이름이지만, 주소에 들어가는 이름도 서명된 값 중 약속한 모양만 받는다.
@@ -147,21 +130,21 @@ export function createUpdateInstaller(opts: UpdateInstallerOptions) {
   }
 
   function classify(e: unknown, cancelled: boolean): UpdateInstallFailure | null {
-    if (e instanceof InstallError) return e.reason;
+    if (e instanceof InstallError || e instanceof VersionMetaError) return e.reason;
     if (cancelled) return null;
     if (e instanceof SyntaxError) return "signature";
     if (e && typeof e === "object" && "syscall" in e) return "disk";
     return "network";
   }
 
-  async function run(ctrl: AbortController): Promise<void> {
+  async function run(ctrl: AbortController, expected: string): Promise<void> {
     let version: string | undefined;
     try {
       fs.mkdirSync(opts.updatesDir, { recursive: true });
       fs.rmSync(staged, { force: true });
       fs.rmSync(part, { force: true });
       fs.rmSync(path.join(opts.updatesDir, ROLLED_BACK), { force: true });
-      const signed = await fetchSigned(ctrl.signal);
+      const signed = await fetchSigned(ctrl.signal, expected);
       version = signed.version;
       state = { phase: "downloading", version, received: 0, total: signed.file.size };
       await download(signed.file, version, ctrl);
@@ -190,11 +173,11 @@ export function createUpdateInstaller(opts: UpdateInstallerOptions) {
   }
 
   /** 시작했으면 true. 이미 진행 중이거나 쓸 수 없으면 false. */
-  function start(): boolean {
+  function start(expected: string): boolean {
     if (!canInstall || state.phase === "downloading" || state.phase === "checking" || state.phase === "installing") return false;
     abort = new AbortController();
     state = { phase: "checking" };
-    void run(abort);
+    void run(abort, expected);
     return true;
   }
 

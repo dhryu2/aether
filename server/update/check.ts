@@ -3,6 +3,7 @@
  * 보내는 것은 없다(사람 정보·설치 식별자 없는 GET 한 번). 다만 배포 서버에는 접속 IP가 남을 수 있다. updateUrl이 비면 기능 전체가 꺼진다.
  * 실패는 조용히 마지막 값을 유지하고 경고를 한 번만 남긴다. 재시도는 없다(다음 주기에 다시 한다).
  */
+import crypto from "node:crypto";
 import { z } from "zod";
 import pkg from "../package.json" with { type: "json" };
 import { config } from "../config";
@@ -73,10 +74,47 @@ export async function readLimitedBytes(res: Response, max: number): Promise<Buff
   return Buffer.concat(chunks);
 }
 
+/** 공개키(SPKI DER, base64)로 서명을 확인한다. 키나 서명 모양이 잘못돼도 false다. */
+export function verifySignature(data: Buffer, signatureBase64: string, publicKeyBase64: string): boolean {
+  try {
+    const key = crypto.createPublicKey({ key: Buffer.from(publicKeyBase64, "base64"), format: "der", type: "spki" });
+    return crypto.verify(null, data, key, Buffer.from(signatureBase64.trim(), "base64"));
+  } catch {
+    return false;
+  }
+}
+
+const SIGNATURE_MAX_BYTES = 1024;
+
+/** 서명된 version.json을 얻지 못한 이유. network는 받기 실패, signature는 서명이 없거나 틀렸거나 모양이 다른 경우다. */
+export class VersionMetaError extends Error {
+  constructor(readonly reason: "network" | "signature") {
+    super(reason);
+  }
+}
+
+/** version.json과 서명을 받아, 내용을 해석하기 전에 서명부터 확인한 값만 돌려준다. */
+export async function fetchVerifiedMeta(base: string, publicKey: string, fetchFn: typeof fetch, signal?: AbortSignal): Promise<z.infer<typeof versionJson>> {
+  const get = async (name: string, max: number) => {
+    const timeout = AbortSignal.timeout(FETCH_TIMEOUT_MS);
+    const res = await fetchFn(`${base}/${name}`, { signal: signal ? AbortSignal.any([signal, timeout]) : timeout, redirect: "error" });
+    if (!res.ok) throw new VersionMetaError(res.status === 404 && name.endsWith(".sig") ? "signature" : "network");
+    return readLimitedBytes(res, max);
+  };
+  const raw = await get("version.json", MAX_BODY_BYTES);
+  const sig = await get("version.json.sig", SIGNATURE_MAX_BYTES);
+  if (!verifySignature(raw, sig.toString("utf8"), publicKey)) throw new VersionMetaError("signature");
+  const parsed = versionJson.safeParse(JSON.parse(raw.toString("utf8")));
+  if (!parsed.success) throw new VersionMetaError("signature");
+  return parsed.data;
+}
+
 export interface UpdateCheckerOptions {
   /** 설정의 updateUrl 원문. */
   url: string;
   current: string;
+  /** 있으면 서명이 맞는 version.json만 받아들인다. 없으면(개발 실행처럼 설치할 수 없는 곳) 서명 없이 링크만 보인다. */
+  publicKey?: string;
   fetchFn?: typeof fetch;
   warn?: (msg: string) => void;
 }
@@ -95,9 +133,13 @@ export function createUpdateChecker(opts: UpdateCheckerOptions) {
   async function checkNow(): Promise<void> {
     if (!base) return;
     try {
-      const res = await fetchFn(`${base}/version.json`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), headers: { accept: "application/json" }, redirect: "error" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      last = versionJson.parse(JSON.parse((await readLimitedBytes(res, MAX_BODY_BYTES)).toString("utf8")));
+      if (opts.publicKey) {
+        last = await fetchVerifiedMeta(base, opts.publicKey, fetchFn);
+      } else {
+        const res = await fetchFn(`${base}/version.json`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), headers: { accept: "application/json" }, redirect: "error" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        last = versionJson.parse(JSON.parse((await readLimitedBytes(res, MAX_BODY_BYTES)).toString("utf8")));
+      }
       checkedAt = new Date().toISOString();
       warned = false;
     } catch (e) {
@@ -143,4 +185,4 @@ export function createUpdateChecker(opts: UpdateCheckerOptions) {
 }
 
 /** 서버가 쓰는 기본 확인기. 설정의 updateUrl과 이 서버의 버전으로 만든다. */
-export const updateChecker = createUpdateChecker({ url: config.updateUrl, current: pkg.version });
+export const updateChecker = createUpdateChecker({ url: config.updateUrl, current: pkg.version, publicKey: (pkg as { aetherUpdatePublicKey?: string }).aetherUpdatePublicKey });

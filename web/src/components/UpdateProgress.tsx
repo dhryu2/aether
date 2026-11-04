@@ -118,8 +118,9 @@ function Screen({ fromVersion, targetVersion, pageUrl }: { fromVersion: string; 
   }
   const retry = async () => {
     setErr(null)
+    if (!target.current) return setErr(t('update.fail.handoff'))
     try {
-      await api.installUpdate()
+      await api.installUpdate(target.current)
       setRound((n) => n + 1)
     } catch (e) {
       setErr(errMsg(e))

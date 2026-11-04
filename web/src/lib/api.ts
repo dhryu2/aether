@@ -195,7 +195,8 @@ export const api = {
   disableRemoteAccess: () => req<RemoteAccessResponse>('/api/system/remote-access', { method: 'DELETE' }),
   // 앱 안 원클릭 업데이트. 설치는 202로 시작만 알리고, 진행은 상태 조회로 본다.
   checkUpdateNow: () => req<UpdateStatusResponse>('/api/system/update/check', { method: 'POST' }),
-  installUpdate: () => req<unknown>('/api/system/update/install', { method: 'POST' }),
+  // 화면이 보여 준 버전을 함께 보낸다. 서버가 서명된 최신 값과 같을 때만 설치한다.
+  installUpdate: (version: string) => req<unknown>('/api/system/update/install', { method: 'POST', body: JSON.stringify({ version }) }),
   cancelUpdate: () => req<unknown>('/api/system/update/cancel', { method: 'POST' }),
   serverLogs: (q: { lines: number; level: ServerLogLevel }) =>
     req<ServerLogResponse>('/api/system/logs?' + new URLSearchParams({ lines: String(q.lines), level: q.level })),
@@ -247,7 +248,7 @@ export const api = {
     // 브리프 질문지 카드의 답. 있으면 서버가 열린 질문지를 닫고, 글은 서버가 답에서 만든다.
     questionnaire?: { id: string; answers: Record<string, QuestionnaireAnswerValue> },
   ) =>
-    req<{ ok: true }>(`/api/sessions/${id}/message`, {
+    req<{ ok: true; duplicate?: boolean }>(`/api/sessions/${id}/message`, {
       method: 'POST',
       timeoutMs: 120_000,
       body: JSON.stringify({

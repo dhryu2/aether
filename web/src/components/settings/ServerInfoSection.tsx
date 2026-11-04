@@ -56,10 +56,12 @@ export function ServerInfoSection({ hideTitle }: { hideTitle?: boolean }) {
       confirmLabel: t('update.confirm.action'),
       onConfirm: async () => {
         try {
-          await api.installUpdate()
+          await api.installUpdate(version)
           actions.openUpdateProgress({ fromVersion: update.current, targetVersion: version, pageUrl: update.pageUrl })
         } catch (e) {
           actions.showError(errMsg(e))
+          // 그 사이 새 버전이 나왔을 수 있다 — 표시를 서버 값으로 다시 맞춘다.
+          api.systemUpdate().then(setUpdate, () => undefined)
         }
       },
     })

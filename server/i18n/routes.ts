@@ -21,6 +21,7 @@ export const routes: Dict = {
   "routes.system.backupFailed": { ko: "백업하지 못했어요", en: "Could not create the backup" },
   "routes.system.backupIdInvalid": { ko: "백업 id가 올바르지 않습니다", en: "Invalid backup id" },
   "routes.system.backupNotFound": { ko: "그 백업을 찾을 수 없어요", en: "Backup not found" },
+  "routes.system.updateVersionChanged": { ko: "그 사이 새 버전이 나왔어요. 버전을 확인한 뒤 다시 업데이트해 주세요.", en: "A newer version came out in the meantime. Check the version and update again." },
   "routes.system.logQueryInvalid": { ko: "lines는 정수, level은 log·warn·error 중 하나여야 합니다", en: "lines must be an integer and level one of log, warn, error" },
 
   // 세션

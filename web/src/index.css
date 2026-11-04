@@ -1746,3 +1746,10 @@ a,
   white-space: nowrap;
   border: 0;
 }
+
+/* 검토함 목록. 줄이 아니라 목록(listbox) 하나가 초점을 받고 aria-activedescendant로 선택 줄을 가리킨다. */
+[data-review-list] { outline: none; }
+[data-review-list]:focus-visible [aria-selected="true"] { outline: 2px solid var(--c-tint-fill); outline-offset: -2px; }
+@media (hover: hover) {
+  [data-review-opt]:hover:not([aria-selected="true"]) { background: var(--c-fill) !important; }
+}

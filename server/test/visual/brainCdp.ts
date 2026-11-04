@@ -72,14 +72,14 @@ export async function connectBrain(port: number, phone: boolean) {
     await send("Input.dispatchKeyEvent", {
       type: "keyDown",
       key: keyName,
-      code: keyName,
+      code: keyName.length === 1 ? `Key${keyName.toUpperCase()}` : keyName,
       modifiers,
       windowsVirtualKeyCode: code,
     });
     await send("Input.dispatchKeyEvent", {
       type: "keyUp",
       key: keyName,
-      code: keyName,
+      code: keyName.length === 1 ? `Key${keyName.toUpperCase()}` : keyName,
       modifiers,
       windowsVirtualKeyCode: code,
     });
@@ -246,7 +246,7 @@ export const HIT_SCRIPT = `(() => {
     const b = box(tab);
     if (b.w < 43.5 || b.h < 43.5) small.push('tab ' + (tab.getAttribute('data-brain-tab') || '') + ' ' + Math.round(b.w) + 'x' + Math.round(b.h));
   }
-  for (const button of document.querySelectorAll('#brain-tabpanel button')) {
+  for (const button of document.querySelectorAll('#brain-tabpanel button, [data-review] button')) {
     if (!(button instanceof HTMLElement) || button.getClientRects().length === 0) continue;
     const b = box(button);
     if (b.w < 43.5 || b.h < 43.5) small.push('button ' + (button.getAttribute('aria-label') || button.textContent || '').trim().slice(0, 24) + ' ' + Math.round(b.w) + 'x' + Math.round(b.h));

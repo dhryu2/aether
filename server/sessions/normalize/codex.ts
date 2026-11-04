@@ -147,7 +147,11 @@ function itemToContent(item: ThreadItem, phase: "started" | "completed"): AgentE
       } else if (item.type === "imageView") target = item.path;
       else if (item.type === "imageGeneration") target = item.revisedPrompt ?? undefined;
       else if (item.type === "sleep") target = `${item.durationMs}ms`;
-      return [{ type: "tool_call", toolId: id, name, toolKind: kind, target, input: itemInput(item) }];
+      // 이름 바꾸기·옮기기는 새 경로(move_path)도 바뀐 파일이다.
+      const paths = item.type === "fileChange"
+        ? item.changes.flatMap((c) => [c.path, (c.kind as { move_path?: unknown } | undefined)?.move_path]).filter((p): p is string => typeof p === "string" && !!p)
+        : [];
+      return [{ type: "tool_call", toolId: id, name, toolKind: kind, target, ...(paths.length ? { paths } : {}), input: itemInput(item) }];
     }
     // completed → 결과
     let output = "";

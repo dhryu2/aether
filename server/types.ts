@@ -177,6 +177,8 @@ export type SessionMeta = {
   workspaceSource?: string;
   /** 이 세션 대화 통로가 마지막으로 따라잡은 시각. 기기 저장소가 아니라 서버가 가진다. */
   lastViewedAt?: number;
+  /** 작업 검토함에서 "검토 완료"로 처리한 마지막 사건 순번. 이 뒤의 사건만 검토 대상이다. */
+  reviewedSeq?: number;
   /**
    * 마지막으로 사람을 부를 사건(완료·실패·한도·크래시·인증). 잠든 세션은 이 칸만 보고 주의를 복원한다.
    * 목록이 events.jsonl을 다시 전수 읽지 않게 한다.

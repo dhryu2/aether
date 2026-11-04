@@ -216,6 +216,10 @@ export const session: Dict = {
     ko: '이 메시지는 남고 이후 대화는 사라져요. 승인 때 백업한 파일은 그 시점으로 돌아가요. 백업이 없거나 승인 없이 바뀐 파일은 되돌릴 수 없어요. 다음 메시지를 보내면 AI가 남은 대화를 읽고 이어서 답해요',
     en: 'This message stays. Later messages disappear. Files with a saved copy return to that copy. Files without a copy stay as they are. Changes made without approval cannot be restored. The next message gives the model the kept chat once, then it continues.',
   },
+  'session.shortcuts.reviewMove': { ko: '검토함 목록에서 위아래로 이동', en: 'Move up and down in the Review list' },
+  'session.shortcuts.reviewOpen': { ko: '검토함에서 세션 열기', en: 'Open the session from Review' },
+  'session.shortcuts.reviewDone': { ko: '검토함에서 검토 완료', en: 'Mark reviewed in Review' },
+  'session.shortcuts.reviewUndo': { ko: '검토함에서 방금 한 검토 완료 되돌리기', en: 'Undo the last review in Review' },
   'session.shortcuts.escape': { ko: '두 번 눌러 응답 중단 · 열린 창 닫기', en: 'Press twice to stop the running turn · close open dialog' },
   'session.shortcuts.help': { ko: '이 도움말 열기/닫기', en: 'Open/close this help' },
 

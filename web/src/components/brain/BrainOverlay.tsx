@@ -5,14 +5,13 @@ import markUrl from '../../assets/aether-chamding-mark.png'
 import { C, MS, R, SH, Z, alpha } from '../../design/tokens'
 import { useEscape, useExitAnim, useScrimClose } from '../../lib/hooks'
 import { useT } from '../../lib/i18n'
-import type { BrainTab } from '../../lib/brain'
 import { actions, useStore } from '../../lib/store'
 import { IconButton } from '../ui'
 import { BrainTabs } from './BrainTabs'
 import { BRAIN_TABS } from './brainTabList'
 import { BrainChrome } from './BrainChrome'
 import { useBrainChrome } from './useBrainChrome'
-import { HubView } from './HubView'
+import { ReviewView } from './ReviewView'
 import { projectLabel } from './helpers'
 
 const FOCUSABLE = 'button, a[href], input, select, textarea, [tabindex="0"]'
@@ -122,7 +121,7 @@ function BrainSheet({ openerRef, open, closing }: { openerRef: RefObject<HTMLEle
   const title = (
     <>
       <img src={markUrl} alt="" width={26} height={26} style={{ display: 'block', flexShrink: 0, borderRadius: 6 }} />
-      <div id="brain-overlay-title" className="truncate" style={{ fontWeight: 600, color: C.label, fontSize: narrow ? 15 : 17, flex: narrow ? 1 : undefined, minWidth: 0 }}>
+      <div id="brain-overlay-title" className="truncate" style={{ fontWeight: 600, color: C.label, fontSize: narrow ? 15 : 17, flex: narrow || !showTabs ? 1 : undefined, minWidth: 0 }}>
         {t('brain.header.title')}
       </div>
     </>
@@ -142,7 +141,7 @@ function BrainSheet({ openerRef, open, closing }: { openerRef: RefObject<HTMLEle
         inert={closing ? true : undefined}
         onKeyDown={onKeyDown}
         style={{
-          position: 'relative', display: 'flex', flexDirection: narrow ? 'column' : 'row', overflow: 'hidden',
+          position: 'relative', display: 'flex', flexDirection: narrow || !showTabs ? 'column' : 'row', overflow: 'hidden',
           width: narrow ? '100%' : 'min(1040px, 94vw)', height: narrow ? '100%' : 'min(88vh, 860px)',
           borderRadius: narrow ? 0 : R.modal, background: C.bg,
           border: narrow ? undefined : `0.5px solid ${C.sep}`,
@@ -151,6 +150,12 @@ function BrainSheet({ openerRef, open, closing }: { openerRef: RefObject<HTMLEle
       >
         {narrow ? (
           <div className="glass" style={{ position: 'absolute', left: 12, right: 12, top: 'calc(env(safe-area-inset-top) + 8px)', height: 44, borderRadius: R.full, zIndex: 5, display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px 0 12px' }}>
+            {title}
+            {closeBtn}
+          </div>
+        ) : !showTabs ? (
+          // 탭이 하나면 왼쪽 기둥 대신 폰과 같은 머리를 위에 둔다. 탭이 둘이 되면 기둥이 돌아온다.
+          <div className="glass" style={{ flexShrink: 0, margin: '12px 12px 0', height: 44, borderRadius: R.full, display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px 0 12px' }}>
             {title}
             {closeBtn}
           </div>
@@ -168,23 +173,23 @@ function BrainSheet({ openerRef, open, closing }: { openerRef: RefObject<HTMLEle
         )}
 
         <div style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          {!narrow && <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 4 }}>{closeBtn}</div>}
+          {!narrow && showTabs && <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 4 }}>{closeBtn}</div>}
           <div className="brain-edge" style={narrow ? { top: 'calc(env(safe-area-inset-top) + 52px)' } : undefined} />
           <div
             ref={scrollerRef}
             className="scroll-area"
             style={{
-              flex: 1, minHeight: 0, overflow: 'auto',
-              paddingTop: narrow ? 'calc(env(safe-area-inset-top) + 68px)' : 28,
+              flex: 1, minHeight: 0, overflow: 'hidden', // 검토함은 목록과 상세가 따로 스크롤한다
+              paddingTop: narrow ? 'calc(env(safe-area-inset-top) + 68px)' : showTabs ? 28 : 16,
               paddingBottom: narrow ? (showTabs ? 'calc(84px + env(safe-area-inset-bottom))' : 'calc(16px + env(safe-area-inset-bottom))') : 32,
-              paddingLeft: narrow ? 16 : 28,
-              paddingRight: narrow ? 16 : 56,
+              paddingLeft: narrow ? 16 : showTabs ? 28 : 24,
+              paddingRight: narrow ? 16 : showTabs ? 56 : 24,
             }}
           >
-            <div style={{ maxWidth: narrow ? undefined : 720 }}>
-              <PanelHead tab={tab} label={t(BRAIN_TABS.find((tb) => tb.id === tab)?.labelKey ?? 'brain.tabs.hub')} back={back} narrow={narrow} />
-              <div key={tab} className={dir} {...(showTabs ? { id: 'brain-tabpanel', role: 'tabpanel', 'aria-labelledby': `brain-tab-${tab}` } : {})}>
-                <HubView />
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+              <PanelHead label={t(BRAIN_TABS.find((tb) => tb.id === tab)?.labelKey ?? 'brain.tabs.review')} back={back} narrow={narrow} />
+              <div key={tab} className={dir} style={{ flex: 1, minHeight: 0 }} {...(showTabs ? { id: 'brain-tabpanel', role: 'tabpanel', 'aria-labelledby': `brain-tab-${tab}` } : {})}>
+                <ReviewView />
               </div>
             </div>
           </div>
@@ -200,7 +205,7 @@ function BrainSheet({ openerRef, open, closing }: { openerRef: RefObject<HTMLEle
   )
 }
 
-function PanelHead({ tab, label, back, narrow }: { tab: BrainTab; label: string; back: { label: string; onBack: () => void } | null; narrow: boolean }) {
+function PanelHead({ label, back, narrow }: { label: string; back: { label: string; onBack: () => void } | null; narrow: boolean }) {
   if (back) {
     return (
       <button type="button" className="press hit-44" onClick={back.onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, height: 44, marginBottom: 8, padding: 0, border: 'none', background: 'transparent', color: C.tint, fontSize: 17, fontWeight: 600, cursor: 'pointer' }}>
@@ -209,6 +214,5 @@ function PanelHead({ tab, label, back, narrow }: { tab: BrainTab; label: string;
       </button>
     )
   }
-  if (tab === 'hub') return null
   return <h1 style={{ margin: '0 0 16px', fontSize: narrow ? 28 : 26, fontWeight: 700, letterSpacing: '-0.02em', color: C.label }}>{label}</h1>
 }

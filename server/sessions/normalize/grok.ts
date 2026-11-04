@@ -57,6 +57,9 @@ function jsonText(v: unknown): string {
 }
 
 function toolKindOf(name: string, kind?: string): ToolKind {
+  // ACP의 도구 종류(kind)가 있으면 이름보다 먼저 본다. 이름 규칙은 kind가 없는 도구의 대비책이다.
+  if (kind === "execute") return "bash";
+  if (kind === "edit" || kind === "delete" || kind === "move") return "file_change";
   const n = `${kind ?? ""} ${name}`.toLowerCase();
   if (/(run_terminal|bash|shell|command)/.test(n)) return "bash";
   if (/(search_replace|write|edit|apply_patch)/.test(n)) return "file_change";
@@ -102,6 +105,14 @@ function rawInput(update: Record<string, unknown>): Record<string, unknown> | un
   if (typeof path === "string" && !out.path) out.path = path;
   if (typeof command === "string" && !out.command) out.command = command;
   return out;
+}
+
+/** 파일 변경 도구의 대상 경로 — 인자(file_path·path·target_file)와 알림의 locations[].path를 모은다. */
+function changedPaths(update: Record<string, unknown>, input: Record<string, unknown> | undefined): { paths?: string[] } {
+  const found = [input?.file_path, input?.path, input?.target_file];
+  if (Array.isArray(update.locations)) for (const loc of update.locations) found.push(asRecord(loc)?.path);
+  const paths = [...new Set(found.filter((p): p is string => typeof p === "string" && !!p))];
+  return paths.length ? { paths } : {};
 }
 
 function toolTarget(input: Record<string, unknown> | undefined, name: string): string | undefined {
@@ -155,7 +166,9 @@ function normalizeUpdate(update: Record<string, unknown>): AgentEventContent[] {
       if (!id) return [];
       const name = toolName(update);
       const input = rawInput(update);
-      return [{ type: "tool_call", toolId: id, name, toolKind: toolKindOf(name, typeof update.kind === "string" ? update.kind : undefined), target: toolTarget(input, name), input }];
+      const toolKind = toolKindOf(name, typeof update.kind === "string" ? update.kind : undefined);
+      const paths = toolKind === "file_change" ? changedPaths(update, input) : {};
+      return [{ type: "tool_call", toolId: id, name, toolKind, target: toolTarget(input, name), ...paths, input }];
     }
     case "tool_call_update": {
       if (isAskUserQuestionUpdate(update)) return [];

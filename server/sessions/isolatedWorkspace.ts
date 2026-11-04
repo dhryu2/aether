@@ -172,6 +172,53 @@ export function folderUncommittedChanges(cwd: string): string[] | null {
   return status === null ? null : status.split("\n").map((l) => l.trim()).filter(Boolean);
 }
 
+/** 작업 검토함이 쓰는 폴더의 저장소 상태. dirty는 커밋 안 된 변경의 절대 경로(새 폴더는 끝에 `/`), ignored는 files 중 무시된 파일(확인 못 하면 null). */
+export type FolderReviewState = { root: string; dirty: string[]; ignored: Set<string> | null };
+
+/**
+ * 폴더의 커밋 안 된 변경과 files의 무시 여부를 읽는다. 저장소가 아니거나 확인에 실패하면 null이다.
+ * 상태는 `-z`로 받아 한글·공백 경로의 따옴표 처리를 피하고, 이름 바뀜은 새 경로와 옛 경로를 모두 넣는다.
+ * files는 절대 경로여야 하고 저장소 밖 경로는 무시 검사에서 뺀다.
+ */
+export async function folderReviewStateAsync(cwd: string, files: readonly string[]): Promise<FolderReviewState | null> {
+  if (!(await isGitRepoAsync(cwd))) return null;
+  try {
+    const env = await gitEnvAsync(cwd);
+    const out = (args: string[]) => execFileP("git", args, { cwd, encoding: "utf8", timeout: 60_000, env, maxBuffer: 16 * 1024 * 1024 });
+    const root = (await out(["rev-parse", "--show-toplevel"])).stdout.trim();
+    const status = (await out(["status", "--porcelain=v1", "-z", "--ignore-submodules=dirty"])).stdout.split("\0");
+    failures.clear(`status:${cwd}`);
+    const dirty: string[] = [];
+    for (let i = 0; i < status.length; i++) {
+      const entry = status[i];
+      if (entry.length < 4) continue;
+      dirty.push(path.join(root, entry.slice(3))); // join은 끝의 /를 보존한다
+      if (entry[0] === "R" || entry[0] === "C" || entry[1] === "R" || entry[1] === "C") {
+        i += 1; // 이름 바뀜·복사는 다음 칸이 옛 경로다
+        if (status[i]) dirty.push(path.join(root, status[i]));
+      }
+    }
+    const inside = files.filter((f) => f.startsWith(root + path.sep));
+    return { root, dirty, ignored: inside.length ? await ignoredAmong(cwd, env, inside) : new Set() };
+  } catch (error) {
+    failures.report(error, { component: "session", operation: "session.workspace.inspect", severity: "warning" }, `status:${cwd}`);
+    return null;
+  }
+}
+
+/** git check-ignore로 무시된 파일을 가린다. 무시된 것이 없으면 git이 1로 끝나므로 그것은 빈 결과다. 그 밖의 실패는 null. */
+function ignoredAmong(cwd: string, env: NodeJS.ProcessEnv, files: readonly string[]): Promise<Set<string> | null> {
+  return new Promise((resolve) => {
+    const child = execFile("git", ["check-ignore", "-z", "--stdin"], { cwd, env, encoding: "utf8", timeout: 30_000, maxBuffer: 16 * 1024 * 1024 }, (error, stdout) => {
+      const code = (error as { code?: unknown } | null)?.code;
+      if (!error || code === 1) resolve(new Set(String(stdout).split("\0").filter(Boolean)));
+      else resolve(null);
+    });
+    child.stdin?.on("error", () => { /* 실패는 콜백이 알린다 */ });
+    child.stdin?.end(files.map((f) => f + "\0").join(""));
+  });
+}
+
 /** 연결 작업 복사본인가. 원 저장소(.git 디렉터리)는 해당하지 않는다. */
 export function isLinkedWorktree(cwd: string): boolean {
   try {

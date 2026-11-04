@@ -113,6 +113,8 @@ export type AgentEventContent =
       displayName?: string;
       /** 검색·요약용 핵심 인자 1개(명령·경로 등). 색인이 이 값을 쓴다. */
       target?: string;
+      /** 파일 변경(toolKind file_change)이 바꾸는 파일 경로들. 변경 도구가 아니거나 경로를 모르면 생략한다. */
+      paths?: string[];
       /**
        * 도구 호출 인자 전체 — 도구 카드가 명령 전문·파일 편집 전후 문자열을 보여주는 데 쓴다.
        * `target` 하나만으로는 카드가 요약으로 퇴화한다. 이미 마스킹·clamp를 거친 영속본에서 읽으므로

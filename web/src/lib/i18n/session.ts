@@ -241,8 +241,8 @@ export const session: Dict = {
     en: 'Delete, keep history: removes it from the list, but the conversation stays in past search.',
   },
   'session.delete.purgeHint': {
-    ko: '완전 삭제: 대화 기록까지 지워 과거 검색에서도 사라집니다. 되돌릴 수 없습니다.',
-    en: 'Delete everything: also erases the conversation, so it disappears from past search. This cannot be undone.',
+    ko: '완전 삭제: 대화 기록까지 지워 과거 검색에서도 사라집니다. 되돌릴 수 없습니다. 다만 이전에 만든 백업에는 남아 있어서, 그 백업을 복원하면 다시 나타납니다.',
+    en: 'Delete everything: also erases the conversation, so it disappears from past search. This cannot be undone. Earlier backups still contain it, and restoring one brings it back.',
   },
   'session.delete.discardConfirm': { ko: '버리기', en: 'Discard' },
   'session.delete.copyDirty': {

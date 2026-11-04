@@ -6,7 +6,7 @@ import { Check, Copy, Download, WrapText } from 'lucide-react'
 import { codeFileName } from '../lib/codeFileName'
 import { MenuItem } from './WorkMenu'
 import { copyItem, menuOf, onContextMenuFor } from './contextMenuFor'
-import ReactMarkdown, { type Components } from 'react-markdown'
+import ReactMarkdown, { type Components, type Options } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import SyntaxHighlighter from 'react-syntax-highlighter/dist/esm/prism-light'
 import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash'
@@ -237,6 +237,9 @@ function MdCode({ className, children, ...props }: ComponentProps<'code'>) {
   )
 }
 
+// 물결표 하나는 「약 17,500~18,500」 같은 범위 표기에 흔해서 취소선으로 읽지 않는다. 취소선은 ~~두 개~~만 쓴다.
+const remarkPlugins: Options['remarkPlugins'] = [[remarkGfm, { singleTilde: false }]]
+
 const markdownComponents: Components = {
   pre: MdPre,
   // 좁은 화면에서 표는 가로로 스크롤된다(index.css의 .md table) — 스크롤바 모양을 공통으로 맞춘다.
@@ -252,7 +255,7 @@ export const Markdown = memo(function Markdown({ children, dark, size = 13.5 }: 
   return (
     <div className="md" style={{ fontSize: size, color: C.label }}>
       <MarkdownCtx.Provider value={ctx}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
           {children}
         </ReactMarkdown>
       </MarkdownCtx.Provider>

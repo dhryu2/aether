@@ -54,6 +54,7 @@ try {
   check(wbin?.binary === true && wbin.before == null, "T7 바이너리 before 생략");
   // T8 시크릿 denylist(.env)
   fs.writeFileSync(path.join(cwd, ".env"), "SECRET=topsecret");
+  check(buildMutationPreview("Write", { file_path: "auth.json", content: "x" }, cwd)?.redacted === true, "T8a auth.json redacted");
   const wenv = buildMutationPreview("Write", { file_path: ".env", content: "SECRET=newvalue" }, cwd);
   check(wenv?.redacted === true && wenv.before == null && wenv.after == null, "T8 .env redacted(before/after 생략)");
   check(!JSON.stringify(wenv ?? {}).includes("topsecret") && !JSON.stringify(wenv ?? {}).includes("newvalue"), "T8 시크릿 내용 payload 미포함(평문 차단)");

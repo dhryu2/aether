@@ -29,6 +29,7 @@ const SECRET_DENY = [
   /\.crt$/i,
   /\.keystore$/i,
   /\.tfvars$/i,
+  /(^|\/)auth(-password)?\.json$/i,
 ];
 
 /** 경로(상대·절대 어느 쪽이든)가 비밀 보유 파일이면 true → 내용을 가린다. */
@@ -36,8 +37,9 @@ const SECRET_DENY = [
 export const isSecretPath = (p: string) => typeof p === "string" && SECRET_DENY.some((re) => re.test(p.replace(/\\/g, "/")));
 
 /**
- * 명령 문자열을 비밀 판정용 토큰으로 쪼갠다. 공백·따옴표·`=`·`,`·괄호와 `:`에서 자르되,
+ * 명령 문자열을 비밀 판정용 토큰으로 쪼갠다. 공백·따옴표·`=`·`,`·괄호와 `:`, 셸 제어 기호(`;` `|` `&` `<` `>` 백틱)에서 자르되,
  * 윈도우 드라이브 문자(한 글자 + `:` + `\` 또는 `/`)의 콜론은 자르지 않는다.
+ * 저장 마스킹용 최선 노력 판정이라 `cat .e*`, `printenv`처럼 낱말에 경로가 드러나지 않는 명령은 잡지 못한다.
  */
 export const commandTokens = (command: string): string[] =>
-  command.split(/[\s'"=,()]+/).flatMap((t) => t.split(/:(?![\\/])|(?<!(?:^|:)[A-Za-z]):/)).filter(Boolean);
+  command.split(/[\s'"=,();|&<>`]+/).flatMap((t) => t.split(/:(?![\\/])|(?<!(?:^|:)[A-Za-z]):/)).filter(Boolean);

@@ -67,5 +67,26 @@ check(commandTokens("cat C:\\p\\.env").some(isSecretPath), "명령 `cat C:\\p\\.
 check(commandTokens("cat 'C:/p/.env'").some(isSecretPath), "슬래시 드라이브 경로도 비밀이다");
 check(commandTokens("echo hi").some(isSecretPath) === false, "일반 명령은 비밀이 아니다");
 
+// 셸 제어 기호가 붙은 명령도 비밀 판정한다
+for (const cmd of [
+  "cat .env; echo done",
+  "cat .env;echo",
+  "cat .env|head -1",
+  "cat <.env",
+  "cat `echo .env`",
+  "source .env;",
+  "base64 server.key>/tmp/x",
+  ". ./.env&&env",
+  "x=$(<.env)",
+  "/bin/zsh -lc 'cat .env; echo done'",
+  'bash -lc "grep KEY .env|cut -c1-3"',
+]) check(commandTokens(cmd).some(isSecretPath), `셸 기호가 붙어도 비밀을 건드린다: ${cmd}`);
+for (const cmd of ["echo a; ls | wc -l", "cat foo.env; echo done"]) check(commandTokens(cmd).some(isSecretPath) === false, `비밀이 아닌 명령: ${cmd}`);
+
+// auth.json 은 provider 이름과 상관없이 비밀 경로다
+for (const p of ["auth.json", "AUTH.JSON", "home/user/.codex/auth.json", "C:\\Users\\example\\.grok\\auth.json", "data/auth-password.json"]) check(isSecretPath(p) === true, `인증 파일은 비밀이다 ${p}`);
+for (const p of ["src/auth.ts", "author.json", "oauth.json", "auth.json.bak", "myauth.json"]) check(isSecretPath(p) === false, `비슷한 이름은 비밀이 아니다 ${p}`);
+check(commandTokens("cat home/user/.codex/auth.json;").some(isSecretPath), "셸 기호가 붙은 auth.json 명령도 비밀이다");
+
 console.log(`\n${fail === 0 ? "✅" : "❌"} secret_paths: ${pass} PASS / ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

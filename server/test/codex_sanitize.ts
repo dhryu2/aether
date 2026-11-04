@@ -209,6 +209,11 @@ const envRead = persisted(itemDone(cmdItem("cat deploy/.env", "TOKEN=abcdef12345
 const envJson = json(envRead);
 check(!envJson.includes("hunter2") && !envJson.includes("abcdef123456"), "비밀 파일을 읽은 명령의 출력이 통째로 가려진다", envJson.slice(0, 200));
 
+for (const cmd of ["cat deploy/.env; echo done", "cat auth.json"]) {
+  const shellRead = json(persisted(itemDone(cmdItem(cmd, "TOKEN=abcdef123456\nDB_PASSWORD=hunter2"))));
+  check(!shellRead.includes("hunter2") && !shellRead.includes("abcdef123456"), `비밀 경로를 읽은 명령의 출력이 가려진다: ${cmd}`, shellRead.slice(0, 200));
+}
+
 const fileChange = (changes: { path: string; diff: string }[]): ThreadItem =>
   ({
     type: "fileChange",

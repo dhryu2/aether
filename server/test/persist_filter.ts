@@ -91,6 +91,11 @@ const readEnv = { type: "assistant", message: { content: [
 const secretIds = collectSecretToolUseIds(readEnv);
 check(secretIds.includes("s1") && secretIds.includes("s2") && !secretIds.includes("s3"), "6a Read(.env)·Bash(cat .env.local) 탐지, 일반파일 제외");
 check(collectSecretToolUseIds({ type: "user", message: { content: [] } }).length === 0, "6b 비-assistant는 빈 배열");
+const shellSecret = collectSecretToolUseIds({ type: "assistant", message: { content: [
+  { type: "tool_use", id: "m1", name: "Bash", input: { command: "cat .env; echo done" } },
+  { type: "tool_use", id: "m2", name: "Read", input: { file_path: "auth.json" } },
+] } });
+check(shellSecret.includes("m1") && shellSecret.includes("m2"), "6c 셸 기호가 붙은 cat .env; 와 Read auth.json 도 탐지");
 
 // ── 7. filterSdkForPersist: 시크릿 tool_result redact ──
 const secretResult = {

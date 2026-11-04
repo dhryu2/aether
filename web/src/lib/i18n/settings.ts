@@ -329,5 +329,5 @@ export const settings: Dict = {
   'settings.errorLog.component.composer': { ko: '입력창', en: 'Composer' },
   'settings.errorLog.component.commands': { ko: '명령', en: 'Commands' },
   'settings.errorLog.component.clipboard': { ko: '클립보드', en: 'Clipboard' },
-  'settings.errorLog.component.brain': { ko: 'Agent Brain', en: 'Brain' },
+  'settings.errorLog.component.brain': { ko: '워크스페이스', en: 'Workspace' },
 }

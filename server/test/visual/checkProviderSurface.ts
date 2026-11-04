@@ -306,7 +306,7 @@ await evaluate<boolean>(`(() => {
   return true;
 })()`);
 await sleep(400);
-check("Agent Brain 연다", await click('[aria-label="Agent Brain"]'));
+check("워크스페이스 연다", await click('[aria-label="워크스페이스"]'));
 await sleep(800);
 check("메모리 탭을 누른다", await click('[data-brain-tab="memory"]'));
 await sleep(300);

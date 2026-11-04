@@ -1,4 +1,4 @@
-// 홈. 지금 환경과 지난 대화 검색으로 가는 입구.
+// 홈. 지금 환경과 지난 대화 검색 팝업으로 가는 입구.
 import { C, R } from '../../design/tokens'
 import { useT } from '../../lib/i18n'
 import { actions, useStore } from '../../lib/store'
@@ -22,10 +22,10 @@ export function HubView() {
         <button
           type="button"
           className="press"
-          onClick={() => actions.setBrainTab('search')}
+          onClick={() => { actions.closeBrain(); actions.openSearch() }}
           style={{ height: narrow ? 44 : 36, padding: '0 16px', marginTop: 12, borderRadius: R.full, border: 'none', background: C.tintFill, color: C.onTint, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
         >
-          {t('brain.tabs.search')}
+          {t('nav.sidebar.searchPast')}
         </button>
       </div>
     </div>

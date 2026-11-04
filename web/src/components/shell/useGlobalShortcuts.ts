@@ -1,7 +1,8 @@
-// 전역 키보드 단축키 — Mod+K(찾기) · Mod+/(Agent Brain) · Mod+,(설정) · Esc(닫기/실행중 중단) · ?(도움말).
+// 전역 키보드 단축키 — Mod+K(지난 대화 검색) · Mod+F(세션 안 찾기) · Mod+/(워크스페이스) · Mod+,(설정) · Esc(닫기/실행중 중단) · ?(도움말).
 //   Cmd/Ctrl+N·Shift+N은 브라우저/OS 예약이라 미사용(억지 preventDefault는 적대적). 다른 오버레이 위엔 겹침 방지.
 import { useEffect, useRef } from 'react'
-import { actions, chromeRoomId, focusedTurn, type State } from '../../lib/store'
+import { actions, chromeRoomId, chromeSessionId, focusedTurn, type State } from '../../lib/store'
+import { MOD } from '../../lib/format'
 
 /**
  * 지금 화면 위에 떠 있는 것이 하나라도 있는가.
@@ -17,6 +18,7 @@ import { actions, chromeRoomId, focusedTurn, type State } from '../../lib/store'
 function overlayOpen(s: State): boolean {
   return !!(
     s.brainOpen ||
+    s.searchOpen ||
     s.settingsOpen ||
     s.modalOpen ||
     s.shortcutsOpen ||
@@ -43,24 +45,33 @@ export function useGlobalShortcuts(s: State) {
       const s = sRef.current
       const running = focusedTurn(s) === 'running'
       const mod = e.metaKey || e.ctrlKey
+      // 검색·찾기는 맥에서 ⌘만 본다. 맥의 Ctrl+K·Ctrl+F는 입력칸의 편집 키라 가로채지 않는다.
+      const modSearch = MOD === '⌘' ? e.metaKey : e.ctrlKey
       const el = e.target as HTMLElement | null
       const editable = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
-      // 확인 창·삭제 창이 맨 위에 있으면 찾기·Agent Brain·설정 단축키는 아무것도 하지 않는다.
+      // 확인 창·삭제 창이 맨 위에 있으면 검색·찾기·워크스페이스·설정 단축키는 아무것도 하지 않는다.
       const confirmOpen = !!(s.dialog || s.deleteTarget)
-      if (mod && e.key.toLowerCase() === 'k') {
-        if (confirmOpen || s.brainOpen || s.settingsOpen || s.modalOpen || s.shortcutsOpen) return
+      if (modSearch && e.key.toLowerCase() === 'k') {
+        // 검색 팝업이 이미 맨 위면 닫는 토글이다. 그 밖의 창이 떠 있으면 열지 않는다.
+        if (confirmOpen || (overlayOpen(s) && !s.searchOpen)) return
+        e.preventDefault()
+        if (s.searchOpen) actions.closeSearch()
+        else actions.openSearch()
+      } else if (modSearch && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
+        // 다른 창이 떠 있거나 찾을 세션이 없으면 브라우저 기본 찾기에 맡긴다.
+        if (overlayOpen(s) || !chromeSessionId(s)) return
         e.preventDefault()
         actions.toggleFind()
       } else if (mod && e.key === '/') {
         // 쌓기에 등록된 창(설정·새 작업·단축키·재인증·확인·삭제)이 하나라도 열려 있으면
         // Brain을 열지도 닫지도 않는다. Brain은 쌓기에 없으므로, 아무 창도 없을 때의 여닫기와
         // Brain만 열린 상태의 토글은 그대로다. Brain 위의 확인 창(s.dialog)도 여기 포함된다.
-        if (confirmOpen || s.settingsOpen || s.modalOpen || s.shortcutsOpen || s.providerAuth.open) return
+        if (confirmOpen || s.searchOpen || s.settingsOpen || s.modalOpen || s.shortcutsOpen || s.providerAuth.open) return
         e.preventDefault()
         if (s.brainOpen) actions.closeBrain()
         else actions.openBrain()
       } else if (mod && e.key === ',') {
-        if (confirmOpen || s.modalOpen || s.brainOpen || s.shortcutsOpen || s.providerAuth.open) return
+        if (confirmOpen || s.modalOpen || s.brainOpen || s.searchOpen || s.shortcutsOpen || s.providerAuth.open) return
         e.preventDefault()
         if (s.settingsOpen) actions.closeSettings()
         else actions.openSettings()
@@ -71,7 +82,7 @@ export function useGlobalShortcuts(s: State) {
         //   첫 Esc는 멈춤 버튼을 "ESC" 글자로 바꿔 다음 한 번이 무엇을 할지 알리고, 그 사이에 눌러야 멈춘다.
         if (running) actions.armOrInterrupt()
       } else if (!mod && e.key === '?' && !editable) {
-        if (s.brainOpen || s.settingsOpen || s.modalOpen || s.findOpen || s.providerAuth.open || s.deleteTarget) return
+        if (s.brainOpen || s.searchOpen || s.settingsOpen || s.modalOpen || s.findOpen || s.providerAuth.open || s.deleteTarget) return
         e.preventDefault()
         if (s.shortcutsOpen) actions.closeShortcuts()
         else actions.openShortcuts()

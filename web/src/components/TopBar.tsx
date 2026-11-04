@@ -5,7 +5,7 @@
 //   그때 제목은 칸 머리, 칩·사용량은 입력창 아랫줄, 찾기·내려받기는 칸 메뉴, 종·연결은 Sidebar로 간다.
 import { useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Bell, Menu, Search } from 'lucide-react'
+import { Bell, Menu, TextSearch } from 'lucide-react'
 import { actions, chromeRoomId, chromeSessionId, convoLoading, isSplit, providerName, showProviderTag, useStore } from '../lib/store'
 import { sessionWorkTitle } from '../lib/workTitle'
 import { inboxLabel, inboxRows } from '../lib/activityInbox'
@@ -295,7 +295,7 @@ export function TopBar() {
                 lift={false}
                 className="press icon-ghost"
               >
-                <Search size={18} />
+                <TextSearch size={18} />
               </IconButton>
             )}
             {/* 모델·생각·권한 칩은 폭 1100 이상에서만 여기 둔다. 그보다 좁으면 입력창 위에 있다(Composer) —

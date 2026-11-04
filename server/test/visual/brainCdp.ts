@@ -1,5 +1,5 @@
 /**
- * checkBrain.ts가 쓰는 CDP 통신과 Agent Brain 창 조작 도우미.
+ * checkBrain.ts가 쓰는 CDP 통신과 워크스페이스 창 조작 도우미.
  * 검사 순서는 checkBrain.ts에 두고, 여기에는 연결·키 입력·열고 닫기·누름 범위 측정만 둔다.
  */
 
@@ -116,20 +116,20 @@ export async function connectBrain(port: number, phone: boolean) {
 
   async function openBrain() {
     const opened = await evaluate<boolean>(`(() => {
-      const button = document.querySelector('button[aria-label="Agent Brain"]');
+      const button = document.querySelector('button[aria-label="워크스페이스"]');
       if (!(button instanceof HTMLElement)) return false;
       button.focus();
       button.click();
       return true;
     })()`);
-    assert(opened, "Agent Brain opener not found");
+    assert(opened, "워크스페이스 opener not found");
     let dialogReady = false;
     for (let attempt = 0; attempt < 30; attempt += 1) {
       dialogReady = await evaluate<boolean>(`!!document.querySelector('[role="dialog"][aria-modal="true"][aria-labelledby="brain-overlay-title"]')`);
       if (dialogReady) break;
       await sleep(100);
     }
-    assert(dialogReady, "Agent Brain dialog did not open");
+    assert(dialogReady, "워크스페이스 dialog did not open");
     await waitForAnimations();
   }
 
@@ -149,7 +149,7 @@ export async function connectBrain(port: number, phone: boolean) {
     let focus = { absent: false, onScreen: false, label: null as string | null };
     for (let attempt = 0; attempt < 10; attempt += 1) {
       focus = await readFocus();
-      const ok = phone ? focus.absent || focus.onScreen : focus.label === "Agent Brain";
+      const ok = phone ? focus.absent || focus.onScreen : focus.label === "워크스페이스";
       if (!ok) {
         await sleep(50);
         continue;
@@ -161,7 +161,7 @@ export async function connectBrain(port: number, phone: boolean) {
       break;
     }
     if (phone) assert(focus.absent || focus.onScreen, `Phone restore focus is off screen: ${JSON.stringify(focus)}`);
-    else assert(focus.label === "Agent Brain", `Focus was not restored: ${focus.label}`);
+    else assert(focus.label === "워크스페이스", `Focus was not restored: ${focus.label}`);
   }
 
   async function assertEscapeClosed(normalMotion: boolean) {
@@ -176,7 +176,7 @@ export async function connectBrain(port: number, phone: boolean) {
       if (closed) break;
       await sleep(50);
     }
-    assert(closed, "Escape did not close Agent Brain");
+    assert(closed, "Escape did not close 워크스페이스");
     if (normalMotion) {
       await sleep(500);
       assert(await evaluate<boolean>(`!document.querySelector('[role="dialog"]')`), "Dialog was still present 0.5s after the normal close");

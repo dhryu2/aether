@@ -6,7 +6,8 @@ import { C, R, Z } from '../design/tokens'
 import { ModalCard, ModalHeader, ModalShell } from './ui'
 
 const ROWS: [string, string][] = [
-  [`${MOD}+K`, 'session.shortcuts.find'],
+  [`${MOD}+K`, 'session.shortcuts.search'],
+  [`${MOD}+F`, 'session.shortcuts.find'],
   [`${MOD}+/`, 'session.shortcuts.brain'],
   [`${MOD}+,`, 'session.shortcuts.settings'],
   ['Ctrl+O', 'session.shortcuts.view'],

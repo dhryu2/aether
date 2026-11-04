@@ -329,12 +329,11 @@ test('검색 화면에서 작업과 지난 말을 찾는다', async ({ page }, i
   await side.getByLabel('세션 검색').fill(`없는작업${marker}`)
   await expect(side.getByText('검색된 세션이 없어요.')).toBeVisible()
   await side.getByLabel('세션 검색').fill('')
-  await side.getByRole('button', { name: 'Agent Brain' }).click()
-  const brain = page.getByRole('dialog', { name: 'Agent Brain' })
-  await expect(brain).toBeVisible()
-  await brain.getByRole('tab', { name: '검색' }).click()
-  await brain.getByPlaceholder('지난 대화, 명령, 에러 메시지 검색').fill(marker)
-  await expect(brain.getByText(marker).first()).toBeVisible()
+  await side.getByRole('button', { name: '지난 대화 검색' }).click()
+  const palette = page.getByRole('dialog', { name: '지난 대화 검색' })
+  await expect(palette).toBeVisible()
+  await palette.getByPlaceholder('지난 대화, 명령, 실행 결과 찾기').fill(marker)
+  await expect(palette.getByText(marker).first()).toBeVisible()
 })
 
 test('설정 화면에서 언어를 바꿀 수 있다', async ({ page }, info) => {

@@ -4,7 +4,7 @@ import { createStorageErrorReporter } from '../lib/errors'
 //   맨 아래에 Agent Brain(참딩)과 설정을 둔다(예전엔 상단바에 있었다).
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import clsx from 'clsx'
-import { Check, ChevronDown, Columns2, ChevronRight, CircleAlert, CircleDashed, Archive, CircleHelp, Clock, Hand, Loader, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, X, type LucideIcon } from 'lucide-react'
+import { Check, ChevronDown, Columns2, ChevronRight, CircleAlert, CircleDashed, Archive, CircleHelp, Clock, Hand, Loader, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, TextSearch, X, type LucideIcon } from 'lucide-react'
 import { actions, chromeSessionId, getState, isSplit, sessionTurn, useStore } from '../lib/store'
 import { inboxRows } from '../lib/activityInbox'
 import { ConnectionIndicator } from './ConnectionIndicator'
@@ -424,6 +424,18 @@ export function Sidebar() {
           </IconButton>
           <IconButton
             type="button"
+            label={t('nav.sidebar.searchPast')}
+            data-search-open
+            onClick={() => { leaveDrawer(); actions.openSearch() }}
+            className="hit-44 press icon-ghost"
+            size={36}
+            color={C.label2}
+            lift={false}
+          >
+            <Search size={18} />
+          </IconButton>
+          <IconButton
+            type="button"
             label={t('nav.session.new')}
             onClick={() => actions.openModal()}
             className="hit-44 press icon-ghost"
@@ -480,6 +492,18 @@ export function Sidebar() {
         )}
         <IconButton
           type="button"
+          label={t('nav.sidebar.searchPast')}
+          data-search-open
+          onClick={() => { leaveDrawer(); actions.openSearch() }}
+          className="hit-44 press icon-ghost"
+          size={36}
+          color={C.label2}
+          lift={false}
+        >
+          <Search size={18} />
+        </IconButton>
+        <IconButton
+          type="button"
           label={t('nav.session.new')}
           data-session-opt="new-work"
           onClick={() => actions.openModal()}
@@ -503,7 +527,7 @@ export function Sidebar() {
             color={C.label2}
             lift={false}
           >
-            <Search size={18} />
+            <TextSearch size={18} />
           </IconButton>
         )}
         {narrow && (

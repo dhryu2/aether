@@ -102,6 +102,19 @@ const hunks = [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: ['-a
   check('미리보기 없는 카드의 도구 이름 줄도 말줄임이 없다', !html.slice(html.lastIndexOf('<div', i), i).includes('truncate') && long.length > 0)
 }
 
+// 검토함도 쓰는 diff 표시: 수정 조각이면 줄 번호를 비우고, 수정 전 내용을 모르면 안내를 붙인다.
+{
+  const { UnifiedDiff } = await vite.ssrLoadModule('/src/components/UnifiedDiff.tsx')
+  const hunk = { oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: ['-aaa', '+bbb'] }
+  const render = (m: object) => text(renderToStaticMarkup(createElement(UnifiedDiff, { m: { kind: 'edit', path: 'a.ts', hunks: [hunk], ...m } })))
+  const plainRows = render({}).split('\n').map((x) => x.trim()).filter(Boolean)
+  check('일반 diff는 줄 번호가 보인다', plainRows.includes('1'), plainRows)
+  const fragRows = render({ fragment: true }).split('\n').map((x) => x.trim()).filter(Boolean)
+  check('조각 diff는 줄 번호가 없다', !fragRows.includes('1') && fragRows.some((x) => x.includes('bbb')), fragRows)
+  check('수정 전 모름 안내', render({ beforeUnknown: true }).includes('수정 전 내용이 기록에 없어'))
+  check('일반 diff에는 그 안내가 없다', !render({}).includes('수정 전 내용이 기록에 없어'))
+}
+
 await vite.close()
 console.log(`\n${fail === 0 ? '✅' : '❌'} permissionCard: ${pass} PASS / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

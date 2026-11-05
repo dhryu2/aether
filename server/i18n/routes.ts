@@ -289,6 +289,7 @@ export const routes: Dict = {
   "routes.review.readFailed": { ko: "작업 검토 내용을 읽을 수 없어요", en: "Could not read the work review" },
   "routes.review.saveFailed": { ko: "검토 완료 위치를 저장할 수 없어요", en: "Could not save the review position" },
   "routes.review.undoConflict": { ko: "다른 기기에서 처리되어 되돌리지 못했어요", en: "Someone else changed this review, so it could not be undone" },
+  "routes.review.pathInvalid": { ko: "이 세션에서 바뀐 파일이 아니에요", en: "That file was not changed in this session" },
   "routes.review.seqInvalid": { ko: "seq가 올바르지 않아요", en: "seq is invalid" },
   "routes.search.failed": { ko: "검색에 실패했어요", en: "Search failed" },
 

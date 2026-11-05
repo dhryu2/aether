@@ -19,7 +19,7 @@ import type {
   FsPlaces,
 } from './types'
 import type { DeletedSessionRow, SearchHit } from './brain'
-import type { ReviewDetailResponse, ReviewListResponse, ReviewMarkResponse } from '@shared/brain'
+import type { ReviewDetailResponse, ReviewFileDiffResponse, ReviewListResponse, ReviewMarkResponse } from '@shared/brain'
 import type { PermissionMode, PermissionModesResponse, AutoResumePlan, AutoResumeSettings, HandoffInfo, HandoffRequestBody, BackupItem, BackupListResponse, ChangePasswordResponse, EventsPageResponse, ServerInfoResponse, ServerLogLevel, RemoteAccessResponse, ServerLogResponse, UpdateStatusResponse } from '@shared/http'
 import type { ErrorGroupDetailResponse, ErrorGroupListResponse, ErrorLogPeriod, ErrorLogSource } from '@shared/errors'
 import { authHeaders } from './clientAuth'
@@ -380,6 +380,8 @@ export const api = {
   reviewList: () => req<ReviewListResponse>('/api/review'),
   /** git=false면 서버가 git 상태를 건너뛴다(기록만 먼저 그릴 때). */
   reviewDetail: (id: string, git: boolean) => req<ReviewDetailResponse>(`/api/review/${encodeURIComponent(id)}${git ? '' : '?git=0'}`),
+  reviewFileDiff: (id: string, path: string) =>
+    req<ReviewFileDiffResponse>(`/api/review/${encodeURIComponent(id)}/diff?path=${encodeURIComponent(path)}`),
   reviewDone: (id: string, seq: number) =>
     req<ReviewMarkResponse>(`/api/review/${encodeURIComponent(id)}/done`, { method: 'POST', body: JSON.stringify({ seq }) }),
   /** seq를 생략하면 검토 위치를 지운다. expected는 그 완료가 저장한 값이고, 지금 값과 다르면 서버가 409로 거절한다. */

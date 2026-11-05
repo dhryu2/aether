@@ -39,10 +39,28 @@ export interface ProviderPersistFilter {
   apply(ev: AetherEvent): AetherEvent | null;
 }
 
+/**
+ * 사건 하나가 말하는 파일 변경 조각 하나(중립 모양). 일부 수정은 before+after, 전체 쓰기는 after만,
+ * 패치는 diff만 채운다. 사건(AgentEvent)에 싣지 않고 요청 때 원본에서 꺼낸다 — 실으면 기록을 불러올 때마다 본문이 두 번 전송된다.
+ */
+export type FileEdit = {
+  toolId: string;
+  path: string;
+  before?: string;
+  after?: string;
+  diff?: string;
+  isCreate?: boolean;
+  replaceAll?: boolean;
+  /** 이름을 바꾼 파일의 새 경로. 내용은 원래 경로 기준 하나만 둔다. */
+  movePath?: string;
+};
+
 export interface ProviderEventCodec {
   readonly provider: Provider;
   /** raw 이벤트 → AgentEvent[] (D2.4 — 순수 함수, 1 raw → 0..N). */
   normalize(ev: AetherEvent): AgentEvent[];
+  /** 이 사건이 시작하거나 갱신하는 파일 변경 조각들. 같은 toolId의 뒤 사건이 앞 사건을 대체한다. 모르는 모양은 빈 배열. */
+  fileEdits(ev: AetherEvent): FileEdit[];
   /** 라이브 전용(토큰 미리보기 등) — 영속·replay·역압 드롭 판정이 전부 이걸 참조한다. */
   isLiveOnly(ev: EventShape): boolean;
   /** 이 이벤트로 한 턴이 끝나는가 — 자동 학습·컨텍스트 갱신 트리거와 재시작 복원의 꼬리 판정. */

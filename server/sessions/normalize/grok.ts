@@ -126,6 +126,14 @@ function toolTarget(input: Record<string, unknown> | undefined, name: string): s
   return name;
 }
 
+/** normalize가 파일 변경 도구 호출(tool_call)로 보는 알림이면 그 id와 인자. 아니면 null. codec이 같은 기준으로 조각을 내도록 export한다. */
+export function grokFileChangeCall(update: Record<string, unknown>): { toolId: string; input: Record<string, unknown> | undefined } | null {
+  if (isAskUserQuestionUpdate(update)) return null;
+  const toolId = toolIdOf(update);
+  if (!toolId || toolKindOf(toolName(update), typeof update.kind === "string" ? update.kind : undefined) !== "file_change") return null;
+  return { toolId, input: rawInput(update) };
+}
+
 function usageFrom(update: Record<string, unknown>): { totalTokens: number; maxTokens: number } | null {
   const used = update.used ?? update.usedTokens ?? update.tokens;
   const size = update.size ?? update.maxTokens ?? update.contextWindow;

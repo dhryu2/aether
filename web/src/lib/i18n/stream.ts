@@ -144,5 +144,6 @@ export const stream: Dict = {
   'stream.diff.truncated': { ko: '파일이 커서 변경 내용을 생략했어요', en: 'File too large, diff omitted (truncated)' },
   'stream.diff.noPreview': { ko: '변경 미리보기 없음', en: 'No change preview' },
   'stream.diff.replaceAll': { ko: '일치하는 곳을 모두 바꿔요', en: 'Replaces every match' },
+  'stream.diff.beforeUnknown': { ko: '수정 전 내용이 기록에 없어 전체를 표시합니다', en: 'The content before the edit is not in the record, so the whole content is shown' },
   'stream.diff.inexact': { ko: '미리보기가 실제 결과와 다를 수 있어요', en: 'Preview may differ from the actual result (inexact)' },
 }

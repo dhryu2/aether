@@ -14,7 +14,7 @@ import { isAuthError } from "../../auth/loginParse";
 import type { AetherEvent } from "../../types";
 import { collectSecretToolUseIds, filterSdkForPersist, stripPermissionInputForPersist } from "../../providers/claude/persistFilter";
 import { normalizeClaude } from "../normalize/claude";
-import type { EventShape, ProviderEventCodec, ProviderPersistFilter } from "./types";
+import type { EventShape, FileEdit, ProviderEventCodec, ProviderPersistFilter } from "./types";
 
 /** Claude 원본 봉투. 코어는 kind를 닫지 않으므로 이 파일 안에서만 좁힌다. */
 type ClaudeRaw = { kind: "sdk"; msg: { type?: unknown } };
@@ -51,9 +51,45 @@ class ClaudePersistFilter implements ProviderPersistFilter {
   }
 }
 
+const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+
+/** assistant의 파일 변경 tool_use 블록에서 조각을 꺼낸다. 블록을 고르는 조건은 normalize가 tool_call을 만드는 조건과 같다(id가 있고 경로가 있다). */
+function claudeFileEdits(ev: EventShape): FileEdit[] {
+  const msg = (ev as { msg?: { type?: unknown; message?: { content?: unknown } } }).msg;
+  if (sdkType(ev) !== "assistant" || !Array.isArray(msg?.message?.content)) return [];
+  const out: FileEdit[] = [];
+  for (const b of msg.message.content as unknown[]) {
+    const blk = b as { type?: unknown; id?: unknown; name?: unknown; input?: unknown } | null;
+    if (blk?.type !== "tool_use" || typeof blk.id !== "string" || !blk.id.trim()) continue;
+    const input = blk.input && typeof blk.input === "object" ? (blk.input as Record<string, unknown>) : {};
+    const toolId = blk.id;
+    const filePath = str(input.file_path);
+    if (blk.name === "Edit" && filePath) {
+      const before = str(input.old_string);
+      const after = str(input.new_string);
+      if (before !== undefined && after !== undefined) out.push({ toolId, path: filePath, before, after, ...(input.replace_all === true ? { replaceAll: true } : {}) });
+    } else if (blk.name === "MultiEdit" && filePath && Array.isArray(input.edits)) {
+      for (const e of input.edits as Record<string, unknown>[]) {
+        const before = str(e?.old_string);
+        const after = str(e?.new_string);
+        if (before !== undefined && after !== undefined) out.push({ toolId, path: filePath, before, after, ...(e.replace_all === true ? { replaceAll: true } : {}) });
+      }
+    } else if (blk.name === "Write" && filePath) {
+      const after = str(input.content);
+      if (after !== undefined) out.push({ toolId, path: filePath, after });
+    } else if (blk.name === "NotebookEdit") {
+      const nb = str(input.notebook_path);
+      const after = str(input.new_source);
+      if (nb && after) out.push({ toolId, path: nb, before: "", after }); // 셀 하나라 파일 전체가 아니다 — 조각으로 보이게 한다
+    }
+  }
+  return out;
+}
+
 export const claudeCodec: ProviderEventCodec = {
   provider: "claude",
   normalize: normalizeClaude,
+  fileEdits: claudeFileEdits,
   // SDK 계약: SDKPartialAssistantMessage.type === "stream_event"(토큰 미리보기).
   isLiveOnly: (ev) => sdkType(ev) === "stream_event",
   // SDK 계약: 정상·실패·중단 어느 쪽이든 한 턴은 result 메시지로 끝난다.

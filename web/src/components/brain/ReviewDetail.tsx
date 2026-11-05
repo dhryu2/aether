@@ -1,5 +1,6 @@
 // 검토함 오른쪽 상세. 기록에서 모은 실패한 명령, 남은 할 일, 바뀐 파일을 보인다.
-//   기록은 먼저 그리고, git 상태는 따로 와서 채운다. 항목을 누르면 세션의 그 지점으로 간다.
+//   기록은 먼저 그리고, git 상태는 따로 와서 채운다.
+//   실패한 명령과 할 일을 누르면 세션의 그 지점으로 가고, 바뀐 파일을 누르면 그 자리에서 변경 내용을 펼친다.
 import { useEffect, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Circle, CircleAlert } from 'lucide-react'
 import type { ReviewDetailResponse, ReviewRow } from '@shared/brain'
@@ -10,6 +11,7 @@ import { useT } from '../../lib/i18n'
 import { displayPath } from '../../lib/review'
 import { Button, Collapse, Skeleton } from '../ui'
 import { Group, RowLine } from './Bits'
+import { ReviewFile } from './ReviewFile'
 
 const itemStyle = {
   display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', minHeight: 44, padding: '10px 14px',
@@ -128,17 +130,17 @@ export function ReviewDetail({ row, narrow, busy, onOpen, onDone }: {
         {d && d.changedFiles.length > 0 && (
           <Section title={t('brain.review.sectionFiles')} count={d.changedFiles.length}>
             {d.changedFiles.map((f, i) => (
-              <div key={f.path}>
-                <RowLine index={i} />
-                <button type="button" className="press" onClick={() => onOpen(f.seq)} style={{ ...itemStyle, flexDirection: 'column', gap: 2 }}>
-                  <span style={{ ...wrapText, flex: 'none', width: '100%', fontFamily: FONT.mono, fontVariantLigatures: 'none', fontSize: 13, lineHeight: 1.45 }}>{displayPath(f.path, row.cwd)}</span>
-                  {gitOk && d.fileStates[i] !== 'unknown' && (
-                    <span style={{ fontSize: 12, color: C.label3 }}>
-                      {t(d.fileStates[i] === 'uncommitted' ? 'brain.review.fileUncommitted' : 'brain.review.fileClean')}
-                    </span>
-                  )}
-                </button>
-              </div>
+              <ReviewFile
+                key={`${row.id}:${row.lastSeq}:${f.path}`}
+                sessionId={row.id}
+                index={i}
+                shownPath={displayPath(f.path, row.cwd)}
+                state={gitOk && d.fileStates[i] !== 'unknown' ? t(d.fileStates[i] === 'uncommitted' ? 'brain.review.fileUncommitted' : 'brain.review.fileClean') : undefined}
+                seq={f.seq}
+                path={f.path}
+                narrow={narrow}
+                onOpen={onOpen}
+              />
             ))}
           </Section>
         )}

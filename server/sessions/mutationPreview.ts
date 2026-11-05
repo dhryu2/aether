@@ -74,13 +74,14 @@ export function readBefore(real: string): { before: string | null; truncated?: b
 /** structuredPatch hunks + 추가/삭제 라인 수. (이 시그니처는 항상 반환하나 방어적으로 빈 결과 degrade.) */
 export function patch(rel: string, before: string, after: string): { hunks?: MutationHunk[]; additions?: number; deletions?: number } {
   const p = structuredPatch(rel, rel, before, after, "", "", { context: 3 });
-  const hunks = p?.hunks as MutationHunk[] | undefined;
+  // "\ No newline at end of file" 같은 표식 줄은 내용이 아니다(parseUnifiedDiff와 같은 기준).
+  const hunks = (p?.hunks as MutationHunk[] | undefined)?.map((h) => ({ ...h, lines: h.lines.filter((l) => !l.startsWith("\\")) }));
   if (!hunks) return {};
   return { hunks, ...countLines(hunks) };
 }
 
 /** hunk 줄에서 더해진 줄·지워진 줄 수를 센다(카드 상단 배지의 출처). */
-function countLines(hunks: MutationHunk[]): { additions: number; deletions: number } {
+export function countLines(hunks: MutationHunk[]): { additions: number; deletions: number } {
   let additions = 0;
   let deletions = 0;
   for (const h of hunks) for (const l of h.lines) { if (l[0] === "+") additions++; else if (l[0] === "-") deletions++; }

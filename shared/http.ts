@@ -374,6 +374,10 @@ export type MutationPreview = {
   inexact?: boolean;
   additions?: number;
   deletions?: number;
+  /** 수정 조각이라 hunk의 줄 번호가 파일 안 위치가 아니다(검토함 diff). */
+  fragment?: boolean;
+  /** 전체 쓰기인데 수정 전 내용이 기록에 없어 전체를 추가로 보여 준다(검토함 diff). */
+  beforeUnknown?: boolean;
   /** 복원은 이 목록을 따른다. 화면용 path 한 줄로 되돌리지 않는다. 목록이 없으면 `before`는 파일 전체여야 한다. */
   files?: MutationFile[];
 };

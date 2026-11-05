@@ -113,6 +113,7 @@ export const mockCodec: ProviderEventCodec = {
     }
     return buildAgentEvents(ev, MOCK_PROVIDER, [{ type: "turn_completed", status: raw.interrupted ? "interrupted" : raw.failed ? "failed" : "ok" }]);
   },
+  fileEdits: () => [],
   isLiveOnly: (ev) => rawOf(ev)?.t === "peek",
   endsTurn: (ev) => rawOf(ev)?.t === "done",
   // 만료 판정도 provider 어휘다 — 이 가짜 provider는 Claude·Codex 어느 문구도 쓰지 않는 자기 표시를 쓴다.

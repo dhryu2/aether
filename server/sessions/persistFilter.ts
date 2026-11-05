@@ -8,6 +8,7 @@
  */
 import { isControlEvent, type AetherEvent } from "../types";
 import { st } from "../i18n";
+import { notice } from "../i18n/notice";
 
 /**
  * base64 이미지(스크린샷 등)는 줄당 수십~수백 KB → 디스크엔 크기/타입만 남긴 stub. 라이브/SSE는 full(이미지 그대로).
@@ -18,6 +19,17 @@ export const imageStub = (dataLen: number, mediaType: unknown) =>
 
 /** 잘라낸 자리에 남기는 표시 — 원래 길이와 남긴 길이를 함께 적어 나중에 "왜 짧지"를 알 수 있게 한다. */
 const clampMark = (origLen: number, keptLen: number) => st("notice.persist.clampMark", { origLen, keptK: Math.floor(keptLen / 1024) });
+
+/** 사전의 표식 문구(양쪽 언어)에서 만든 판별식 — 문구가 바뀌어도 사전만 고치면 된다. */
+const CLAMP_MARK_RE = new RegExp(
+  Object.values(notice["notice.persist.clampMark"])
+    .map((t) => t.replace(/[.*+?^$()|[\]\\]/g, "\\$&").replace(/\{origLen\}|\{keptK\}/g, "\\d+"))
+    .map((r) => `(?:${r})$`)
+    .join("|"),
+);
+
+/** 잘라낸 표식으로 끝나는 문자열인가 — 저장 때 잘린 내용인지 가린다(언어와 무관). 표식은 항상 끝에 붙으므로 본문 중간의 같은 글은 잡지 않는다. */
+export const isClampedString = (s: string) => CLAMP_MARK_RE.test(s);
 
 /**
  * 긴 문자열을 상한까지 자른다. 상한 이하면 원본을 그대로 돌려준다(같은 참조 — 불필요한 복사 방지).

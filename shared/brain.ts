@@ -4,6 +4,7 @@
  * 과거 대화 검색 API가 JSON으로 주는 형태다. 화면과 서버가 이 파일만 본다.
  * 탭 이름·하이라이트 분해처럼 화면만 쓰는 값은 여기 두지 않는다.
  */
+import type { MutationPreview } from "./http";
 
 export type SearchHit = {
   id: number;
@@ -82,6 +83,14 @@ export type ReviewDetailResponse = ReviewSessionHead & ReviewSummary & {
   fileStates: ("uncommitted" | "clean" | "unknown")[];
   /** 그 폴더의 커밋 안 된 변경 중 이 세션 기록에 없는 것(최대 200개). */
   unrecorded: string[];
+};
+
+/** 바뀐 파일 하나의 변경 내용. record는 세션 기록에서, git은 기록에 내용이 없어 커밋 안 된 변경에서 온다. none이면 보여 줄 내용이 없다(edits에 잘린 조각만 남을 수 있다). */
+export type ReviewFileDiffResponse = {
+  path: string;
+  source: "record" | "git" | "none";
+  edits: MutationPreview[];
+  partial: boolean;
 };
 
 /** 검토 완료·되돌리기 응답. previous는 되돌릴 때 쓸 이전 위치(없으면 처음 처리한 것). 되돌릴 때 본문의 expected는 그 완료가 저장한 reviewedSeq이고, 지금 값과 다르면 409다. */

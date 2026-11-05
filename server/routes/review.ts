@@ -2,22 +2,27 @@
  * 작업 검토함 라우트(인증 게이트 뒤).
  *   GET  /api/review               끝난 세션 중 검토할 것이 있는 목록(기록만 읽고 git은 부르지 않는다)
  *   GET  /api/review/:id[?git=0]   상세. git 상태는 ?git=0이면 건너뛴다
+ *   GET  /api/review/:id/diff?path=  바뀐 파일 하나의 변경 내용(기록 → 없으면 커밋 안 된 git 변경). path는 요약의 바뀐 파일 목록에 든 값만
  *   POST /api/review/:id/done      { seq }  검토 완료 위치 저장
  *   POST /api/review/:id/undo      { seq? } 이전 위치로 되돌림(없으면 지움)
- * 요약은 AI 없이 저장된 기록(중립 사건)에서만 모은다. 요청에서 경로를 받지 않는다.
+ * 요약은 AI 없이 저장된 기록(중립 사건)에서만 모은다. 경로는 diff 주소에서만 받고, 그것도 요약의 바뀐 파일 목록에 든 값만 허용한다(그 밖의 경로는 읽지 않는다).
  */
 import fs from "node:fs";
 import path from "node:path";
 import { Router, type Request, type Response } from "express";
 import type { AgentEvent } from "../../shared/agentEvent";
-import type { ReviewDetailResponse, ReviewListResponse, ReviewMarkResponse, ReviewRow, ReviewSessionHead, ReviewSummary } from "../../shared/brain";
+import type { ReviewDetailResponse, ReviewFileDiffResponse, ReviewListResponse, ReviewMarkResponse, ReviewRow, ReviewSessionHead, ReviewSummary } from "../../shared/brain";
 import { st } from "../i18n";
 import { reportResponseError, rejectRequest } from "../observability/http";
-import { folderReviewStateAsync, isolatedWorkspaceExists, type FolderReviewState } from "../sessions/isolatedWorkspace";
+import { folderFileDiffAsync, folderReviewStateAsync, isolatedWorkspaceExists, type FolderReviewState } from "../sessions/isolatedWorkspace";
 import { lastSeqFromDisk, readEventsPage } from "../sessions/persistence";
 import { isHiddenSeq } from "../sessions/rewind";
 import { sessionManager } from "../sessions/SessionManager";
 import { summarizeReview } from "../sessions/reviewSummary";
+import { fileEditPreview } from "../sessions/fileEdits";
+import { isSecretPath } from "../sessions/secretPaths";
+import type { FileEdit } from "../sessions/codec/types";
+import type { MutationPreview } from "../../shared/http";
 
 export const reviewRouter = Router();
 
@@ -35,21 +40,27 @@ type Computed = { summary: ReviewSummary; lastSeq: number; partial: boolean };
 // 같은 (세션, 검토 위치, 마지막 순번)은 다시 계산하지 않는다. 가장 오래된 것부터 밀어낸다.
 const cache = new Map<string, Computed>();
 
+/** 검토 위치 이후의 원본 사건을 읽는다(숨긴 구간 제외, 최대 MAX_EVENTS건). 요약과 파일 diff가 같은 범위를 본다. */
+function readRange(id: string, reviewedSeq: number, diskLast: number) {
+  const page = readEventsPage(id, diskLast + 1, MAX_EVENTS);
+  const ranges = sessionManager.hiddenRangesOf(id);
+  const codec = sessionManager.codecOf(id);
+  const raw = page.events.filter((ev) => ev.seq > reviewedSeq && (!ranges.length || !isHiddenSeq(ev.seq, ranges)));
+  const first = page.events[0]?.seq ?? 0;
+  return { page, codec, raw, partial: page.hasOlder && first > reviewedSeq + 1 };
+}
+
 function compute(id: string, reviewedSeq: number): Computed {
   const diskLast = lastSeqFromDisk(id);
   const key = `${id}:${reviewedSeq}:${diskLast}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const page = readEventsPage(id, diskLast + 1, MAX_EVENTS);
-  const ranges = sessionManager.hiddenRangesOf(id);
-  const codec = sessionManager.codecOf(id);
-  const raw = page.events.filter((ev) => ev.seq > reviewedSeq && (!ranges.length || !isHiddenSeq(ev.seq, ranges)));
+  const { page, codec, raw, partial } = readRange(id, reviewedSeq, diskLast);
   const events: AgentEvent[] = raw.flatMap((ev) => codec.normalize(ev));
-  const first = page.events[0]?.seq ?? 0;
   const out: Computed = {
     summary: summarizeReview(events),
     lastSeq: Math.max(diskLast, page.events[page.events.length - 1]?.seq ?? 0),
-    partial: page.hasOlder && first > reviewedSeq + 1,
+    partial,
   };
   cache.set(key, out);
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value as string);
@@ -119,7 +130,7 @@ function canon(p: string): string {
   const rest: string[] = [];
   for (;;) {
     try {
-      return path.join(fs.realpathSync(cur), ...rest) + trailing;
+      return path.join(fs.realpathSync.native(cur), ...rest) + trailing; // 맥에서 대소문자를 디스크 표기로 맞춘다
     } catch {
       const up = path.dirname(cur);
       if (up === cur) return path.resolve(p) + trailing;
@@ -134,6 +145,66 @@ async function gitState(cwd: string, files: string[]): Promise<FolderReviewState
   const timeout = new Promise<null>((r) => setTimeout(() => r(null), GIT_TIMEOUT_MS).unref());
   return Promise.race([folderReviewStateAsync(cwd, files), timeout]);
 }
+
+// 대체 수단(git)도 같은 제한 시간 안에서만 기다린다.
+async function gitFileDiff(cwd: string, abs: string): Promise<MutationPreview | null> {
+  if (!isolatedWorkspaceExists(cwd)) return null;
+  const timeout = new Promise<null>((r) => setTimeout(() => r(null), GIT_TIMEOUT_MS).unref());
+  return Promise.race([folderFileDiffAsync(cwd, abs), timeout]);
+}
+
+reviewRouter.get("/:id/diff", async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  if (!SESSION_ID_RE.test(id) || (!sessionManager.get(id) && !sessionManager.hasDiskSession(id))) {
+    return rejectRequest(res, 404, { error: st("routes.common.sessionNotFound") });
+  }
+  try {
+    const item = sessionManager.list().find((s) => s.id === id);
+    if (!item) return rejectRequest(res, 404, { error: st("routes.common.sessionNotFound") });
+    const want = req.query.path;
+    const reviewedSeq = sessionManager.reviewedSeqOf(id) ?? 0;
+    // 요약이 말한 바뀐 파일만 읽는다. 임의 경로(절대·상위 경로 포함)는 목록과 정확히 같지 않으면 거절한다.
+    if (typeof want !== "string" || !compute(id, reviewedSeq).summary.changedFiles.some((f) => f.path === want)) {
+      return rejectRequest(res, 400, { error: st("routes.review.pathInvalid") });
+    }
+    const { codec, raw, partial } = readRange(id, reviewedSeq, lastSeqFromDisk(id));
+    const done = (source: ReviewFileDiffResponse["source"], edits: MutationPreview[]) => {
+      const body: ReviewFileDiffResponse = { path: want, source, edits, partial };
+      res.json(body);
+    };
+    const target = path.resolve(item.cwd, want);
+    const real = canon(target);
+    // 비밀 판정은 요청 글자만 보지 않는다: 링크를 푼 실제 경로, 저장소 내부(.git), 이름이 바뀐 쪽의 경로도 본다.
+    const secret = (p: string) => isSecretPath(p) || isSecretPath(canon(path.resolve(item.cwd, p))) || /(^|\/)\.git(\/|$)/.test(canon(path.resolve(item.cwd, p)).replace(/\\/g, "/"));
+    const redacted = () => done("record", [{ kind: "edit", path: want, redacted: true }]);
+    if (secret(want)) return redacted();
+
+    // 같은 도구 호출의 뒤 사건이 앞 사건의 내용을 통째로 대체한다(시작·완료가 둘 다 내용을 싣는 경우). 처음 나온 순서는 유지한다.
+    const byTool = new Map<string, FileEdit[]>();
+    for (const ev of raw) {
+      const group = new Map<string, FileEdit[]>();
+      for (const e of codec.fileEdits(ev)) group.set(e.toolId, [...(group.get(e.toolId) ?? []), e]);
+      for (const [toolId, edits] of group) byTool.set(toolId, edits);
+    }
+    // 실패한 도구 호출은 뺀다(요약과 같은 기준: 같은 id의 마지막 결과).
+    const failed = new Map<string, boolean>();
+    for (const e of raw.flatMap((ev) => codec.normalize(ev))) if (e.type === "tool_result") failed.set(e.toolId, e.isError === true);
+    const mine = [...byTool.values()].flat().filter((e) => [e.path, e.movePath].some((p) => p && path.resolve(item.cwd, p) === target));
+    // 이름을 바꾼 쪽 중 하나라도 비밀이면 어느 쪽 이름으로 물어도 내용을 주지 않는다(실패한 호출 포함 — 보수적으로).
+    if (mine.some((e) => [e.path, e.movePath].some((p) => p && secret(p)))) return redacted();
+    const previews = mine.filter((e) => failed.get(e.toolId) !== true).map((e) => fileEditPreview(e, want));
+    const usable = previews.filter((p) => p.hunks?.length || p.truncated);
+    if (previews.some((p) => p.hunks?.length)) return done("record", usable);
+
+    // 기록에 쓸 만한 내용이 없으면 커밋 안 된 변경을 대신 보여 준다.
+    const fromGit = await gitFileDiff(item.cwd, real);
+    if (fromGit && (fromGit.hunks?.length || fromGit.truncated || fromGit.binary)) return done("git", [{ ...fromGit, path: want }]);
+    done("none", usable);
+  } catch (error) {
+    void reportResponseError(res, error, { component: "routes", operation: "review.diff", session_id: id });
+    res.status(500).json({ error: st("routes.review.readFailed") });
+  }
+});
 
 reviewRouter.get("/:id", async (req: Request, res: Response) => {
   const id = String(req.params.id);

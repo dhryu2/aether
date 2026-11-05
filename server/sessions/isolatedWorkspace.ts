@@ -16,6 +16,8 @@ import { config } from "../config";
 import { st } from "../i18n";
 import { modelEnv } from "../providers/modelEnv";
 import type { IsolatedWorkspace } from "../providers/types";
+import { countLines, parseUnifiedDiff, patch, readBefore, type MutationPreview } from "./mutationPreview";
+import { resolveFileUnderCwd } from "./safePath";
 
 const failures = new FailureTracker();
 const execFileP = promisify(execFile);
@@ -217,6 +219,53 @@ function ignoredAmong(cwd: string, env: NodeJS.ProcessEnv, files: readonly strin
     child.stdin?.on("error", () => { /* 실패는 콜백이 알린다 */ });
     child.stdin?.end(files.map((f) => f + "\0").join(""));
   });
+}
+
+/**
+ * 파일 하나의 커밋 안 된 변경을 미리보기로 만든다(기록에 내용이 없을 때의 대체 수단). absPath는 실제 경로로 푼 절대 경로여야 한다.
+ * 저장소 밖·무시된 파일·변경 없음·git 실패는 null이다.
+ * 이미 커밋된 파일은 찾지 않는다 — 마지막 커밋이 이 세션의 것인지 알 수 없어 남의 변경을 보여 줄 수 있다.
+ * 보호 환경에서 돌리고 외부 diff 프로그램과 textconv를 끈다. 추적하지 않는 새 파일은 git 없이 직접 읽는다.
+ */
+export async function folderFileDiffAsync(cwd: string, absPath: string): Promise<MutationPreview | null> {
+  if (!(await isGitRepoAsync(cwd))) return null;
+  try {
+    const env = await gitEnvAsync(cwd);
+    const run = (args: string[], maxBuffer = 1024 * 1024) =>
+      execFileP("git", ["--literal-pathspecs", ...args], { cwd, encoding: "utf8", timeout: 10_000, env, maxBuffer });
+    const root = (await run(["rev-parse", "--show-toplevel"])).stdout.trim();
+    const inRepo = path.relative(root, absPath);
+    if (!inRepo || inRepo.startsWith("..") || path.isAbsolute(inRepo)) return null;
+    // 폴더나 비밀을 품은 폴더가 통째로 나오지 않게 한다. 삭제된 파일(없음)은 통과시킨다.
+    if (fs.statSync(absPath, { throwIfNoEntry: false })?.isDirectory()) return null;
+    const realCwd = fs.realpathSync.native(cwd);
+    const rel = path.relative(realCwd, absPath);
+    const tracked = await run(["ls-files", "--error-unmatch", "--", absPath]).then(() => true, () => false);
+    if (tracked) {
+      let out: string;
+      let truncated = false;
+      try {
+        out = (await run(["diff", "--no-ext-diff", "--no-textconv", "--no-color", "HEAD", "--", absPath], config.diffMaxBytes)).stdout;
+      } catch (error) {
+        if ((error as { code?: unknown }).code !== "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") throw error;
+        out = "";
+        truncated = true;
+      }
+      failures.clear(`diff:${cwd}`);
+      if (truncated) return { kind: "edit", path: rel, truncated: true };
+      const { hunks, inexact } = parseUnifiedDiff(out);
+      if (hunks.length) return { kind: "edit", path: rel, hunks, ...(inexact ? { inexact: true } : {}), ...countLines(hunks) };
+      return /^Binary files /m.test(out) ? { kind: "edit", path: rel, binary: true } : null;
+    }
+    if ((await ignoredAmong(cwd, env, [absPath]))?.has(absPath) !== false) return null; // 무시된 파일이거나 확인 실패
+    const b = readBefore(resolveFileUnderCwd(realCwd, absPath).real);
+    if (b.binary) return { kind: "write", path: rel, binary: true, isCreate: true, totalBytes: b.totalBytes };
+    if (b.before === null) return null;
+    return { kind: "write", path: rel, isCreate: true, truncated: b.truncated, totalBytes: b.totalBytes, ...(b.truncated ? {} : patch(rel, "", b.before)) };
+  } catch (error) {
+    failures.report(error, { component: "session", operation: "session.workspace.inspect", severity: "warning" }, `diff:${cwd}`);
+    return null;
+  }
 }
 
 /** 연결 작업 복사본인가. 원 저장소(.git 디렉터리)는 해당하지 않는다. */

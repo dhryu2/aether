@@ -26,7 +26,7 @@ import { isControlEvent, type AetherEvent } from "../../types";
 import { clampString } from "../persistFilter";
 import { commandTokens, isSecretPath } from "../secretPaths";
 import { normalizeCodex } from "../normalize/codex";
-import type { EventShape, ProviderEventCodec, ProviderPersistFilter } from "./types";
+import type { EventShape, FileEdit, ProviderEventCodec, ProviderPersistFilter } from "./types";
 import type { Provider } from "../../../shared/agentEvent";
 import type { ServerNotification } from "../../codex/protocol/ServerNotification";
 import type { ThreadItem } from "../../codex/protocol/v2/ThreadItem";
@@ -207,6 +207,29 @@ class CodexPersistFilter implements ProviderPersistFilter {
   }
 }
 
+/** fileChange 항목의 changes[] → 조각. 추가·삭제인데 패치 머리(@@)가 없으면 diff 칸이 파일 본문 자체다. */
+function codexFileEdits(ev: EventShape): FileEdit[] {
+  const m = methodOf(ev);
+  if (m !== "item/started" && m !== "item/completed") return [];
+  const item = (ev as { msg?: { params?: { item?: ThreadItem } } }).msg?.params?.item;
+  if (item?.type !== "fileChange" || !item.id || !Array.isArray(item.changes)) return [];
+  const out: FileEdit[] = [];
+  for (const c of item.changes) {
+    if (typeof c?.path !== "string" || !c.path || typeof c.diff !== "string") continue;
+    const toolId = item.id;
+    // 패치는 첫 줄(또는 ---/+++ 머리 다음 줄)이 @@ -숫자 로 시작한다. 새 파일 본문 속 @@ 줄에 속지 않는다.
+    const lines = c.diff.split("\n");
+    const hasHunk = /^@@ -\d/.test(lines[lines[0]?.startsWith("--- ") && lines[1]?.startsWith("+++ ") ? 2 : 0] ?? "");
+    if (c.kind?.type === "add" && !hasHunk) out.push({ toolId, path: c.path, after: c.diff, isCreate: true });
+    else if (c.kind?.type === "delete" && !hasHunk) out.push({ toolId, path: c.path, before: c.diff });
+    else {
+      const move = c.kind?.type === "update" && typeof c.kind.move_path === "string" && c.kind.move_path ? { movePath: c.kind.move_path } : {};
+      out.push({ toolId, path: c.path, diff: c.diff, ...move });
+    }
+  }
+  return out;
+}
+
 /**
  * Codex 원본 이벤트를 해석하는 codec. Codex 실행기를 빌려 쓰는 provider(Ollama)는 자기 이름으로 하나 만든다.
  * 판정 규칙은 원본 모양에만 달려 있어 같고, 정리된 이벤트에 찍히는 provider 이름만 다르다.
@@ -218,6 +241,7 @@ export function codexCodecFor(provider: Provider): ProviderEventCodec {
 export const codexCodec: ProviderEventCodec = {
   provider: "codex",
   normalize: (ev) => normalizeCodex(ev),
+  fileEdits: codexFileEdits,
   isLiveOnly: (ev) => {
     const m = methodOf(ev);
     return m !== undefined && LIVE_ONLY_METHODS.has(m);

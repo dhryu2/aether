@@ -26,6 +26,7 @@ export const importFakeCodec: ProviderEventCodec = {
     }
     return [];
   },
+  fileEdits: () => [],
   isLiveOnly: () => false,
   endsTurn(ev) {
     return ev.kind === "status";

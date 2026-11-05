@@ -1,4 +1,4 @@
-// 권한 카드용 unified diff(한 컬럼 — 모바일 가독). mutation.hunks에서 렌더.
+// 권한 카드용 unified diff(한 컬럼 — 모바일 가독). mutation.hunks에서 렌더. 검토함도 쓴다(fragment면 줄 번호를 비운다).
 //   재설계 4단계: 카드 여백 안에 들어앉은 둥근 판(모서리 12, 화면 바탕색)이다. 카드 폭 끝까지 가로지르는 띠가 아니다.
 import type { MutationPreview } from '../lib/types'
 import { useT } from '../lib/i18n'
@@ -46,11 +46,11 @@ export function UnifiedDiff({ m }: { m: MutationPreview }) {
       const c = raw[0]
       const text = raw.slice(1)
       if (c === '+') {
-        rows.push({ type: 'add', n: newLine++, text })
+        rows.push({ type: 'add', n: m.fragment ? null : newLine++, text })
       } else if (c === '-') {
-        rows.push({ type: 'del', n: oldLine++, text })
+        rows.push({ type: 'del', n: m.fragment ? null : oldLine++, text })
       } else {
-        rows.push({ type: 'ctx', n: newLine, text })
+        rows.push({ type: 'ctx', n: m.fragment ? null : newLine, text })
         oldLine++
         newLine++
       }
@@ -60,6 +60,7 @@ export function UnifiedDiff({ m }: { m: MutationPreview }) {
   return (
     <div className="flex flex-col" style={{ gap: 8 }}>
       {m.inexact && <Label tone="warn">{t('stream.diff.inexact')}</Label>}
+      {m.beforeUnknown && <Label>{t('stream.diff.beforeUnknown')}</Label>}
       {m.replaceAll && <Label tone="warn">{t('stream.diff.replaceAll')}</Label>}
       {/* tabular-nums = 줄 번호의 숫자 폭을 같게. 9와 10에서 자릿수가 어긋나 보이지 않는다. */}
       <div className="font-mono tabular-nums overflow-x-auto" style={{ ...PANEL, overflow: 'auto', fontSize: 12.5, lineHeight: 1.7, padding: '8px 0' }}>

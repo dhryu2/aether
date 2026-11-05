@@ -150,7 +150,10 @@ function shrinkItem(item: ThreadItem, max: number): ThreadItem {
       let changed = false;
       const changes = item.changes.map((c) => {
         // 비밀을 담은 파일의 변경 내용은 그대로가 곧 비밀이다 — 자르지 않고 지운다.
-        const diff = isSecretPath(c.path) ? redactedResult() : clampString(c.diff ?? "", max);
+        // 옮기는 파일은 옮긴 뒤 이름이 비밀이어도 같다(일반 파일을 .env로 옮기며 고치는 경우).
+        const movePath = (c.kind as { move_path?: unknown } | undefined)?.move_path;
+        const secret = isSecretPath(c.path) || (typeof movePath === "string" && isSecretPath(movePath));
+        const diff = secret ? redactedResult() : clampString(c.diff ?? "", max);
         if (diff === c.diff) return c;
         changed = true;
         return { ...c, diff };

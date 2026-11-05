@@ -44,6 +44,19 @@ check(!!shrunk && JSON.stringify(shrunk).length < JSON.stringify(update("tool_ca
 
 const secret = persisted(update("tool_call", { toolCallId: "t2", rawInput: { file_path: "/tmp/proj/.env", content: "SECRET=1" } }));
 check(!!secret && !JSON.stringify(secret).includes("SECRET=1"), "③ 비밀 경로의 내용은 가려진다", secret);
+const diffBlock = (p: string) => ({ type: "diff", path: p, oldText: "OLD_SECRET=1", newText: "NEW_SECRET=1" });
+for (const [name, fields] of [
+  ["블록 경로", { toolCallId: "t3", content: [diffBlock("/tmp/proj/.env")] }],
+  ["입력 경로", { toolCallId: "t4", rawInput: { path: "/tmp/proj/.env" }, content: [diffBlock("/tmp/proj/a.txt")] }],
+  ["locations", { toolCallId: "t5", locations: [{ path: "/tmp/proj/.env" }], content: [diffBlock("/tmp/proj/a.txt")] }],
+] as const) {
+  const kept = JSON.stringify(persisted(update("tool_call_update", fields)));
+  check(!kept.includes("OLD_SECRET") && !kept.includes("NEW_SECRET"), `③ diff 블록 본문이 가려진다(${name})`, kept);
+}
+const newFile = JSON.stringify(persisted(update("tool_call_update", { toolCallId: "t6", content: [{ type: "diff", path: "/tmp/proj/.env", oldText: null, newText: "NEW_SECRET=1" }] })));
+check(!newFile.includes("NEW_SECRET") && newFile.includes('"oldText":null'), "③ 새 파일 표시(oldText null)는 남기고 본문만 가린다", newFile);
+const plainDiff = JSON.stringify(persisted(update("tool_call_update", { toolCallId: "t7", content: [{ type: "diff", path: "/tmp/proj/a.txt", oldText: "a", newText: "b" }] })));
+check(plainDiff.includes('"newText":"b"'), "③ 일반 파일의 diff 블록은 그대로 남는다", plainDiff);
 
 const dropped = persisted(ev({ method: "_x.ai/mcp/servers_updated", params: { servers: [] } }));
 check(dropped === null, "③ 계정·MCP 확장 알림은 세션 기록에 안 남긴다");

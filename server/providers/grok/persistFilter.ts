@@ -33,6 +33,24 @@ function looksSecretPath(v: unknown): boolean {
   return typeof v === "string" && isSecretPath(v);
 }
 
+/** ACP diff 블록의 본문을 가린다. 블록 자신의 경로, 입력 경로, 알림의 locations 중 하나라도 비밀이면 대상이다. */
+function redactSecretDiffs(update: Record<string, unknown>): unknown {
+  const content = update.content;
+  if (!Array.isArray(content)) return content;
+  const raw = update.rawInput as Record<string, unknown> | undefined;
+  const locations = Array.isArray(update.locations) ? update.locations.map((l) => (l as { path?: unknown } | null)?.path) : [];
+  const updateSecret = [raw?.file_path, raw?.path, raw?.target_file, ...locations].some(looksSecretPath);
+  let changed = false;
+  const next = content.map((block) => {
+    const b = block as { type?: unknown; path?: unknown; oldText?: unknown; newText?: unknown } | null;
+    if (b?.type !== "diff" || !(updateSecret || looksSecretPath(b.path))) return block;
+    changed = true;
+    // oldText가 null이면 새 파일이라는 뜻이므로 그대로 둔다.
+    return { ...b, ...(typeof b.oldText === "string" ? { oldText: redactedResult() } : {}), newText: redactedResult() };
+  });
+  return changed ? next : content;
+}
+
 function shrinkUpdate(update: Record<string, unknown>, max: number): Record<string, unknown> {
   const next: Record<string, unknown> = { ...update };
   let changed = false;
@@ -74,7 +92,7 @@ function shrinkUpdate(update: Record<string, unknown>, max: number): Record<stri
     next.rawInput = raw;
   }
   if ("content" in next) {
-    const c = clampJson(next.content, max);
+    const c = clampJson(redactSecretDiffs(next), max);
     if (c !== next.content) {
       next.content = c;
       changed = true;

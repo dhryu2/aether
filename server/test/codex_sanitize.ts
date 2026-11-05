@@ -234,6 +234,13 @@ const mixedJson = json(mixed);
 check(mixedJson.includes("const a = 2"), "평범한 파일의 변경 내용은 그대로 남는다");
 check(!mixedJson.includes("old-value-9911") && !mixedJson.includes("new-value-2288"), "비밀 파일의 변경 내용은 남지 않는다", mixedJson.slice(0, 300));
 
+const moved = (from: string, to: string) => JSON.stringify(persisted(itemDone({
+  ...fileChange([{ path: from, diff: "+API_KEY=abc" }]),
+  changes: [{ path: from, kind: { type: "update", move_path: to }, diff: "+API_KEY=abc" }],
+} as ThreadItem)));
+check(!moved("old.txt", ".env.prod").includes("API_KEY=abc"), "일반 파일을 비밀 이름으로 옮기는 diff는 가려진다");
+check(!moved(".env", "config.txt").includes("API_KEY=abc"), "비밀 파일을 일반 이름으로 옮기는 diff는 가려진다");
+check(moved("old.txt", "new.txt").includes("API_KEY=abc"), "일반 파일끼리 옮기는 diff는 그대로 남는다");
 const bigDiff = persisted(itemDone(fileChange([{ path: "src/big.ts", diff: "라".repeat(4000) }])));
 check(json(bigDiff).length < 2000, "긴 변경 내용도 상한 안으로 줄어든다", { 길이: json(bigDiff).length });
 

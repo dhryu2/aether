@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { inboxLabel, inboxRows } from '../src/lib/activityInbox'
+import { inboxLabel, inboxRows, plainPreview } from '../src/lib/activityInbox'
 import { executionId } from '../src/lib/workspaceRooms'
 import type { WorkspaceRoom } from '../src/lib/types'
 
@@ -77,6 +77,9 @@ check(topbar.includes('inboxLabel'), 'TopBar inboxLabel')
 check(topbar.includes('inboxRows'), 'TopBar inboxRows')
 check(topbar.includes('selectSession(jump.roomId)'), 'TopBar pick→selectSession(jump.roomId)')
 check(topbar.includes('data-activity-inbox'), 'TopBar data-activity-inbox')
+
+check(plainPreview('`main`을 **올렸다**\n- [가이드](http://x) 두 개') === 'main을 올렸다 가이드 두 개', 'plainPreview 마크다운 기호 제거')
+check(plainPreview('## 제목\n```ts\ncode\n```') === '제목 code', 'plainPreview 제목·코드 울타리')
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} activityInbox: ${pass} PASS / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

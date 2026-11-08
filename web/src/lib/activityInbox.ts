@@ -29,3 +29,14 @@ export function inboxRows(rooms: WorkspaceRoom[]): WorkspaceRoom[] {
     return r.lastViewedAt < r.lastActivityAt
   })
 }
+
+/** 알림 목록 미리보기용 — 마크다운 기호(코드 표시·굵게·제목·목록·링크)를 걷어 읽히는 글만 남긴다. */
+export function plainPreview(md: string): string {
+  return md
+    .replace(/```[^\n]*\n?/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/(\*\*|__|`)/g, '')
+    .replace(/^\s*(#{1,6}|>|[-*+]|\d+\.)\s+/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}

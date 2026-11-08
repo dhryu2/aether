@@ -5,12 +5,12 @@
 //   그때 제목은 칸 머리, 칩·사용량은 입력창 아랫줄, 찾기·내려받기는 칸 메뉴, 종·연결은 Sidebar로 간다.
 import { useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Bell, Menu, TextSearch } from 'lucide-react'
+import { Bell, Columns2, Menu, TextSearch } from 'lucide-react'
 import { actions, chromeRoomId, chromeSessionId, convoLoading, isSplit, providerName, showProviderTag, useStore } from '../lib/store'
 import { sessionWorkTitle } from '../lib/workTitle'
-import { inboxLabel, inboxRows } from '../lib/activityInbox'
+import { inboxLabel, inboxRows, plainPreview } from '../lib/activityInbox'
 import { findRoom } from '../lib/workspaceRooms'
-import { MOD } from '../lib/format'
+import { MOD, relTime } from '../lib/format'
 import { hiddenPaneIds, visibleCapacity, visibleSessionIds } from '../lib/splitPane'
 import { useT } from '../lib/i18n'
 import { useDismiss } from '../lib/hooks'
@@ -69,7 +69,8 @@ export function HandChip({ inSidebar }: { inSidebar?: boolean }) {
       align={inSidebar ? 'left' : 'right'}
       minWidth={260}
       zIndex={inSidebar ? Z.root.findBar : undefined}
-      style={inSidebar ? { position: 'fixed', top: 14, left: sideRight + 8, maxHeight: 'calc(100vh - 28px)', overflowY: 'auto' } : undefined}
+      // 너비를 고정한다. 미리보기가 한 줄로 길면 목록이 화면 끝까지 늘어나 상단바와 목록 기둥을 덮었다.
+      style={{ width: 360, ...(inSidebar ? { position: 'fixed', top: 14, left: sideRight + 8, maxHeight: 'calc(100vh - 28px)', overflowY: 'auto' } : null) }}
     >
       {items.map((row) => (
         <div
@@ -102,37 +103,35 @@ export function HandChip({ inSidebar }: { inSidebar?: boolean }) {
                 {row.attention === 'waiting' && row.attentionSince != null && <WaitAge since={row.attentionSince} />}
               </span>
               {inboxLabel(row.attention, row.attentionKind) ? (
-                <span className="truncate" style={{ display: 'block', fontSize: 12.5, color: row.attention === 'waiting' ? C.attn : C.label2, lineHeight: 1.4 }}>
+                <span className="truncate" style={{ display: 'block', fontSize: 12.5, fontWeight: 500, color: row.attention === 'waiting' ? C.attn : row.attention === 'failed' ? C.del : row.attention === 'done' ? C.ok : C.label2, lineHeight: 1.4 }}>
                   {inboxLabel(row.attention, row.attentionKind)}
+                  {row.attention !== 'waiting' && row.lastActivityAt != null && (
+                    <span style={{ fontWeight: 400, color: C.label3 }}> · {relTime(row.lastActivityAt)}</span>
+                  )}
                 </span>
               ) : null}
               {row.attentionPreview ? (
-                <span className="truncate" style={{ display: 'block', fontSize: 12.5, color: C.label2, lineHeight: 1.4 }}>
-                  {row.attentionPreview}
+                // 두 줄까지 보여 주고 자른다. 마크다운 기호는 걷어 낸다(목록에서는 렌더하지 않으므로 기호가 그대로 보였다).
+                <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginTop: 2, fontSize: 12.5, color: C.label2, lineHeight: 1.4 }}>
+                  {plainPreview(row.attentionPreview)}
                 </span>
               ) : null}
             </span>
           </button>
           {s.isWide && row.id !== s.activeId && row.status !== 'corrupted' && (
-            <button
+            // 목록 기둥의 옆에 열기와 같은 아이콘 단추. 파란 글자 링크는 줄 전체를 누르는 동작과 겹쳐 보였다.
+            <IconButton
               type="button"
               data-open-beside={row.id}
+              label={t('nav.topbar.openBeside')}
+              title={t('nav.topbar.openBeside')}
+              size={28}
+              color={C.label2}
               onClick={() => openBeside(row)}
-              style={{
-                flexShrink: 0,
-                marginTop: 1,
-                fontSize: 12.5,
-                fontWeight: 500,
-                color: C.tint,
-                padding: '4px 8px',
-                border: 'none',
-                background: 'transparent',
-                borderRadius: R.full,
-                cursor: 'pointer',
-              }}
+              style={{ flexShrink: 0, marginTop: -4 }}
             >
-              {t('nav.topbar.openBeside')}
-            </button>
+              <Columns2 size={14} />
+            </IconButton>
           )}
         </div>
       ))}

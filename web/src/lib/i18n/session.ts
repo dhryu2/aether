@@ -289,7 +289,7 @@ export const session: Dict = {
   'session.questionnaire.textPlaceholder': { ko: '답을 입력하세요', en: 'Type your answer' },
   'session.questionnaire.skip': { ko: '건너뛰기', en: 'Skip' },
   'session.questionnaire.skipped': { ko: '건너뜀', en: 'No answer' },
-  'session.questionnaire.sendRecommended': { ko: '추천대로 보내기', en: 'Send as suggested' },
+  'session.questionnaire.sendRecommended': { ko: '보내기', en: 'Send' },
   'session.questionnaire.sendAsIs': { ko: '이대로 보내기', en: 'Send as is' },
   'session.questionnaire.sending': { ko: '보내는 중…', en: 'Sending…' },
   'session.questionnaire.allRecommended': { ko: '모두 추천대로', en: 'All as suggested' },

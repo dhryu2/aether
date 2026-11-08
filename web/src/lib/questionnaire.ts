@@ -225,7 +225,7 @@ export type CardView = {
   answered: number
   changed: number
   unanswered: number
-  /** 바꾼 것이나 답 안 한 것이 하나라도 있으면 「이대로 보내기」, 아니면 「추천대로 보내기」. */
+  /** 바꾼 것이나 답 안 한 것이 하나라도 있으면 「이대로 보내기」, 아니면 「보내기」. */
   asIs: boolean
   rows: { q: QuestionnaireQuestion; draft: Draft; status: RowStatus; shown: string }[]
 }

@@ -1,11 +1,10 @@
-import { createContext, useContext, useId, useRef, useState, type MouseEvent } from 'react'
+import { createContext, useContext, useId, useRef, type MouseEvent } from 'react'
 import { MoreVertical } from 'lucide-react'
 import { actions, useStore } from '../lib/store'
 import type { SessionListItem } from '../lib/types'
-import { useDismiss } from '../lib/hooks'
 import { canCopy, copyWithNotice } from '../lib/copyNotice'
 import { useT } from '../lib/i18n'
-import { IconButton, PopoverSurface } from './ui'
+import { IconButton } from './ui'
 import { HandoffMenuItems } from './HandoffMenuItems'
 import { C, R } from '../design/tokens'
 
@@ -24,34 +23,41 @@ type WorkMenuActions = {
 
 export function WorkMenu({ size, ...items }: WorkMenuActions & { size: number }) {
   const t = useT()
-  const [open, setOpen] = useState(false)
-  const box = useRef<HTMLDivElement>(null)
-  useDismiss(box, () => setOpen(false), open, '[data-session-opt="work-menu"]')
+  const st = useStore()
+  const button = useRef<HTMLButtonElement>(null)
+  // 목록이 스크롤 칸에 갇혀 잘리지 않도록 우클릭 메뉴와 같은 맨 위 한 벌(shell/ContextMenu.tsx)로 연다.
+  //   그 메뉴의 바깥 누르기 닫기는 이 버튼을 건너뛴다(같은 버튼을 다시 누르면 닫히게 — 여기서 연다/닫는다).
+  const anchor = (button.current?.closest<HTMLElement>('[data-room-id]') ?? button.current) ?? undefined
+  const open = !!anchor && st.contextMenu?.anchor === anchor
 
   return (
-    <div ref={box} className="relative" onClick={(e) => e.stopPropagation()}>
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
       <IconButton
+        ref={button}
         type="button"
         className="card-action"
         size={size}
         data-session-opt="work-menu"
         aria-expanded={open}
+        aria-haspopup="menu"
         label={t('nav.session.menu')}
         title={t('nav.session.menu')}
         onClick={(e) => {
           e.stopPropagation()
-          setOpen((v) => !v)
+          if (open) return actions.closeContextMenu()
+          const rect = e.currentTarget.getBoundingClientRect()
+          actions.openContextMenu({
+            // 메뉴 오른쪽 끝을 버튼 오른쪽 끝에 맞춘다(최소 너비 188). 화면 밖이면 ContextMenu가 안쪽으로 민다.
+            x: rect.right - 188,
+            y: rect.bottom + 6,
+            items: <WorkMenuItems {...items} close={actions.closeContextMenu} />,
+            anchor: e.currentTarget.closest<HTMLElement>('[data-room-id]') ?? e.currentTarget,
+            byKeyboard: e.detail === 0,
+          })
         }}
       >
         <MoreVertical size={14} />
       </IconButton>
-      {open && (
-        <PopoverSurface align="right" minWidth={188} role="menu">
-          <div className="flex flex-col" style={{ padding: 6 }}>
-            <WorkMenuItems {...items} close={() => setOpen(false)} />
-          </div>
-        </PopoverSurface>
-      )}
     </div>
   )
 }

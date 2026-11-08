@@ -34,6 +34,8 @@ function MenuLayer({ menu }: { menu: Menu }) {
     const onDown = (e: PointerEvent) => {
       const el = e.target as Element | null
       if (ref.current?.contains(el)) return
+      // 점 버튼(WorkMenu)이 같은 메뉴를 여닫는다. 여기서 먼저 닫으면 이어지는 클릭이 다시 연다.
+      if (el?.closest('[data-session-opt="work-menu"]')) return
       actions.closeContextMenu()
       // 창 뒤의 어두운 막(useScrimClose가 data-scrim을 붙인다)을 왼쪽으로 누르면 메뉴만 닫고 창은 둔다.
       if (e.button === 0 && el?.hasAttribute('data-scrim')) e.stopPropagation()

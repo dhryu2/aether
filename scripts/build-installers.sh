@@ -13,7 +13,7 @@ OUT="$REPO/build/installers"
 CACHE="$REPO/build/cache"
 # shellcheck disable=SC1091
 source "$REPO/deploy/installer/node-version.env"
-VERSION="$(node -p "require('$REPO/server/package.json').version")"
+VERSION="$(node -p "require('$REPO/server/package.json').aetherReleaseVersion")"
 
 command -v makensis >/dev/null || { echo "makensis가 없습니다. 'brew install makensis'로 설치한 뒤 다시 실행하세요." >&2; exit 1; }
 for t in pkgbuild productbuild; do

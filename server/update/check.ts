@@ -185,4 +185,4 @@ export function createUpdateChecker(opts: UpdateCheckerOptions) {
 }
 
 /** 서버가 쓰는 기본 확인기. 설정의 updateUrl과 이 서버의 버전으로 만든다. */
-export const updateChecker = createUpdateChecker({ url: config.updateUrl, current: pkg.version, publicKey: (pkg as { aetherUpdatePublicKey?: string }).aetherUpdatePublicKey });
+export const updateChecker = createUpdateChecker({ url: config.updateUrl, current: pkg.aetherReleaseVersion, publicKey: (pkg as { aetherUpdatePublicKey?: string }).aetherUpdatePublicKey });

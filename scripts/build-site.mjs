@@ -24,8 +24,8 @@ const mono = path.join(REPO, "web/node_modules/@fontsource/geist-mono/files/geis
 const NOTES_MAX = 4000;
 function fail(msg) { console.error(`사이트 빌드 실패: ${msg}`); process.exit(1); }
 
-const version = JSON.parse(fs.readFileSync(pkgFile, "utf8")).version;
-if (!/^\d+\.\d+\.\d+$/.test(version)) fail(`server/package.json 버전이 x.y.z 형식이 아닙니다: ${version}`);
+const version = JSON.parse(fs.readFileSync(pkgFile, "utf8")).aetherReleaseVersion;
+if (!/^\d+\.\d+\.\d+$/.test(version)) fail(`server/package.json aetherReleaseVersion이 x.y.z 형식이 아닙니다: ${version}`);
 const releasedRaw = new Date(arg("released-at") ?? Date.now());
 if (Number.isNaN(releasedRaw.getTime())) fail(`--released-at이 시각이 아닙니다: ${arg("released-at")}`);
 const releasedAt = releasedRaw.toISOString(); // 서버 스키마(문자열 40자 이하)와 형식을 맞춘다

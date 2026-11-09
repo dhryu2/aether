@@ -266,7 +266,7 @@ delete process.env.AETHER_SUPERVISED; // 에이전트의 자식 프로세스에 
 /** 서버가 쓰는 기본 인스턴스. */
 export const updateInstaller = createUpdateInstaller({
   url: config.updateUrl,
-  current: pkg.version,
+  current: pkg.aetherReleaseVersion,
   publicKey: (pkg as { aetherUpdatePublicKey?: string }).aetherUpdatePublicKey,
   supervised,
   platform: process.platform,

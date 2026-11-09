@@ -43,7 +43,7 @@ function updateStatus(): UpdateStatusResponse {
 systemRouter.get("/info", (_req: Request, res: Response) => {
   // 여섯 칸을 손으로 적는다. config나 process.env를 펼치면 비밀이 새어 나갈 수 있다.
   const body: ServerInfoResponse = {
-    version: pkg.version,
+    version: pkg.aetherReleaseVersion,
     dataDir: config.dataDir,
     port: config.port,
     authMode: config.authMode,

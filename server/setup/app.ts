@@ -58,7 +58,7 @@ export function createSetupApp(opts: SetupAppOptions): Express {
   app.use(express.json({ limit: "16kb" }));
 
   app.get("/api/health", (_req, res) => {
-    res.json({ ok: true, version: pkg.version, auth: "off", setup: true });
+    res.json({ ok: true, version: pkg.aetherReleaseVersion, serverVersion: pkg.version, auth: "off", setup: true });
   });
 
   app.get("/api/setup/defaults", (_req, res) => {

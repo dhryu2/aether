@@ -89,7 +89,7 @@ async function waitHealth(h) {
   }
 }
 const findSqlite = (d) => { try { return fs.readdirSync(d, { withFileTypes: true, recursive: true }).some((e) => e.isFile() && /\.(sqlite|db)(-wal|-shm)?$/.test(e.name)); } catch { return false; } };
-const version = JSON.parse(fs.readFileSync(path.join(serverDir, "package.json"), "utf8")).version;
+const version = JSON.parse(fs.readFileSync(path.join(serverDir, "package.json"), "utf8")).aetherReleaseVersion;
 
 const checkAvailability = (av, label) => {
   const ids = Object.keys(av);

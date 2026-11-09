@@ -51,7 +51,7 @@ function prepareInstalledEnv(): void {
   if (fs.existsSync(p.envFile)) process.loadEnvFile(p.envFile);
   process.env.AETHER_CONFIG = p.configFile;
   // release.ts가 설치 폴더의 부모에서 git을 실행하지 않도록 묶음 버전을 명시한다.
-  process.env.AETHER_RELEASE = pkg.version;
+  process.env.AETHER_RELEASE = pkg.aetherReleaseVersion;
 }
 
 try {
@@ -72,7 +72,7 @@ try {
     // index.ts는 불러오지 않는다(DB·부팅 부작용 없음). 설정 서버가 쓰는 config.ts가 import 때 환경을 읽으므로 먼저 정한다.
     log(`첫 실행입니다: ${path.basename(p.configFile)}이 없어 설정 서버를 시작합니다.`);
     process.env.AETHER_DATA_DIR = p.defaultDataDir;
-    process.env.AETHER_RELEASE = pkg.version;
+    process.env.AETHER_RELEASE = pkg.aetherReleaseVersion;
     const { startSetupServer } = await import("./setup/main");
     await startSetupServer({
       paths: p,

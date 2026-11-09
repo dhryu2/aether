@@ -139,7 +139,7 @@ if (config.authMode === "password") {
 // database 칸은 Express 생존(HTTP 200)과 DB 생존을 분리한다.
 app.get("/api/health", (_req, res) => {
   const database = probeDatabase();
-  res.json({ ok: true, version: pkg.version, database, auth: config.authMode });
+  res.json({ ok: true, version: pkg.aetherReleaseVersion, serverVersion: pkg.version, database, auth: config.authMode });
 });
 app.use("/api/auth", authRouter); // login/logout — 게이트 앞이라 로그인 경로 보장
 

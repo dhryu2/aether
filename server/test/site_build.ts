@@ -21,7 +21,7 @@ const SCRIPT = path.join(REPO, "scripts/build-site.mjs");
 const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "aether-site-")));
 const inst = path.join(tmp, "inst"); fs.mkdirSync(inst);
 const notes = path.join(tmp, "notes"); fs.mkdirSync(notes);
-const pkg = path.join(tmp, "package.json"); fs.writeFileSync(pkg, JSON.stringify({ version: "1.2.3" }));
+const pkg = path.join(tmp, "package.json"); fs.writeFileSync(pkg, JSON.stringify({ version: "0.0.0", aetherReleaseVersion: "1.2.3" }));
 fs.writeFileSync(path.join(notes, "1.2.3.md"), "- 첫째 </script><b>\n둘째 줄\n");
 const WIN = "Aether-1.2.3-win-x64.exe", MAC = "Aether-1.2.3-mac-arm64.pkg";
 const winBytes = crypto.randomBytes(12345), macBytes = crypto.randomBytes(67890);

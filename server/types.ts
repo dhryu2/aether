@@ -175,6 +175,8 @@ export type SessionMeta = {
    * cwd는 실제 작업 경로(분리됐으면 그 경로)다. 코어는 분리 수단을 모른다.
    */
   workspaceSource?: string;
+  /** 격리 세션이면 허용한 MCP 서버(이름 → 주소). 없으면 보통 세션. */
+  isolation?: { mcpServers: Record<string, string> };
   /** 이 세션 대화 통로가 마지막으로 따라잡은 시각. 기기 저장소가 아니라 서버가 가진다. */
   lastViewedAt?: number;
   /** 작업 검토함에서 "검토 완료"로 처리한 마지막 사건 순번. 이 뒤의 사건만 검토 대상이다. */

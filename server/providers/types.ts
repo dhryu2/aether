@@ -192,6 +192,8 @@ export type RuntimeStartOptions = {
    * 적용/폐기는 이 경로로 돌아간다. 코어는 분리 수단을 모른다.
    */
   workspaceSource?: string;
+  /** 격리 세션(Claude만): 사용자 전역 설정·aether MCP·회상 주입 없이 이 MCP만 붙인다. */
+  isolation?: { mcpServers: Record<string, string> };
   /** resume 식별자를 가장 이른 시점에 알린다(멱등 — 같은 값 반복 호출 가능). */
   onResumeKey: (key: string) => void;
   /** 턴에 실제로 적용된 강도를 턴이 끝나야 아는 실행기가 알린다. 모델 목록으로 미리 아는 실행기는 부르지 않는다. */
@@ -379,6 +381,8 @@ export interface ProviderServices {
   readonly displayName: string;
   /** 새 세션 창이 계획 검토 카드를 그릴지. 없으면 그리지 않는다. */
   readonly planReview?: boolean;
+  /** 격리 세션(사용자 전역 설정·내장 MCP·회상 주입 없이 지정한 MCP만)을 지원하는지. 없으면 요청을 거부한다. */
+  readonly isolatedSession?: boolean;
   /**
    * 원격 대화형 인증을 UI에서 완료할 수 있는 provider만 구현한다.
    * API key 전용·외부 자격증명 전용 provider까지 빈 인증 구현을 만들게 하면 설정 화면에 죽은 버튼이 생긴다.

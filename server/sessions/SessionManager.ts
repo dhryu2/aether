@@ -24,6 +24,7 @@ import { applyIsolatedWorkspace, discardIsolatedWorkspace, folderUncommittedChan
 import { lastWorkPreview } from "./workPreview";
 import type { ProviderEventCodec } from "./codec/types";
 import type { ProviderId } from "../providers/types";
+import { restoreIsolation, type Isolation } from "./isolation";
 import type { AetherEvent, AetherEventBody, DerivedStatus, SessionEffort, SessionListItem, SessionMeta } from "../types";
 import { PERMISSION_MODES, type SlashCommandInfo, type AutoResumePlan, type HandoffFields, type HandoffJob, type HandoffSource, type PermissionMode, type PresenceSession } from "../../shared/http";
 import { computeAttention, isStickyAttentionKind } from "./attention";
@@ -148,7 +149,7 @@ class SessionManager {
     this.onLive = fn;
   }
 
-  create(opts: { cwd?: string; provider: string; model?: string; resume?: string; permissionMode?: PermissionMode; isolateWorkspace?: boolean; name?: string; effort?: SessionEffort }): LiveSession {
+  create(opts: { cwd?: string; provider: string; model?: string; resume?: string; permissionMode?: PermissionMode; isolateWorkspace?: boolean; name?: string; effort?: SessionEffort; isolation?: Isolation }): LiveSession {
     // 입력 정규화(단일 chokepoint): 빈문자열/비문자열 model·resume·cwd가 runtime options로 새지 않게.
     // (빈 model이 ?? 폴백을 우회하던 결함 + 비문자열 무검증 통과 차단.)
     const cwd = resolveWorkFolder(typeof opts.cwd === "string" ? opts.cwd : undefined); // 작업 폴더 검증(공용 — fs/list와 동일 의미론)
@@ -175,7 +176,7 @@ class SessionManager {
       workCwd = iso.cwd;
       workspaceSource = iso.workspaceSource;
     }
-    const session = new LiveSession({ id, cwd: workCwd, name: optionalName(opts.name), provider, model, resume, permissionMode, workspaceSource, effort: opts.effort, eventLog: adoptEventLog(id), onTitleChange: this.onTitleChange });
+    const session = new LiveSession({ id, cwd: workCwd, name: optionalName(opts.name), provider, model, resume, permissionMode, workspaceSource, effort: opts.effort, isolation: opts.isolation, eventLog: adoptEventLog(id), onTitleChange: this.onTitleChange });
     this.sessions.set(session.id, session);
     this.disk.delete(session.id);
     this.onLive?.(session);
@@ -213,7 +214,7 @@ class SessionManager {
    *
    * resume(잠든 세션 복원)은 이 경로를 쓰지 않는다 — 저장된 모델은 저장될 때 이미 확인됐다.
    */
-  async createChecked(opts: { cwd?: string; provider: string; resume?: string; permissionMode?: PermissionMode; isolateWorkspace?: boolean; name?: string }, model: string): Promise<LiveSession> {
+  async createChecked(opts: { cwd?: string; provider: string; resume?: string; permissionMode?: PermissionMode; isolateWorkspace?: boolean; name?: string; isolation?: Isolation }, model: string): Promise<LiveSession> {
     // ★ 구성 시 model을 넘기지 않는다(위 ①). create가 config.claudeDefaultModel을 채울 수는 있는데,
     //   그건 운영자가 설정한 값이라 확인 대상이 아니고 아래 setModel이 곧바로 덮어쓴다.
     const session = this.create({ ...opts, model: undefined });
@@ -555,6 +556,7 @@ class SessionManager {
         lastActivityAt: live.lastActivityAt, // 깨우기만 한 이벤트를 제외한 마지막 실제 활동시각 유지
         lastInputAt: live.lastInputAt,
         workspaceSource: live.workspaceSource,
+        isolation: live.isolation,
         lastViewedAt: live.lastViewedAt,
         reviewedSeq: live.reviewedSeq,
         attentionSticky: live.attentionSticky,
@@ -630,6 +632,7 @@ class SessionManager {
       lastActivityAt: entry.meta.lastActivityAt, // 디스크 꼬리의 깨우기 훅보다 영속된 실제 활동시각 우선
       lastInputAt: entry.meta.lastInputAt,
       workspaceSource,
+      isolation: restoreIsolation(entry.meta.isolation),
       lastViewedAt: entry.meta.lastViewedAt,
       reviewedSeq: entry.meta.reviewedSeq,
       attentionSticky: entry.meta.attentionSticky,

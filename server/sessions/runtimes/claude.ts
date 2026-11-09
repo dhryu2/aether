@@ -15,6 +15,7 @@ import { reportError } from "../../observability/report";
  */
 import { randomUUID } from "node:crypto";
 import type { PermissionMode as SdkPermissionMode, PermissionResult, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
+import { claudeScope } from "../isolation";
 import { loadClaudeSdk } from "../../providers/claude/sdk";
 import { config } from "../../config";
 import type { PermissionMode } from "../../../shared/http";
@@ -262,13 +263,14 @@ export class ClaudeRuntime implements AgentRuntime {
     wantsTurnHook: boolean,
   ): Promise<Query> {
     const { query, createSdkMcpServer, tool } = await loadClaudeSdk();
-    const aetherMcp = await buildAetherMcpServer({ createSdkMcpServer, tool }, knowledgeTools, {
+    const aetherMcp = opts.isolation ? undefined : await buildAetherMcpServer({ createSdkMcpServer, tool }, knowledgeTools, {
       cwd: opts.cwd,
       services: claudeServices,
       sessionId: opts.sessionId,
       engine: this.provider,
       onTodoList: opts.onTodoList,
     });
+    const scope = claudeScope(opts.isolation, { aetherMcp, promptAppend, wantsTurnHook });
     return query({
       prompt: this.input.stream(),
       options: {
@@ -296,12 +298,13 @@ export class ClaudeRuntime implements AgentRuntime {
         //   서브에이전트(~/.claude/agents)·슬래시명령(~/.claude/commands)·~/.claude/CLAUDE.md가 복사 없이 그대로 뜬다(spike_user_scope로 검증).
         //   유저 permissions.allow(자동승인 목록)도 존중 → 등록한 안전 패턴은 폰 카드 없이 실행(터미널 동일). 미등록 변이는 여전히 canUseTool(폰 카드)로 게이팅됨.
         //   플러그인도 이 경로로 enabledPlugins 토글 따라 로드된다(터미널과 동일 — 별도 강제 주입 없음).
-        settingSources: ["user", "project", "local"],
+        settingSources: scope.settingSources, // 격리 세션은 user 제외
+        ...(scope.extraArgs ? { extraArgs: scope.extraArgs } : {}),
         includePartialMessages: config.includePartialMessages, // 토큰 스트리밍(기본 off) — partial은 디스크 영속 제외(ingest)
         // aether MCP 툴(session_search 회상 + remember 영구기억) per-session 주입(cwd 바인딩). requestPermission에서 자동 허용.
-        ...(aetherMcp ? { mcpServers: { aether: aetherMcp } } : {}),
+        ...(scope.mcpServers ? { mcpServers: scope.mcpServers as any } : {}),
         // 회상·메모리·스킬 안내를 기본 claude_code 프롬프트에 append. 생성 시 1회 고정.
-        ...(promptAppend ? { systemPrompt: { type: "preset" as const, preset: "claude_code" as const, append: promptAppend } } : {}),
+        ...(scope.promptAppend ? { systemPrompt: { type: "preset" as const, preset: "claude_code" as const, append: scope.promptAppend } } : {}),
         resume: opts.resumeKey,
         canUseTool: (toolName, toolInput, ctx): Promise<PermissionResult> => this.requestPermission(toolName, toolInput, ctx),
         toolConfig: { askUserQuestion: { previewFormat: "markdown" } },
@@ -310,7 +313,7 @@ export class ClaudeRuntime implements AgentRuntime {
         hooks: {
           // Stop 훅 — 실제 적용된 강도는 이 입력에만 실려 온다(모델 목록과 시작 정보에는 없다).
           Stop: [{ hooks: [async (input: unknown) => this.onStop(input as { effort?: { level?: string } })] }],
-          ...(wantsTurnHook
+          ...(scope.turnHook
             ? { UserPromptSubmit: [{ hooks: [(input: unknown) => this.onUserPromptSubmit(input as { prompt?: string })] }] }
             : {}),
         },

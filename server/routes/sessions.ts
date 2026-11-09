@@ -44,6 +44,7 @@ import { availableProviders, listProviders, providerAvailability } from "../prov
 import type { QuestionAnswer } from "../providers/types";
 import type { SessionEffort, ImageAttachment, DocAttachment, AetherQuestion } from "../types";
 import { st } from "../i18n";
+import { parseIsolation } from "../sessions/isolation";
 import { PERMISSION_MODES } from "../../shared/http";
 import { isHiddenSeq, RewindError } from "../sessions/rewind";
 import { AUTO_RESUME_TEXT_MAX } from "../sessions/autoResume";
@@ -154,6 +155,9 @@ sessionsRouter.post("/", async (req: Request, res: Response) => {
 
   // ── 형식 가드 — 프로세스를 띄우기 전에 걸러낸다(모양이 틀린 값은 물어볼 필요가 없다). ──
   if (wanted && !isWellFormedName(wanted)) return res.status(400).json({ error: st("routes.sessions.modelMalformed") });
+  const parsedIso = parseIsolation(req.body ?? {});
+  if ("error" in parsedIso) return res.status(400).json({ error: parsedIso.error });
+  const isolation = parsedIso.isolation;
 
   // 지금 쓸 수 없는 provider(프로그램 없음, 로그인 안 됨 등)면 세션을 만들지 않는다. 만들면 첫 메시지에서 바로 멈춘다.
   //   등록되지 않은 이름은 여기서 걸러지지 않고 아래 create가 거부한다.
@@ -177,10 +181,13 @@ sessionsRouter.post("/", async (req: Request, res: Response) => {
     chosen = usable[0].id;
   }
 
+  // 격리 세션은 Claude만 지원한다 — 다른 provider는 전역 설정을 끊는 수단이 없어 조용히 무시하지 않고 거부한다.
+  if (isolation && !listProviders().find((e) => e.id === chosen)?.services.isolatedSession) return res.status(400).json({ error: st("routes.sessions.isolatedClaudeOnly") });
+
   // ── 모델 미지정 = 계정 기본 모델. 확인할 것이 없으니 기다리지 않는다. ──
   if (!wanted) {
     try {
-      const s = sessionManager.create({ cwd, provider: chosen, model, resume, permissionMode, isolateWorkspace, name }); // create가 model/resume/cwd/name 타입 정규화
+      const s = sessionManager.create({ cwd, provider: chosen, model, resume, permissionMode, isolateWorkspace, name, isolation }); // create가 model/resume/cwd/name 타입 정규화
       return res.status(201).json({ id: s.id, cwd: s.cwd, provider: s.provider, model: s.model ?? "" });
     } catch (err) {
       if (err instanceof WorkspaceCopyError) return res.status(400).json({ error: err.message }); // 경로·git 출력이 없는 문구라 그대로 보여도 된다
@@ -201,7 +208,7 @@ sessionsRouter.post("/", async (req: Request, res: Response) => {
 
   let s: LiveSession;
   try {
-    s = await sessionManager.createChecked({ cwd, provider: chosen, resume, permissionMode, isolateWorkspace, name }, wanted);
+    s = await sessionManager.createChecked({ cwd, provider: chosen, resume, permissionMode, isolateWorkspace, name, isolation }, wanted);
   } catch (err) {
     if (err instanceof SessionReadyTimeoutError) {
       void reportResponseError(res, err, { component: "routes", operation: "session.create.wait" }); console.error("[aether] 세션 준비 대기 초과:", err.message);

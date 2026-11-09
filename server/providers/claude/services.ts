@@ -27,6 +27,7 @@ export const claudeServices: ProviderServices = {
   provider: "claude",
   displayName: "Claude",
   planReview: false,
+  isolatedSession: true,
   // 기존 PTY 로그인 매니저가 ProviderAuth 형태를 그대로 만족(status/start/submitCode/cancel/disposeAll).
   auth: claudeLogin,
   distill: runDistill,

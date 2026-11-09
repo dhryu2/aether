@@ -61,6 +61,7 @@ import type {
   RuntimeModel,
 } from "../providers/types";
 import type { ProviderEventCodec, ProviderPersistFilter } from "./codec/types";
+import type { Isolation } from "./isolation";
 import { mergeModelList, rememberModelList } from "../providers/modelCatalogMemory";
 import { buildCommonSystemAppend } from "./injections";
 import { filterUserMsgForPersist } from "./persistFilter";
@@ -251,6 +252,7 @@ export class LiveSession {
   private permissionEpoch = 0; // 사용자가 모드를 바꿀 때마다 올린다. 늦게 도착한 어댑터 값이 사용자의 선택을 덮지 않게 한다.
   private permissionChanging = 0; // 모드 변경이 진행 중인 횟수. 그동안의 목록 조회는 목록만 갱신하고 현재 모드를 덮지 않는다.
   private freshPermission: boolean; // 새 세션이고 사용자가 모드를 정하지 않았으며 첫 턴 전이다. 이때 어댑터가 정한 기본값 확정은 알리지 않는다.
+  readonly isolation?: Isolation; // 격리 세션(전역 설정·aether MCP 없음). 없으면 보통 세션.
   readonly workspaceSource?: string; // 작업 폴더를 분리했을 때 원래 고른 폴더. 없으면 격리 없음.
   readonly createdAt: number; // 생성시각(1회 고정) — result마다 덮어쓰지 않는다
   lastActivityAt: number; // 마지막 이벤트(턴 입력·응답·도구 등) 시각 — 사이드바 '마지막 사용' 표기용
@@ -360,6 +362,7 @@ export class LiveSession {
     lastActivityAt?: number;
     lastInputAt?: number;
     workspaceSource?: string;
+    isolation?: Isolation;
     lastViewedAt?: number;
     reviewedSeq?: number;
     archivedAt?: number;
@@ -388,6 +391,7 @@ export class LiveSession {
     this.permissionModes = opts.permissionModes;
     this.freshPermission = opts.permissionMode === undefined;
     this.workspaceSource = opts.workspaceSource;
+    this.isolation = opts.isolation;
     this.createdAt = opts.createdAt ?? Date.now(); // resume 시 원본 생성시각 보존(덮어쓰기 방지)
     this.resumeKey = opts.resume?.trim() || undefined;
     this.hiddenRanges = parseHiddenRanges(opts.hiddenRanges);
@@ -451,7 +455,7 @@ export class LiveSession {
       permissionMode: opts.permissionMode,
       resumeKey: this.resumeKey,
       // 세션 시작 때 한 번 붙는 공통 안내(회상·메모리 스냅샷·스킬 안내). runtime은 이 문자열만 붙인다.
-      systemAppend: buildCommonSystemAppend(this.cwd) || undefined,
+      systemAppend: this.isolation ? undefined : buildCommonSystemAppend(this.cwd) || undefined,
       // 되돌린 세션의 첫 턴에만 다시 심을 대화를 얹는다. 되돌린 세션은 새로 만들어지므로 생성 때 값이 있는지만 보면 된다.
       turnContext: this.reseedText
         ? async () => {
@@ -463,6 +467,7 @@ export class LiveSession {
       onQuestion: (ask) => this.requestQuestion(ask),
       onPlan: (ask) => this.requestPlan(ask),
       workspaceSource: this.workspaceSource,
+      isolation: this.isolation,
       onResumeKey: (key) => this.persistResumeKey(key),
       onEffortObserved: (effort) => this.noteObservedEffort(effort),
       onCommandOperation: (operation) => this.recordCommandOperation(operation),
@@ -848,6 +853,7 @@ export class LiveSession {
       lastActivityAt: this.lastActivityAt,
       lastInputAt: this.lastInputAt,
       workspaceSource: this.workspaceSource,
+      ...(this.isolation ? { isolation: this.isolation } : {}),
       lastViewedAt: this.lastViewedAt,
       reviewedSeq: this.reviewedSeq,
       archivedAt: this.archivedAt,

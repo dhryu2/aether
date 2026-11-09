@@ -127,6 +127,22 @@ export const routes: Dict = {
     ko: "effort 값의 형식이 올바르지 않습니다(1~64자, 제어 문자·앞의 '-' 불가)",
     en: "Malformed effort value (1-64 characters, no control characters, cannot start with '-')",
   },
+  "routes.sessions.isolatedInvalid": {
+    ko: "isolated는 true 또는 false여야 합니다",
+    en: "isolated must be true or false",
+  },
+  "routes.sessions.mcpServersNeedIsolated": {
+    ko: "mcpServers는 isolated가 true일 때만 쓸 수 있습니다",
+    en: "mcpServers is only allowed when isolated is true",
+  },
+  "routes.sessions.mcpServersInvalid": {
+    ko: "mcpServers는 이름(소문자로 시작, 영숫자·_·-, 32자 이내) → http://127.0.0.1 또는 http://localhost 주소의 객체여야 하며 8개까지입니다",
+    en: "mcpServers must map names (lowercase start, alphanumerics/_/-, up to 32 chars) to http://127.0.0.1 or http://localhost URLs, at most 8",
+  },
+  "routes.sessions.isolatedClaudeOnly": {
+    ko: "격리 세션(isolated)은 Claude 제공자에서만 지원합니다",
+    en: "Isolated sessions are only supported by the Claude provider",
+  },
   "routes.sessions.permissionModeInvalid": {
     ko: "permissionMode는 manual, edits, auto, full 중 하나여야 합니다",
     en: "permissionMode must be one of manual, edits, auto, full",

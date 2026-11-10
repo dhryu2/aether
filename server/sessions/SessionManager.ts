@@ -269,6 +269,14 @@ class SessionManager {
     return this.disk.has(id);
   }
 
+  /** 외부 클라이언트가 API로 만든 격리(isolation) 세션인가. Aether 화면·알림·검색에서 숨기는 기준 — API 자체는 그대로 쓴다. */
+  isExternal(id: string): boolean {
+    const live = this.sessions.get(id);
+    if (live) return !!live.isolation;
+    const e = this.disk.get(id);
+    return !!e && !!restoreIsolation(e.meta.isolation);
+  }
+
   /**
    * 이 세션의 이벤트를 해석할 codec(D2.6) — SSE 봉투·페이징처럼 세션 밖에서 이벤트를 읽는 경로가 쓴다.
    * live면 그 세션이 들고 있는 것, 잠든 디스크 세션이면 meta의 provider로 고른다(값 없는 옛 세션은 storedProviderId가 해석).
@@ -808,7 +816,7 @@ class SessionManager {
 
   list(): SessionListItem[] {
     // 목록 제목 = 사람이 붙인 이름, 없으면 첫 말에서 뽑은 제목. 폴더 이름은 그룹 헤더가 맡는다.
-    const live = [...this.sessions.values()].map((s) => ({
+    const live = [...this.sessions.values()].filter((s) => !s.isolation).map((s) => ({
       id: s.id,
       cwd: s.cwd,
       displayName: resolveWorkTitle(s.name, s.generatedName),
@@ -835,7 +843,7 @@ class SessionManager {
       ...this.attentionFieldsForLive(s),
     }));
     const disk = [...this.disk.entries()]
-      .filter(([id]) => !this.sessions.has(id))
+      .filter(([id, e]) => !this.sessions.has(id) && !restoreIsolation(e.meta.isolation))
       .map(([id, e]) => ({
         id,
         cwd: e.meta.cwd ?? "",
@@ -1686,6 +1694,7 @@ class SessionManager {
   }
 
   private emitPresence(update: PresenceSession) {
+    if (this.isExternal(update.id)) return;
     const key = JSON.stringify(update);
     if (this.lastPresence.get(update.id) === key) return;
     this.lastPresence.set(update.id, key);

@@ -221,6 +221,7 @@ for (const p of listProviders()) {
 }
 // 세션이 살아날 때마다 알림 판정부를 붙인다. 본체는 웹 푸시·데스크톱 출구를 모른다.
 const notifyOut = (intent: NotifyIntent) => {
+  if (intent.sessionId && sessionManager.isExternal(intent.sessionId)) return; // 외부 격리 세션(Acme 등)은 Aether 알림을 내지 않는다
   deliverWebPush(intent);
   emitDesktopNotify(intent);
 };

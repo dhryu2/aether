@@ -63,7 +63,7 @@ searchRouter.get("/", async (req: Request, res: Response) => {
   };
   try {
     if (!sessionLetterReady()) throw new Error("세션 글자 색인을 열지 못했다");
-    const hits = await searchSessionLetters({ query: q, sessionId, limit, sort, chatOnly, fromTs, toTs });
+    const hits = (await searchSessionLetters({ query: q, sessionId, limit, sort, chatOnly, fromTs, toTs })).filter((h) => !sessionManager.isExternal(h.sessionId));
     const results = hits.map((h) => (sessionExists(h.sessionId) ? h : { ...h, deleted: true }));
     try {
       await recordSearchAudit({
@@ -86,6 +86,7 @@ searchRouter.get("/session/:id", async (req: Request, res: Response) => {
   const id = String(req.params.id ?? "");
   if (!SESSION_ID_RE.test(id)) return res.status(400).json({ error: st("routes.search.failed") });
   const after = optFinite(req.query.after) ?? 0;
+  if (sessionManager.isExternal(id)) return res.json({ rows: [] });
   try {
     if (!sessionLetterReady()) throw new Error("세션 글자 색인을 열지 못했다");
     const rows = await getLetterSessionPage(id, after, 100);

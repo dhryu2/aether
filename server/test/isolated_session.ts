@@ -100,6 +100,26 @@ try {
     if (b.id) sessionManager.delete(b.id);
   }
 
+  // 2b. 화면에서 숨김 — 목록·presence·GET /api/sessions에서 빠지고, 보통 세션은 그대로, 세션 API는 동작
+  {
+    const iso = (await (await post({ provider: "claude", isolated: true, mcpServers: { acme: OK } })).json()) as { id: string };
+    const plain = (await (await post({ provider: "claude" })).json()) as { id: string };
+    const seen: string[] = [];
+    const off = sessionManager.subscribePresence((u) => seen.push(u.id));
+    const ids = (rows: { id: string }[]) => rows.map((r) => r.id);
+    check(!ids(sessionManager.list()).includes(iso.id) && ids(sessionManager.list()).includes(plain.id), "list(): 격리 세션만 빠진다");
+    check(!ids(sessionManager.presenceSnapshot()).includes(iso.id) && ids(sessionManager.presenceSnapshot()).includes(plain.id), "presenceSnapshot: 격리 세션만 빠진다");
+    const api = (await (await fetch(`${base}/api/sessions`)).json()) as { sessions: { id: string }[]; rooms: { sourceSessionId: string }[] };
+    check(!ids(api.sessions).includes(iso.id) && !api.rooms.some((r) => r.sourceSessionId === iso.id) && ids(api.sessions).includes(plain.id), "GET /api/sessions: 격리 세션만 빠진다(200)");
+    const tsk = await fetch(`${base}/api/sessions/${iso.id}/usage`);
+    check(tsk.status !== 404, "격리 세션 API(/usage)는 그대로 동작", tsk.status);
+    check(sessionManager.isExternal(iso.id) && !sessionManager.isExternal(plain.id), "isExternal 판정(live)");
+    check(!seen.includes(iso.id), "presence 갱신이 격리 세션에서 나가지 않는다", seen);
+    off();
+    sessionManager.delete(iso.id);
+    sessionManager.delete(plain.id);
+  }
+
   // 3. 변조된 meta는 되살릴 때 다시 검증된다
   check(restoreIsolation({ mcpServers: { a: "http://evil.com/" } }) === undefined, "변조된 meta의 원격 URL은 복원되지 않는다");
   check(restoreIsolation(undefined) === undefined && restoreIsolation("x") === undefined, "isolation 없는 meta는 보통 세션");

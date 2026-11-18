@@ -59,7 +59,7 @@ export function fmtDate(ts: number, now = new Date()): string {
   if (!ts) return ''
   const d = new Date(ts)
   const loc = bcp47()
-  const hm = d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' })
+  const hm = d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
   if (d.toDateString() === now.toDateString()) return t('brain.date.today', { hm })
   if (new Date(now.getTime() - 86400000).toDateString() === d.toDateString()) return t('brain.date.yesterday', { hm })
   return `${d.toLocaleDateString(loc, { month: 'long', day: 'numeric' })} ${hm}`
@@ -68,7 +68,7 @@ export function fmtDate(ts: number, now = new Date()): string {
 /** 짧은 날짜+시각("1/1 09:00") — 한도 초기화 예정 시각처럼 가까운 미래를 가리킬 때. */
 export function fmtShortDateTime(ts: number): string {
   const d = new Date(ts)
-  return d.toLocaleString(bcp47(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleString(bcp47(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 }
 
 export function tokensShort(n?: number): string {

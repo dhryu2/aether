@@ -37,6 +37,7 @@ pub enum Action {
     Stop,
     Restart,
     Quit,
+    Update,
 }
 
 /// 확인 창 (제목, 본문, 확인 버튼, 취소 버튼). sessions가 None이면 세션 수를 모르는 경우다.
@@ -45,6 +46,7 @@ pub fn confirm(a: Action, sessions: Option<u64>) -> (String, String, String, Str
         Action::Stop => (tr("서버를 중지할까요?", "Stop the server?"), tr("중지", "Stop")),
         Action::Restart => (tr("서버를 재시작할까요?", "Restart the server?"), tr("재시작", "Restart")),
         Action::Quit => (tr("Aether를 종료할까요?", "Quit Aether?"), tr("종료", "Quit")),
+        Action::Update => (tr("업데이트를 적용할까요?", "Apply the update?"), tr("적용", "Apply")),
     };
     let body = match sessions {
         Some(n) if ko() => format!("실행 중인 세션 {n}개가 끊깁니다. 진행 중인 작업은 저장되지 않을 수 있습니다."),
@@ -52,6 +54,16 @@ pub fn confirm(a: Action, sessions: Option<u64>) -> (String, String, String, Str
         None => tr("실행 중인 세션이 모두 끊길 수 있습니다.", "All running sessions may be disconnected.").into(),
     };
     (title.into(), body, ok.into(), tr("취소", "Cancel").into())
+}
+
+/// 적용할 업데이트가 없을 때의 안내 창 (제목, 본문)
+pub fn no_update() -> (&'static str, &'static str) {
+    (tr("적용할 업데이트가 없습니다", "No update to apply"), tr("준비된 새 버전이 없습니다.", "No new version is ready."))
+}
+
+/// 교체 스크립트를 시작하지 못했을 때의 안내 창 (제목, 본문)
+pub fn update_failed() -> (&'static str, &'static str) {
+    (tr("업데이트를 시작하지 못했습니다", "Could not start the update"), tr("교체 스크립트를 실행할 수 없습니다. 앱을 다시 설치해 보세요.", "The update script could not be run. Try reinstalling the app."))
 }
 
 #[cfg(test)]

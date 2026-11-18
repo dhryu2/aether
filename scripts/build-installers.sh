@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 설치 파일 생성: 윈도우 Aether-<버전>-win-x64.exe, 맥 Aether-<버전>-mac-arm64.pkg, 2단계 시험용 zip과 smoke.mjs.
 # 사용: build-installers.sh [--no-secret-compare]   (기본은 저장소 server/.env 또는 AETHER_BUILD_ENV의 비밀 값이 묶음에 섞였는지 대조하고, 그 파일이 없으면 멈춘다)
+# 환경: AETHER_BUILD_MAC_APP_ONLY=1이면 윈도우 대상과 맥 pkg를 건너뛰고 맥 서버 묶음(build-manager-app.sh의 입력)까지만 만든다.
 # 환경: AETHER_UPDATE_URL(선택) = 다운로드 사이트 주소. 있으면 설치본이 그 주소로 새 버전을 확인한다.
 # 필요: node, npm, rsync, curl, makensis(brew install makensis), pkgbuild·productbuild(macOS).
 # 운영 web/dist·server/data·.env는 건드리지 않는다: git이 아는 파일만 임시 폴더로 복사해 거기서 빌드한다.
@@ -15,8 +16,9 @@ CACHE="$REPO/build/cache"
 source "$REPO/deploy/installer/node-version.env"
 VERSION="$(node -p "require('$REPO/server/package.json').aetherReleaseVersion")"
 
-command -v makensis >/dev/null || { echo "makensis가 없습니다. 'brew install makensis'로 설치한 뒤 다시 실행하세요." >&2; exit 1; }
+[ -n "${AETHER_BUILD_MAC_APP_ONLY:-}" ] || command -v makensis >/dev/null || { echo "makensis가 없습니다. 'brew install makensis'로 설치한 뒤 다시 실행하세요." >&2; exit 1; }
 for t in pkgbuild productbuild; do
+  [ -n "${AETHER_BUILD_MAC_APP_ONLY:-}" ] && break
   command -v "$t" >/dev/null || { echo "$t가 없습니다. 맥 패키지는 macOS에서만 만들 수 있습니다." >&2; exit 1; }
 done
 # makensis는 소스의 한글을 로캘로 읽는다. UTF-8이 아니면 "Bad text encoding"으로 실패한다.
@@ -24,9 +26,9 @@ export LC_ALL=en_US.UTF-8
 
 WORK="$(mktemp -d)"
 # 실패하면 임시 폴더와 반쯤 만들어진 결과물을 지운다(이전 성공본과 헷갈리지 않게).
-trap 'rc=$?; rm -rf "$WORK"; if [ "$rc" -ne 0 ]; then rm -f "$OUT/Aether-$VERSION-win-x64.exe" "$OUT/Aether-$VERSION-mac-arm64.pkg"; fi; exit "$rc"' EXIT
+trap 'rc=$?; rm -rf "$WORK"; if [ "$rc" -ne 0 ] && [ -z "${AETHER_BUILD_MAC_APP_ONLY:-}" ]; then rm -f "$OUT/Aether-$VERSION-win-x64.exe" "$OUT/Aether-$VERSION-mac-arm64.pkg"; fi; exit "$rc"' EXIT
 mkdir -p "$OUT" "$CACHE"
-rm -f "$OUT/Aether-$VERSION-win-x64.exe" "$OUT/Aether-$VERSION-mac-arm64.pkg"
+[ -n "${AETHER_BUILD_MAC_APP_ONLY:-}" ] || rm -f "$OUT/Aether-$VERSION-win-x64.exe" "$OUT/Aether-$VERSION-mac-arm64.pkg"
 INST="$REPO/deploy/installer"
 
 # 빌드 기록: 어느 커밋에서 만들었는지 묶음에 남긴다. 커밋 안 한 변경이 있으면 경고하고 기록에도 적는다.
@@ -174,7 +176,9 @@ build_target() { # $1=이름(win-x64) $2=npm os $3=npm cpu
   echo "[9/9] 대상 $name: 비밀 검사와 패키징"
   # 묶음에 비밀·운영 데이터가 섞이면 여기서 빌드를 멈춘다.
   node "$INST/check-bundle.mjs" "$dir" ${NOCMP:+"$NOCMP"} --env "$BUILD_ENV" || { echo "묶음 검사에 실패했습니다($name)." >&2; exit 1; }
-  if [ "$os" = win32 ]; then
+  if [ -n "${AETHER_BUILD_MAC_APP_ONLY:-}" ]; then
+    :  # pkg 단계 생략
+  elif [ "$os" = win32 ]; then
     makensis -V2 -WX -DVERSION="$VERSION" -DSRC="$dir" -DOUTFILE="$OUT/Aether-$VERSION-$name.exe" "$INST/windows/aether.nsi"
   else
     local scripts="$WORK/pkgscripts"
@@ -196,8 +200,9 @@ build_target() { # $1=이름(win-x64) $2=npm os $3=npm cpu
   fi
 }
 
-build_target win-x64 win32 x64
+[ -n "${AETHER_BUILD_MAC_APP_ONLY:-}" ] || build_target win-x64 win32 x64
 build_target mac-arm64 darwin arm64
+if [ -n "${AETHER_BUILD_MAC_APP_ONLY:-}" ]; then echo "완료(맥 서버 묶음만): $OUT/Aether-$VERSION-mac-arm64"; exit 0; fi
 
 cp "$REPO/deploy/installer/smoke.mjs" "$OUT/smoke.mjs"
 rm -f "$OUT/Aether-$VERSION-win-x64.zip"

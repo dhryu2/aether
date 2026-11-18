@@ -95,12 +95,13 @@ fn main() {
                 restart: MenuItem::with_id(h, "restart", tr("서버 재시작…", "Restart Server…"), false, None::<&str>)?,
                 toggle: MenuItem::with_id(h, "toggle", tr("서버 중지…", "Stop Server…"), true, None::<&str>)?,
             };
+            let update = MenuItem::with_id(h, "update", tr("업데이트 적용…", "Apply Update…"), true, None::<&str>)?;
             let logs = MenuItem::with_id(h, "logs", tr("로그 폴더 열기", "Open Logs Folder"), true, None::<&str>)?;
             let quit = MenuItem::with_id(h, "quit", tr("Aether 종료…", "Quit Aether…"), true, None::<&str>)?;
             let sep = || PredefinedMenuItem::separator(h);
             let menu = Menu::with_items(h, &[
                 &items.status, &sep()?, &items.open, &items.serve, &sep()?,
-                &items.restart, &items.toggle, &sep()?, &logs, &sep()?, &quit,
+                &items.restart, &items.toggle, &update, &sep()?, &logs, &sep()?, &quit,
             ])?;
             let tray = TrayIconBuilder::new()
                 .menu(&menu)
@@ -162,6 +163,19 @@ fn main() {
                         "restart" => {
                             if confirm(&app, &sup, Action::Restart) {
                                 sup.send(Cmd::Restart);
+                            }
+                        }
+                        "update" => {
+                            if !config_dir().join("update/Aether.app").is_dir() {
+                                let (title, body) = text::no_update();
+                                app.dialog().message(body).title(title).blocking_show();
+                            } else if confirm(&app, &sup, Action::Update) {
+                                // 교체 스크립트는 새 세션으로 떨어져 나가 앱이 종료돼도 끝까지 돈다
+                                let script = std::env::current_exe().unwrap_or_default().with_file_name("../Resources/apply-update.sh");
+                                if std::process::Command::new("/bin/bash").arg(script).arg("--detach").env("AETHER_APP_BASE", config_dir()).spawn().is_err() {
+                                    let (title, body) = text::update_failed();
+                                    app.dialog().message(body).title(title).blocking_show();
+                                }
                             }
                         }
                         "toggle" => match state {

@@ -26,6 +26,8 @@ ditto "$REPO/manager/src-tauri/target/release/bundle/macos/Aether.app" "$DEST/Ae
 # Tauri resources 설정 대신 직접 복사한다: node_modules의 심볼릭 링크와 실행 권한을 그대로 지킨다.
 ditto "$CORE" "$DEST/Aether.app/Contents/Resources/core"
 rm -rf "$DEST/Aether.app/Contents/Resources/core/bin"  # pkg 전용(삭제·업데이트 스크립트)
+cp "$REPO/manager/src-tauri/resources/apply-update.sh" "$DEST/Aether.app/Contents/Resources/apply-update.sh"  # 서명 전에 넣는다
+chmod 755 "$DEST/Aether.app/Contents/Resources/apply-update.sh"
 
 codesign --force --deep --sign "${AETHER_SIGN_IDENTITY:--}" ${AETHER_SIGN_KEYCHAIN:+--keychain "$AETHER_SIGN_KEYCHAIN"} "$DEST/Aether.app"
 codesign --verify --deep "$DEST/Aether.app"

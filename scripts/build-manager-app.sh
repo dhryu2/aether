@@ -2,7 +2,9 @@
 # 관리 앱 Aether.app 생성: manager/(Tauri 메뉴 막대 앱)에 서버 묶음(node, server, web)을 넣는다.
 # 사용: build-installers.sh를 먼저 돌린 뒤 build-manager-app.sh
 # 필요: cargo와 cargo-tauri(~/.cargo/bin), codesign, ditto(macOS).
-# 서명 신원이 없어 임시 서명(ad-hoc)으로 만든다. 배포용이 아니다(Gatekeeper가 막고, 빌드마다 권한을 다시 묻는다).
+# 기본은 임시 서명(ad-hoc)이다. 배포용이 아니다(Gatekeeper가 막고, 빌드마다 앱 신원이 바뀌어 권한을 다시 묻는다).
+# 환경: AETHER_SIGN_IDENTITY(선택) = 서명 인증서 이름, AETHER_SIGN_KEYCHAIN(선택) = 그 인증서가 든 키체인 경로.
+#       같은 인증서로 서명하면 다시 빌드해도 앱 신원이 같아 macOS 권한이 유지된다.
 set -euo pipefail
 export PATH="$HOME/.cargo/bin:$PATH"
 export COPYFILE_DISABLE=1
@@ -25,7 +27,7 @@ ditto "$REPO/manager/src-tauri/target/release/bundle/macos/Aether.app" "$DEST/Ae
 ditto "$CORE" "$DEST/Aether.app/Contents/Resources/core"
 rm -rf "$DEST/Aether.app/Contents/Resources/core/bin"  # pkg 전용(삭제·업데이트 스크립트)
 
-codesign --force --deep --sign - "$DEST/Aether.app"
+codesign --force --deep --sign "${AETHER_SIGN_IDENTITY:--}" ${AETHER_SIGN_KEYCHAIN:+--keychain "$AETHER_SIGN_KEYCHAIN"} "$DEST/Aether.app"
 codesign --verify --deep "$DEST/Aether.app"
 echo "완료: $DEST/Aether.app"
 du -sh "$DEST/Aether.app" | sed 's/^/  /'

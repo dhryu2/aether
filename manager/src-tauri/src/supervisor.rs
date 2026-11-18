@@ -75,6 +75,36 @@ pub fn core_dir() -> PathBuf {
     exe.parent().map(|p| p.join("../Resources/core")).unwrap_or_default()
 }
 
+/// 사용자의 로그인 셸이 쓰는 PATH. Finder가 띄운 앱은 PATH가 최소라서, 셸 설정으로 잡히는 도구
+/// (nvm의 node, 에이전트 CLI)를 서버와 그 아래 세션이 찾지 못한다. 앱이 뜰 때 한 번만 묻는다.
+fn login_shell_path() -> &'static str {
+    static PATH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    PATH.get_or_init(|| {
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
+        let Ok(mut child) = Command::new(shell)
+            .args(["-ilc", "echo __AETHER_PATH__${PATH}__AETHER_PATH__"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+        else {
+            return String::new();
+        };
+        // 셸 설정이 입력을 기다리며 멈출 수 있다. 5초 뒤에는 포기하고 고정 목록만 쓴다.
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut out = child.stdout.take().unwrap();
+        std::thread::spawn(move || {
+            let mut s = String::new();
+            let _ = out.read_to_string(&mut s);
+            let _ = tx.send(s);
+        });
+        let got = rx.recv_timeout(Duration::from_secs(5)).unwrap_or_default();
+        let _ = child.kill();
+        let _ = child.wait();
+        got.split("__AETHER_PATH__").nth(1).unwrap_or("").to_string()
+    })
+}
+
 fn new_token() -> String {
     let mut buf = [0u8; 32];
     if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
@@ -114,7 +144,7 @@ impl Worker {
         let spawned = Command::new(core.join("node/bin/node"))
             .arg(core.join("server/index.mjs"))
             .current_dir(core.join("server"))
-            .env("PATH", format!("{home}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"))
+            .env("PATH", format!("{}:{home}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin", login_shell_path()).trim_start_matches(':'))
             .env("NODE_ENV", "production")
             .env("TMPDIR", &tmp)
             .env("AETHER_PARENT_WATCH", "1")

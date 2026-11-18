@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { format } from "node:util";
 import pkg from "./package.json" with { type: "json" };
+import { watchParent } from "./supervision";
 import { appPaths, bundledUpdateUrl, isFirstRun, scrubInheritedEnv } from "./setup/paths";
 
 const p = appPaths();
@@ -73,6 +74,7 @@ try {
     log(`첫 실행입니다: ${path.basename(p.configFile)}이 없어 설정 서버를 시작합니다.`);
     process.env.AETHER_DATA_DIR = p.defaultDataDir;
     process.env.AETHER_RELEASE = pkg.aetherReleaseVersion;
+    watchParent();
     const { startSetupServer } = await import("./setup/main");
     await startSetupServer({
       paths: p,
@@ -82,6 +84,7 @@ try {
     // 저장이 끝나면 설정 서버가 코드 1로 끝난다. 자동 실행 장치(윈도우 AetherHost, 맥 LaunchAgent)가 진짜 서버로 다시 띄운다.
     // 자동 실행 없이 수동으로 띄웠다면 재시작 없이 그냥 끝난다 — 저장 때 start.log에 그렇게 안내한다.
   } else {
+    watchParent();
     prepareInstalledEnv();
     // 새 버전 확인 주소: .env나 config.json에 없으면 빌드 때 묶음에 넣은 값을 쓴다. 없으면 기능이 꺼진다.
     const updateUrl = bundledUpdateUrl((pkg as { aetherUpdateUrl?: unknown }).aetherUpdateUrl, p.configFile);

@@ -22,6 +22,9 @@ import { MIN_JWT_SECRET_BYTES } from "./auth/jwt";
 import { resolveTailscaleCli } from "./auth/tailscale";
 import { currentPasswordHash } from "./auth/passwordHash";
 import { createStaticAddon } from "./routes/static";
+import { screenRegistry } from "./routes/screens";
+import { createAdminRouter } from "./routes/admin";
+import { adminToken, announceListening } from "./supervision";
 import { authRouter } from "./routes/auth";
 import { fsRouter } from "./routes/fs";
 import { sessionsRouter } from "./routes/sessions";
@@ -107,7 +110,7 @@ process.on("SIGINT", () => void shutdown(0));
 const app = express();
 app.use(errorRequestContext);
 
-const staticAddon = createStaticAddon({ enabled: config.serveStatic });
+const staticAddon = createStaticAddon({ enabled: config.serveStatic, rootDir: () => screenRegistry.rootDir() });
 
 // ── 보안/전송 미들웨어 ──
 if (config.helmet) app.use(helmet(staticAddon.helmetOptions()));
@@ -186,6 +189,12 @@ app.use("/api/provider-auth", providerAuthRouter);
 app.use("/api/system", createAuthMiddleware(selectStrategy()));
 app.use("/api/system", systemRouter);
 
+// 관리 앱 전용(토큰). 토큰이 없으면 붙이지 않아 아래 /api 404 가드가 답한다.
+if (adminToken) {
+  app.use("/api/admin", createAdminRouter(adminToken, screenRegistry, () =>
+    sessionManager.all().filter((s) => s.isTurnOpen || s.hasPendingInput || s.backgroundTasks.length > 0).length));
+}
+
 // 자동 재개 설정(보호) — 한도가 풀리면 이어 가기의 켜기·기본 문장.
 app.use("/api/auto-resume", createAuthMiddleware(selectStrategy()));
 app.use("/api/auto-resume", autoResumeRouter);
@@ -209,6 +218,11 @@ app.use("/api/{*splat}", (_req, res) => {
 
 // ── 빌드된 프론트(단일포트 선택 장착). 없거나 꺼져 있으면 내부 skip ──
 staticAddon.mount(app);
+
+// 화면 등록이 없을 때 Express 기본 HTML 404 대신 JSON으로 답한다.
+app.use((_req, res) => {
+  res.status(404).json({ error: st("routes.common.apiNotFound") });
+});
 
 // ── 에러 핸들러(반드시 맨 끝) ──
 app.use(errorHandler);
@@ -237,6 +251,7 @@ updateInstaller.onExit((code) => void shutdown(code));
 
 const onListen = () => {
   updateInstaller.markHealthy();
+  announceListening(config.port);
   console.log(`[aether] 백엔드 기동 → http://${config.host}:${config.port} (HTTPS 종단=tailscale serve)`);
   if (restored) console.log(`[aether] 세션 ${restored}개 복원 — message 시 resume`);
   console.log(`[aether] 작업 폴더 범위 제한 없음, 기본 폴더 ${config.projectRoot}`);

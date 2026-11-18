@@ -142,14 +142,14 @@ console.log("\n=== 설치 함수 단위 ===");
 {
   const missing = fs.mkdtempSync(path.join(os.tmpdir(), "aether-static-missing-"));
   const addon = createStaticAddon({ enabled: true, distDir: missing });
-  check(addon.helmetOptions()?.contentSecurityPolicy === false, "dist 없으면 CSP 없음");
+  check(addon.helmetOptions()?.contentSecurityPolicy !== false, "dist 없어도 CSP 고정(등록이 늦게 생길 수 있다)");
   fs.rmSync(missing, { recursive: true, force: true });
 }
 {
   const dist = fs.mkdtempSync(path.join(os.tmpdir(), "aether-static-off-"));
   writeFakeDist(dist);
   const addon = createStaticAddon({ enabled: false, distDir: dist });
-  check(addon.helmetOptions()?.contentSecurityPolicy === false, "꺼져 있으면 dist가 있어도 CSP 없음");
+  check(addon.helmetOptions()?.contentSecurityPolicy !== false, "꺼져 있어도 CSP 고정");
   fs.rmSync(dist, { recursive: true, force: true });
 }
 {
@@ -157,7 +157,7 @@ console.log("\n=== 설치 함수 단위 ===");
   fs.mkdirSync(path.join(dist, "assets"), { recursive: true });
   fs.writeFileSync(path.join(dist, "assets", "app.js"), "1");
   const addon = createStaticAddon({ enabled: true, distDir: dist });
-  check(addon.helmetOptions()?.contentSecurityPolicy === false, "index.html 없는 손상 dist는 CSP 없음");
+  check(addon.helmetOptions()?.contentSecurityPolicy !== false, "손상 dist도 CSP 고정");
   fs.rmSync(dist, { recursive: true, force: true });
 }
 {
@@ -208,7 +208,7 @@ async function main() {
       check(/백엔드 기동/.test(logs()), "F1 백엔드 기동");
       check(/static 서빙 스킵/.test(logs()), "F1 static skip 로그");
       const health = await assertApiSse(port, "F1");
-      check(health.headers["content-security-policy"] === undefined, "F1 건강 응답에 CSP 없음");
+      check(health.headers["content-security-policy"] !== undefined, "F1 건강 응답에 CSP 있음");
       const root = await req("127.0.0.1", port, "GET", "/");
       check(!root.body.includes("SPA_MARKER"), "F1 / 가 화면 HTML이 아니다");
     } finally {
@@ -229,7 +229,7 @@ async function main() {
       check(/백엔드 기동/.test(logs()), "F2 백엔드 기동");
       check(/static 서빙 꺼짐/.test(logs()), "F2 꺼짐 로그");
       const health = await assertApiSse(port, "F2");
-      check(health.headers["content-security-policy"] === undefined, "F2 건강 응답에 CSP 없음");
+      check(health.headers["content-security-policy"] !== undefined, "F2 건강 응답에 CSP 있음");
       const root = await req("127.0.0.1", port, "GET", "/");
       check(!root.body.includes("SPA_MARKER"), "F2 dist가 있어도 화면을 안 붙인다");
     } finally {
@@ -248,7 +248,7 @@ async function main() {
       check(/백엔드 기동/.test(logs()), "F3 백엔드 기동");
       check(/static 서빙 스킵/.test(logs()), "F3 손상 dist skip 로그");
       const health = await assertApiSse(port, "F3");
-      check(health.headers["content-security-policy"] === undefined, "F3 건강 응답에 CSP 없음");
+      check(health.headers["content-security-policy"] !== undefined, "F3 건강 응답에 CSP 있음");
     } finally {
       await stopServer(child, dataDir);
       fs.rmSync(dist, { recursive: true, force: true });

@@ -99,23 +99,32 @@ export function createStaticAddon(opts?: {
   /** 빌드 실행 함수. 시험이 실제 vite 대신 주입한다. */
   runBuild?: (webDir: string) => { ok: boolean; error?: string };
   contractVersion?: number;
+  /** 지금 제공할 화면 폴더(없으면 null). 기본은 enabled일 때의 distDir. */
+  rootDir?: () => string | null;
 }): StaticAddon {
   const enabled = opts?.enabled ?? config.serveStatic;
   const dist = opts?.distDir ?? defaultDistDir();
-  const indexHtml = path.join(dist, "index.html");
+  /** 지금 제공할 화면 폴더. null이면 제공하지 않는다. 요청마다 불러 등록 변경이 재시작 없이 반영된다. */
+  const rootDir = opts?.rootDir ?? (() => (enabled ? dist : null));
   const serverContract = opts?.contractVersion ?? AGENT_EVENT_CONTRACT_VERSION;
-  const webDir = path.dirname(dist);
-  const repoRoot = path.dirname(webDir);
-  const hasSource = hasWebSource(repoRoot) && path.basename(dist) === "dist" && path.basename(webDir) === "web";
+  const hasSourceAt = (d: string) => {
+    const webDir = path.dirname(d);
+    return hasWebSource(path.dirname(webDir)) && path.basename(d) === "dist" && path.basename(webDir) === "web";
+  };
+  let bootDir: string | null = null; // 부팅 때 확인한 화면 폴더
   let bootReason: string | null = null; // 부팅 때 빌드가 실패했거나 못 한 이유
   const autoBuild = opts?.autoBuild ?? config.webAutoBuild;
-  // 자동 빌드가 dist를 처음 만들 수도 있으니, 켜질 수 있으면 index.html이 아직 없어도 장착한다.
-  const active = enabled && (fs.existsSync(indexHtml) || (autoBuild && hasSource));
 
   // 서버 잠금을 잡은 뒤 listen 전에 한 번: 화면이 서버와 맞는지 보고, 안 맞으면(운영일 때만) 다시 빌드한다.
   // 어떤 실패도 부팅을 막지 않는다.
   function prepare(): void {
-    if (!enabled) return;
+    const root = rootDir();
+    if (!root) return;
+    bootDir = root;
+    const dist = root;
+    const webDir = path.dirname(dist);
+    const repoRoot = path.dirname(webDir);
+    const hasSource = hasSourceAt(dist);
     try {
       const sourceHash = () => (hasSource ? computeWebSourceHash(repoRoot) : undefined);
       const verdict = judgeBuild(readBuildInfo(dist), serverContract, sourceHash());
@@ -139,17 +148,18 @@ export function createStaticAddon(opts?: {
   }
 
   // 요청 때 판정: build-info 수정 시각이 같으면 다시 읽지 않는다. build-info가 없으면 막지 않는다.
-  let cachedMtime = -1;
+  let cachedKey = "";
   let cachedBlock: string | null = null;
-  function blockReason(): string | null {
+  function blockReason(dist: string): string | null {
     let mtime: number;
     try { mtime = fs.statSync(path.join(dist, "build-info.json")).mtimeMs; } catch { return null; }
-    if (mtime !== cachedMtime) {
-      cachedMtime = mtime;
+    const key = `${dist}\0${mtime}`;
+    if (key !== cachedKey) {
+      cachedKey = key;
       const info = readBuildInfo(dist);
       cachedBlock = null;
       if (info && info.contractVersion < serverContract) {
-        cachedBlock = `화면이 서버보다 오래됐습니다. ${bootReason ?? "자동으로 다시 만들지 못했습니다."} (화면 ${info.contractVersion}, 서버 ${serverContract})`;
+        cachedBlock = `화면이 서버보다 오래됐습니다. ${(dist === bootDir ? bootReason : null) ?? "자동으로 다시 만들지 못했습니다."} (화면 ${info.contractVersion}, 서버 ${serverContract})`;
       } else if (info && info.contractVersion > serverContract) {
         // 화면만 새로 만들고 서버를 아직 다시 켜지 않은 상태 — 막지 않고 그대로 내보낸다(새 화면이 스스로 지킨다).
         console.warn(`[aether] 화면 계약(${info.contractVersion})이 서버(${serverContract})보다 높습니다 — 서버를 다시 켜야 합니다`);
@@ -159,7 +169,6 @@ export function createStaticAddon(opts?: {
   }
 
   function helmetOptions(): Parameters<typeof helmet>[0] {
-    if (!active) return { contentSecurityPolicy: false };
     return {
       contentSecurityPolicy: {
         directives: {
@@ -176,45 +185,56 @@ export function createStaticAddon(opts?: {
   }
 
   function mount(app: Express): void {
-    if (!active) {
-      if (!enabled) console.log("[aether] static 서빙 꺼짐 (AETHER_SERVE_STATIC=0)");
-      else console.log(`[aether] web/dist 없음 → static 서빙 스킵 (${dist})`);
-      return;
-    }
+    const root0 = rootDir();
+    if (!root0) console.log("[aether] static 서빙 꺼짐 (화면 등록 없음 또는 AETHER_SERVE_STATIC=0)");
+    else if (!fs.existsSync(path.join(root0, "index.html")) && !(autoBuild && hasSourceAt(root0))) {
+      console.log(`[aether] web/dist 없음 → static 서빙 스킵 (${root0})`);
+    } else console.log(`[aether] static 서빙 활성 (${root0})`);
 
     // 화면 계약이 서버와 다르면 옛 화면 대신 안내를 준다(HTML 경로만. 에셋·build-info.json은 그대로 나간다).
     app.use((req, res, next) => {
       if (req.method !== "GET" || req.path === "/api" || req.path.startsWith("/api/")) return next();
       if (req.path !== "/" && req.path !== "/index.html" && path.extname(req.path)) return next();
-      const reason = blockReason();
+      const root = rootDir();
+      if (!root) return next();
+      const reason = blockReason(root);
       if (!reason) return next();
       res.status(503).setHeader("Cache-Control", "no-cache").type("html").send(noticeHtml(reason));
     });
 
-    // 해시된 asset(/assets/*)만 immutable, 그 외(index.html 등)는 no-cache.
-    app.use(
-      express.static(dist, {
-        index: false,
-        etag: true,
-        lastModified: true,
-        fallthrough: true,
-        setHeaders: (res, p) => {
-          const isAsset = p.includes(`${path.sep}assets${path.sep}`);
-          res.setHeader("Cache-Control", isAsset ? "public, max-age=31536000, immutable" : "no-cache");
-        },
-      }),
-    );
+    // 해시된 asset(/assets/*)만 immutable, 그 외(index.html 등)는 no-cache. express.static은 마지막 폴더 하나만 들고 있다가 바뀌면 새로 만든다.
+    let staticDir = "";
+    let staticHandler: express.RequestHandler | null = null;
+    app.use((req, res, next) => {
+      const root = rootDir();
+      if (!root) return next();
+      if (root !== staticDir || !staticHandler) {
+        staticDir = root;
+        staticHandler = express.static(root, {
+          index: false,
+          etag: true,
+          lastModified: true,
+          fallthrough: true,
+          setHeaders: (r, p) => {
+            const isAsset = p.includes(`${path.sep}assets${path.sep}`);
+            r.setHeader("Cache-Control", isAsset ? "public, max-age=31536000, immutable" : "no-cache");
+          },
+        });
+      }
+      staticHandler(req, res, next);
+    });
 
     // SPA 딥링크 fallback — GET 한정, /api/ 하위만 통과(앞선 404 가드가 처리), index.html은 캐시 고정 금지.
     // ⚠️ startsWith("/api")는 /apikeys 같은 정상 SPA 경로까지 과매칭 → 정확히 "/api" 또는 "/api/" 하위만.
     app.get("/{*splat}", (req, res, next) => {
       if (req.path === "/api" || req.path.startsWith("/api/")) return next();
+      const root = rootDir();
+      if (!root) return next();
+      const indexHtml = path.join(root, "index.html");
       if (!fs.existsSync(indexHtml)) return next(); // 빌드가 실패해 화면이 없으면 API 쪽 처리로 넘긴다
       res.setHeader("Cache-Control", "no-cache");
       res.sendFile(indexHtml);
     });
-
-    console.log(`[aether] static 서빙 활성 (${dist})`);
   }
 
   return { helmetOptions, mount, prepare };

@@ -5,6 +5,7 @@
 import http, { type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createSetupApp, type SetupAppOptions } from "./app";
+import { announceListening } from "../supervision";
 import { openBrowser, writeShortcut } from "./desktop";
 
 const TRIES = 20;
@@ -40,6 +41,7 @@ export async function startSetupServer(
   const url = `http://127.0.0.1:${port}/`;
   writeShortcut(o.paths.configDir, port);
   o.log(`첫 설정 서버가 ${url} 에서 기다립니다.`);
+  announceListening(port, true);
   if (process.env.AETHER_SETUP_NO_BROWSER !== "1") openBrowser(url);
   return server;
 }

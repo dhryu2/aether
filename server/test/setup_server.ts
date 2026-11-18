@@ -140,6 +140,19 @@ check(winScript.includes("IFileOpenDialog") && !winScript.includes("FolderBrowse
 check(await pickFolder(undefined, "linux").then(() => false, () => true), "지원하지 않는 운영체제는 throw");
 const idx = await request(a.port, "GET", "/");
 check(idx.status === 200 && String(idx.body).includes("setup"), "정적 화면 제공");
+{
+  // 일반 서버의 화면 등록 목록이 비어 있어도 설정 서버의 화면은 그대로 나온다.
+  const shot = path.join(config.dataDir, "screens.json");
+  const hadShot = fs.existsSync(shot);
+  check(path.resolve(config.dataDir).startsWith(os.tmpdir()) || fs.realpathSync(config.dataDir).startsWith(fs.realpathSync(os.tmpdir())), "시험 데이터 폴더는 임시 폴더");
+  if (!hadShot) {
+    fs.mkdirSync(config.dataDir, { recursive: true });
+    fs.writeFileSync(shot, "[]");
+    const again = await request(a.port, "GET", "/");
+    fs.rmSync(shot, { force: true });
+    check(again.status === 200 && String(again.body).includes("setup"), "screens.json이 []여도 설정 서버 화면 제공");
+  }
+}
 for (const [m, u] of [["GET", "/api/sessions"], ["GET", "/api/system/restart"], ["POST", "/api/system/restart"], ["GET", "/api/hermes/mcp"], ["POST", "/api/hermes/hook"], ["POST", "/api/auth/login"], ["GET", "/api/errors"], ["GET", "/api/locale"]] as const) {
   check((await request(a.port, m, u, { origin: a.origin })).status === 404, `${m} ${u}은 404`);
 }

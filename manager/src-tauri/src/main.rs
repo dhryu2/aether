@@ -11,7 +11,8 @@ use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, RunEvent};
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogResult};
+use tauri_plugin_notification::NotificationExt;
 use text::{tr, Action};
 
 #[derive(Clone)]
@@ -44,6 +45,10 @@ impl Items {
 fn open(target: &str) {
     let _ = std::process::Command::new("/usr/bin/open").arg(target).spawn();
 }
+
+// 미확인: 널리 쓰이는 값이나 이 맥에서 열어 보지 않았다.
+const URL_FULL_DISK: &str = "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles";
+const URL_SCREEN_REC: &str = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
 
 fn port_of(s: State) -> Option<u16> {
     match s {
@@ -86,6 +91,7 @@ fn main() {
     let serving = Arc::new(AtomicBool::new(false));
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
             let h = app.handle();
             let items = Items {
@@ -97,11 +103,12 @@ fn main() {
             };
             let update = MenuItem::with_id(h, "update", tr("업데이트 적용…", "Apply Update…"), true, None::<&str>)?;
             let logs = MenuItem::with_id(h, "logs", tr("로그 폴더 열기", "Open Logs Folder"), true, None::<&str>)?;
+            let perms = MenuItem::with_id(h, "perms", tr("권한 설정…", "Permissions…"), true, None::<&str>)?;
             let quit = MenuItem::with_id(h, "quit", tr("Aether 종료…", "Quit Aether…"), true, None::<&str>)?;
             let sep = || PredefinedMenuItem::separator(h);
             let menu = Menu::with_items(h, &[
                 &items.status, &sep()?, &items.open, &items.serve, &sep()?,
-                &items.restart, &items.toggle, &update, &sep()?, &logs, &sep()?, &quit,
+                &items.restart, &items.toggle, &update, &sep()?, &logs, &perms, &sep()?, &quit,
             ])?;
             let tray = TrayIconBuilder::new()
                 .menu(&menu)
@@ -114,7 +121,12 @@ fn main() {
             let (it, tr2, sv, hh) = (items.clone(), tray.clone(), serving.clone(), h.clone());
             let sup_cell: Arc<std::sync::OnceLock<Supervisor>> = Arc::new(std::sync::OnceLock::new());
             let cell = sup_cell.clone();
+            let notify = hh.clone();
             let on_change = move |s: State| {
+                if s == State::Error {
+                    let (title, body) = text::server_down();
+                    let _ = notify.notification().builder().title(title).body(body).show();
+                }
                 it.apply(&tr2, s, sv.load(Ordering::Relaxed));
                 if let (State::Running(port), Some(sup)) = (s, cell.get()) {
                     // 실행 중에 들어갈 때 현재 제공 여부를 읽어 체크를 맞춘다
@@ -187,6 +199,15 @@ fn main() {
                             }
                         },
                         "logs" => open(&log_dir().to_string_lossy()),
+                        "perms" => {
+                            let (title, body, disk, screen, close) = text::permissions();
+                            let r = app.dialog().message(body).title(title)
+                                .buttons(MessageDialogButtons::YesNoCancelCustom(disk.into(), screen.into(), close.into()))
+                                .blocking_show_with_result();
+                            if let MessageDialogResult::Custom(l) = r {
+                                if l == disk { open(URL_FULL_DISK) } else if l == screen { open(URL_SCREEN_REC) }
+                            }
+                        }
                         "quit" => {
                             if confirm(&app, &sup, Action::Quit) {
                                 sup.send(Cmd::Quit);

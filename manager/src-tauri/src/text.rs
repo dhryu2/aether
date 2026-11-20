@@ -66,6 +66,25 @@ pub fn update_failed() -> (&'static str, &'static str) {
     (tr("업데이트를 시작하지 못했습니다", "Could not start the update"), tr("교체 스크립트를 실행할 수 없습니다. 앱을 다시 설치해 보세요.", "The update script could not be run. Try reinstalling the app."))
 }
 
+/// 서버가 연달아 죽어 다시 띄우지 않을 때의 알림 (제목, 본문)
+pub fn server_down() -> (&'static str, &'static str) {
+    (tr("서버가 멈췄습니다", "Server Stopped"), tr("연달아 종료되어 다시 띄우지 않았습니다.", "It kept exiting and was not restarted."))
+}
+
+/// 맥 권한 안내 창 (제목, 본문, 전체 디스크 접근 단추, 화면 녹음 단추, 닫기 단추)
+pub fn permissions() -> (&'static str, &'static str, &'static str, &'static str, &'static str) {
+    (
+        tr("맥 권한", "Mac Permissions"),
+        tr(
+            "메일, 메시지, Safari 같은 보호된 데이터를 에이전트가 읽으려면 전체 디스크 접근 권한이 필요합니다. 화면 캡처에는 화면 녹음 권한이 필요합니다. 시스템 설정에서 Aether를 켠 뒤 서버를 재시작하세요.",
+            "To let agents read protected data such as Mail, Messages, and Safari, Aether needs Full Disk Access. Screen capture needs Screen Recording. Turn on Aether in System Settings, then restart the server.",
+        ),
+        tr("전체 디스크 접근 열기", "Open Full Disk Access"),
+        tr("화면 녹음 열기", "Open Screen Recording"),
+        tr("닫기", "Close"),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -82,5 +101,12 @@ mod tests {
         assert_eq!(row(State::Stopped, true), (false, false, true, false));
         assert_eq!(row(State::Error, true), (false, false, true, true));
         assert_eq!(row(State::Setup(1), false), (true, false, false, true));
+    }
+    #[test]
+    fn 알림과_권한_문구는_비어_있지_않다() {
+        let (t, b) = server_down();
+        assert!(!t.is_empty() && !b.is_empty());
+        let (t, b, a, c, d) = permissions();
+        assert!([t, b, a, c, d].iter().all(|x| !x.is_empty()));
     }
 }

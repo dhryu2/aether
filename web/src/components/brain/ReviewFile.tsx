@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { ReviewFileDiffResponse } from '@shared/brain'
 import { C, FONT } from '../../design/tokens'
 import { api } from '../../lib/api'
+import { actions } from '../../lib/store'
 import { useT } from '../../lib/i18n'
 import { Button, Collapse, Skeleton } from '../ui'
 import { UnifiedDiff } from '../UnifiedDiff'
@@ -65,6 +66,7 @@ export function ReviewFile({ sessionId, index, shownPath, state, seq, path, narr
       </button>
       <Collapse open={open} id={id}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 14px 12px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', columnGap: 16 }}>
           <button
             type="button"
             className="press"
@@ -73,6 +75,15 @@ export function ReviewFile({ sessionId, index, shownPath, state, seq, path, narr
           >
             {t('brain.review.viewInSession')}
           </button>
+          <button
+            type="button"
+            className="press"
+            onClick={() => actions.openFileViewer(sessionId, path)}
+            style={{ alignSelf: 'flex-start', minHeight: narrow ? 44 : 36, padding: 0, border: 'none', background: 'transparent', color: C.tint, fontSize: 14, cursor: 'pointer' }}
+          >
+            {t('brain.review.openFile')}
+          </button>
+          </div>
           {!res && !failed && slow && (
             <div role="status" aria-label={t('brain.loading')} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <Skeleton width="100%" height={18} radius={6} />

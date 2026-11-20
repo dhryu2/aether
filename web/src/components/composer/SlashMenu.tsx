@@ -1,15 +1,20 @@
 import { C, FONT, Z } from '../../design/tokens'
+import { useStore } from '../../lib/store'
 import { PopoverSurface } from '../ui'
 import type { SlashCmd } from '../../lib/slashCommands'
 
+type Row = Pick<SlashCmd, 'name' | 'cmd' | 'arg' | 'desc'>
+
 // 슬래시 명령 메뉴 — 입력 위로 떠서 표시(높이 변동 없음). onMouseDown으로 포커스 유지하며 선택.
-export function SlashMenu({ cmds, sel, onHover, onPick }: {
-  cmds: SlashCmd[]
+//   @ 파일 고르기도 같은 부품을 쓴다(name=경로, cmd=파일 이름, arg=폴더 경로). key는 name이라 파일 이름이 겹쳐도 겹치지 않는다.
+export function SlashMenu<T extends Row>({ cmds, sel, onHover, onPick }: {
+  cmds: T[]
   /** 키보드·마우스로 고른 항목의 인덱스. */
   sel: number
   onHover: (i: number) => void
-  onPick: (c: SlashCmd) => void
+  onPick: (c: T) => void
 }) {
+  const narrow = useStore().isNarrow
   return (
     <PopoverSurface
       direction="up"
@@ -26,7 +31,7 @@ export function SlashMenu({ cmds, sel, onHover, onPick }: {
     >
       {cmds.map((c, i) => (
         <button
-          key={c.cmd}
+          key={c.name}
           type="button"
           data-slash-name={c.name}
           ref={i === sel ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}
@@ -36,11 +41,11 @@ export function SlashMenu({ cmds, sel, onHover, onPick }: {
           }}
           onMouseEnter={() => onHover(i)}
           className="flex w-full items-baseline text-left"
-          style={{ gap: 8, padding: '9px 12px', background: i === sel ? C.tintSoft : 'transparent', cursor: 'pointer' }}
+          style={{ gap: 8, padding: '9px 12px', minHeight: narrow ? 44 : undefined, alignItems: narrow ? 'center' : undefined, background: i === sel ? C.tintSoft : 'transparent', cursor: 'pointer' }}
         >
           <code style={{ fontFamily: FONT.mono, fontSize: 12.5, fontWeight: 600, color: C.tint, flexShrink: 0 }}>{c.cmd}</code>
-          <span className="truncate" style={{ fontFamily: FONT.mono, fontSize: 10.5, color: C.label3 }}>{c.arg}</span>
-          <span style={{ fontSize: 11.5, color: C.label2, marginLeft: 'auto', flexShrink: 0 }}>{c.desc}</span>
+          <span className="truncate" style={{ minWidth: 0, fontFamily: FONT.mono, fontSize: 10.5, color: C.label3 }}>{c.arg}</span>
+          {c.desc && <span style={{ fontSize: 11.5, color: C.label2, marginLeft: 'auto', flexShrink: 0 }}>{c.desc}</span>}
         </button>
       ))}
     </PopoverSurface>

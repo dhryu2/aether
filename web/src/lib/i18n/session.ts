@@ -372,4 +372,17 @@ export const session: Dict = {
   'session.plan.approvedStatus': { ko: '✓ 승인됨 · 구현을 시작해요', en: '✓ Approved · Implementation starts' },
   'session.plan.revisedStatus': { ko: '↩ 수정 요청을 보냈어요', en: '↩ Revision requested' },
   'session.plan.cancelledStatus': { ko: '✕ 계획을 취소했어요', en: '✕ Plan cancelled' },
+
+  // FileViewer — 작업 폴더 파일 열어 보기(읽기 전용)
+  'fileViewer.title': { ko: '작업 폴더 파일', en: 'Working Folder Files' },
+  'fileViewer.search': { ko: '파일 이름으로 찾기', en: 'Find by file name' },
+  'fileViewer.empty': { ko: '맞는 파일이 없어요', en: 'No matching files' },
+  'fileViewer.listTruncated': { ko: '파일이 많아 일부만 찾아요', en: 'Too many files. Only some are searched.' },
+  'fileViewer.truncated': { ko: '앞부분 256KB만 보여요', en: 'Showing the first 256 KB only' },
+  'fileViewer.binary': { ko: '글자 파일이 아니라서 보여 줄 수 없어요', en: "This isn't a text file, so it can't be shown" },
+  'fileViewer.redacted': { ko: '비밀이 든 파일이라 내용을 가렸어요', en: 'This file holds secrets, so its contents are hidden' },
+  'fileViewer.notFound': { ko: '파일이 없어요', en: 'File not found' },
+  'fileViewer.failed': { ko: '읽지 못했어요', en: "Couldn't read the file" },
+  'fileViewer.retry': { ko: '다시 시도', en: 'Try Again' },
+  'fileViewer.back': { ko: '파일 목록으로', en: 'Back to files' },
 }

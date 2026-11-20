@@ -27,6 +27,7 @@ import { createAdminRouter } from "./routes/admin";
 import { adminToken, announceListening } from "./supervision";
 import { authRouter } from "./routes/auth";
 import { fsRouter } from "./routes/fs";
+import { filesRouter } from "./routes/files";
 import { sessionsRouter } from "./routes/sessions";
 import { providersRouter } from "./routes/providers";
 import { searchRouter } from "./routes/search";
@@ -168,6 +169,10 @@ if (config.search) {
 // 작업 검토함 — 끝난 세션의 변경·실패·할 일 요약(보호)
 app.use("/api/review", createAuthMiddleware(selectStrategy()));
 app.use("/api/review", reviewRouter);
+
+// 작업 폴더 파일 목록·내용(읽기 전용) — 동일 인증 게이트 뒤(보호)
+app.use("/api/files", createAuthMiddleware(selectStrategy()));
+app.use("/api/files", filesRouter);
 
 // 파일시스템 탐색(FolderPicker) — 동일 인증 게이트 뒤(보호)
 app.use("/api/fs", createAuthMiddleware(selectStrategy()));

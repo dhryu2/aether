@@ -361,6 +361,12 @@ export type MutationFile = {
   isCreate?: boolean;
 };
 
+/** 작업 폴더 파일 목록. 경로는 작업 폴더 기준 상대 경로이고 구분자는 `/`다. */
+export type WorkspaceFilesResponse = { files: string[]; truncated: boolean };
+
+/** 작업 폴더 파일 하나의 내용. redacted면 비밀 파일이라 내용 없음, binary면 글자 파일이 아님. */
+export type WorkspaceFileResponse = { path: string; text?: string; truncated?: boolean; binary?: boolean; totalBytes?: number; redacted?: boolean };
+
 export type MutationPreview = {
   kind: "edit" | "write" | "notebook" | "multiedit";
   path: string;

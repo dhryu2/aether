@@ -208,6 +208,22 @@ export async function folderReviewStateAsync(cwd: string, files: readonly string
   }
 }
 
+/**
+ * 작업 폴더 안의 파일 목록(추적 + 추적 안 된 것, .gitignore 대상 제외). cwd 기준 상대 경로, 저장소가 아니거나 실패하면 null.
+ * cwd가 저장소 안쪽 폴더이면 git이 그 폴더 아래만 상대 경로로 답한다.
+ */
+export async function folderFileListAsync(cwd: string): Promise<string[] | null> {
+  if (!(await isGitRepoAsync(cwd))) return null;
+  try {
+    const env = await gitEnvAsync(cwd);
+    const { stdout } = await execFileP("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd, encoding: "utf8", timeout: 10_000, env, maxBuffer: 32 * 1024 * 1024 });
+    return [...new Set(stdout.split("\0").filter(Boolean))]; // 추적 중이면서 수정·삭제된 파일이 겹쳐 나올 수 있다
+  } catch (error) {
+    failures.report(error, { component: "session", operation: "session.workspace.list", severity: "warning" }, `list:${cwd}`);
+    return null;
+  }
+}
+
 /** git check-ignore로 무시된 파일을 가린다. 무시된 것이 없으면 git이 1로 끝나므로 그것은 빈 결과다. 그 밖의 실패는 null. */
 function ignoredAmong(cwd: string, env: NodeJS.ProcessEnv, files: readonly string[]): Promise<Set<string> | null> {
   return new Promise((resolve) => {

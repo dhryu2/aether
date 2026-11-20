@@ -312,6 +312,7 @@ export type State = {
   modalCwd: string | null // 새 작업 창을 열 때 미리 고를 폴더. null이면 루트부터 고른다.
   deleteTarget: SessionListItem | null // 삭제/초기화 확인 다이얼로그 대상(null = 닫힘)
   deleteMode: 'delete' | 'reset' | 'discard' // deleteTarget이 null이 아닐 때만 의미 있음
+  fileViewer: { sessionId: string; path?: string } | null // 작업 폴더 파일 열어 보기(null = 닫힘). path가 없으면 찾기 화면. sessionId는 실행 id.
   handoffSheet: { sessionId: string; mode: 'form' | 'waiting' | 'result' } | null // 새 세션으로 넘기기 창(null = 닫힘). sessionId는 실행 id.
   dialog: DialogState | null // 범용 확인 다이얼로그(null = 닫힘)
   /**
@@ -425,6 +426,7 @@ let state: State = {
   modalOpen: false,
   modalCwd: null,
   deleteTarget: null,
+  fileViewer: null,
   handoffSheet: null,
   deleteMode: 'delete',
   dialog: null,
@@ -2798,6 +2800,8 @@ export const actions = {
   openHandoff: (sessionId: string) => set({ handoffSheet: { sessionId, mode: 'form' } }),
   openHandoffResult: (sessionId: string) => set({ handoffSheet: { sessionId, mode: 'result' } }),
   closeHandoff: () => set({ handoffSheet: null }),
+  openFileViewer: (sessionId: string, path?: string) => set({ fileViewer: { sessionId, ...(path ? { path } : {}) } }),
+  closeFileViewer: () => set({ fileViewer: null }),
   /** 사람의 답을 기다리는 넘기기를 취소한다(서버가 작업을 지운다). 결과 알림은 실시간 갱신으로 온다. */
   async cancelHandoff(sessionId: string) {
     try {

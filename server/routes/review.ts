@@ -7,7 +7,6 @@
  *   POST /api/review/:id/undo      { seq? } 이전 위치로 되돌림(없으면 지움)
  * 요약은 AI 없이 저장된 기록(중립 사건)에서만 모은다. 경로는 diff 주소에서만 받고, 그것도 요약의 바뀐 파일 목록에 든 값만 허용한다(그 밖의 경로는 읽지 않는다).
  */
-import fs from "node:fs";
 import path from "node:path";
 import { Router, type Request, type Response } from "express";
 import type { AgentEvent } from "../../shared/agentEvent";
@@ -20,7 +19,7 @@ import { isHiddenSeq } from "../sessions/rewind";
 import { sessionManager } from "../sessions/SessionManager";
 import { summarizeReview } from "../sessions/reviewSummary";
 import { fileEditPreview } from "../sessions/fileEdits";
-import { isSecretPath } from "../sessions/secretPaths";
+import { canonPath, isSecretTarget } from "../sessions/workspaceFiles";
 import type { FileEdit } from "../sessions/codec/types";
 import type { MutationPreview } from "../../shared/http";
 
@@ -123,23 +122,6 @@ reviewRouter.get("/", async (_req: Request, res: Response) => {
   }
 });
 
-/** 없는 폴더도 다룬다: 존재하는 가장 가까운 조상을 실제 경로로 풀고 나머지를 붙인다(git은 실제 경로로 답한다). */
-function canon(p: string): string {
-  const trailing = p.endsWith("/") ? "/" : "";
-  let cur = path.resolve(p);
-  const rest: string[] = [];
-  for (;;) {
-    try {
-      return path.join(fs.realpathSync.native(cur), ...rest) + trailing; // 맥에서 대소문자를 디스크 표기로 맞춘다
-    } catch {
-      const up = path.dirname(cur);
-      if (up === cur) return path.resolve(p) + trailing;
-      rest.unshift(path.basename(cur));
-      cur = up;
-    }
-  }
-}
-
 async function gitState(cwd: string, files: string[]): Promise<FolderReviewState | null> {
   if (!isolatedWorkspaceExists(cwd)) return null;
   const timeout = new Promise<null>((r) => setTimeout(() => r(null), GIT_TIMEOUT_MS).unref());
@@ -173,9 +155,9 @@ reviewRouter.get("/:id/diff", async (req: Request, res: Response) => {
       res.json(body);
     };
     const target = path.resolve(item.cwd, want);
-    const real = canon(target);
+    const real = canonPath(target);
     // 비밀 판정은 요청 글자만 보지 않는다: 링크를 푼 실제 경로, 저장소 내부(.git), 이름이 바뀐 쪽의 경로도 본다.
-    const secret = (p: string) => isSecretPath(p) || isSecretPath(canon(path.resolve(item.cwd, p))) || /(^|\/)\.git(\/|$)/.test(canon(path.resolve(item.cwd, p)).replace(/\\/g, "/"));
+    const secret = (p: string) => isSecretTarget(item.cwd, p);
     const redacted = () => done("record", [{ kind: "edit", path: want, redacted: true }]);
     if (secret(want)) return redacted();
 
@@ -218,15 +200,15 @@ reviewRouter.get("/:id", async (req: Request, res: Response) => {
     const base = { ...head(item, c), ...c.summary };
     const skipGit = req.query.git === "0";
     // 기록의 경로와 저장소 경로는 실제 경로로 풀어 비교한다(맥의 /var와 /private/var 차이).
-    const files = c.summary.changedFiles.map((f) => canon(path.resolve(item.cwd, f.path)));
+    const files = c.summary.changedFiles.map((f) => canonPath(path.resolve(item.cwd, f.path)));
     const state = skipGit ? null : await gitState(item.cwd, files);
     if (!state) {
       const body: ReviewDetailResponse = { ...base, git: skipGit ? "skipped" : "unavailable", fileStates: [], unrecorded: [] };
       return res.json(body);
     }
-    const dirty = state.dirty.map(canon);
+    const dirty = state.dirty.map(canonPath);
     const covers = (g: string, f: string) => g === f || (g.endsWith("/") && f.startsWith(g));
-    const cwdReal = canon(item.cwd);
+    const cwdReal = canonPath(item.cwd);
     const unrecorded = dirty
       .filter((g) => !files.some((f) => covers(g, f)))
       .slice(0, MAX_UNRECORDED)

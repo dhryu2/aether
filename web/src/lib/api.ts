@@ -20,7 +20,7 @@ import type {
 } from './types'
 import type { DeletedSessionRow, SearchHit } from './brain'
 import type { ReviewDetailResponse, ReviewFileDiffResponse, ReviewListResponse, ReviewMarkResponse } from '@shared/brain'
-import type { PermissionMode, PermissionModesResponse, AutoResumePlan, AutoResumeSettings, HandoffInfo, HandoffRequestBody, BackupItem, BackupListResponse, AuthDevicesResponse, ChangePasswordResponse, EventsPageResponse, ServerInfoResponse, ServerLogLevel, RemoteAccessResponse, ServerLogResponse, UpdateStatusResponse } from '@shared/http'
+import type { WorkspaceFileResponse, WorkspaceFilesResponse, PermissionMode, PermissionModesResponse, AutoResumePlan, AutoResumeSettings, HandoffInfo, HandoffRequestBody, BackupItem, BackupListResponse, AuthDevicesResponse, ChangePasswordResponse, EventsPageResponse, ServerInfoResponse, ServerLogLevel, RemoteAccessResponse, ServerLogResponse, UpdateStatusResponse } from '@shared/http'
 import type { ErrorGroupDetailResponse, ErrorGroupListResponse, ErrorLogPeriod, ErrorLogSource } from '@shared/errors'
 import { authHeaders } from './clientAuth'
 
@@ -378,6 +378,10 @@ export const api = {
   fsPlaces: () => req<FsPlaces>('/api/fs/places'),
   fsList: (path: string, showHidden = false) =>
     req<FsListing>(`/api/fs/list?path=${encodeURIComponent(path)}&showHidden=${showHidden ? 1 : 0}`),
+
+  // ── 작업 폴더 파일(읽기 전용) ──
+  workspaceFiles: (id: string) => req<WorkspaceFilesResponse>(`/api/files/${encodeURIComponent(id)}`),
+  workspaceFile: (id: string, path: string) => req<WorkspaceFileResponse>(`/api/files/${encodeURIComponent(id)}/content?path=${encodeURIComponent(path)}`),
 
   // ── 작업 검토함 ──
   reviewList: () => req<ReviewListResponse>('/api/review'),

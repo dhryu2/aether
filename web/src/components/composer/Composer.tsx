@@ -39,6 +39,7 @@ import { ComposerCodeBox } from './ComposerCodeBox'
 import { ComposerTextarea, MAX_TA_HEIGHT } from './ComposerTextarea'
 import { PermissionQuickBar } from './PermissionQuickBar'
 import { SlashMenu } from './SlashMenu'
+import { mentionAt, rankFiles } from '../../lib/fileMention'
 import { AttachmentPreview } from './AttachmentPreview'
 import { browseDown, browseUp, promptsFor, rememberPrompt, type HistoryBrowse } from '../../lib/promptHistory'
 import { ComposerPlusMenu } from './ComposerPlusMenu'
@@ -114,6 +115,12 @@ export function Composer({ sessionId }: { sessionId: string }) {
   const [sent, setSent] = useState(0) // 보낸 횟수 — 바뀔 때마다 전송 버튼이 한 번 눌린다(SendButton)
   const [slashClosed, setSlashClosed] = useState(false) // Esc로 닫음(다음 입력 시 재오픈)
   const [browse, setBrowse] = useState<HistoryBrowse>({ cursor: null, draft: '' })
+  // 입력칸의 @ 파일 고르기. 목록은 메뉴가 열릴 때 한 번 받고 거르기는 여기서 한다. 닫히면 버려 다음 @에서 새 파일도 잡는다.
+  const [mention, setMention] = useState<{ blockId: string; start: number; query: string } | null>(null)
+  const [fileList, setFileList] = useState<{ id: string; files: string[] } | null>(null)
+  const [mentionSel, setMentionSel] = useState(0)
+  const fetchedFor = useRef<string | null>(null)
+  const closeMention = () => { setMention(null); setFileList(null); fetchedFor.current = null }
   const idRef = useRef(sessionId)
   // 넘겨받은 인계서가 아직 보내지지 않았다. 입력창이 비어 있으면(다른 기기에서 열었을 때 등) 서버에서 받아 채운다.
   const handoffFrom = room?.handoffDraftPending ? room.handoffFrom : undefined
@@ -196,6 +203,26 @@ export function Composer({ sessionId }: { sessionId: string }) {
   const slashBoxRef = useRef<HTMLDivElement>(null)
   useDismiss(slashBoxRef, () => setSlashClosed(true), showSlash)
 
+  // @ 메뉴 — 두 메뉴가 동시에 열리지 않게 슬래시 메뉴가 우선이다. 맞는 파일이 없으면 그리지 않는다.
+  const mentionBlock = mention ? blocks.find((b) => b.id === mention.blockId) : undefined
+  const mentionLive = !!mention && mentionBlock?.kind === 'text' && mentionBlock.value[mention.start] === '@'
+  const mentionRows = mentionLive && fileList?.id === execId ? rankFiles(fileList.files, mention.query).map((f) => {
+    const cut = f.lastIndexOf('/')
+    return { name: f, cmd: f.slice(cut + 1), arg: cut >= 0 ? f.slice(0, cut) : '', desc: '' }
+  }) : []
+  const showMention = mentionRows.length > 0 && !showSlash && !loading
+  const mentionIdx = Math.min(mentionSel, Math.max(0, mentionRows.length - 1))
+  useDismiss(slashBoxRef, closeMention, showMention)
+  const mentionOpen = mentionLive && !!execId
+  useEffect(() => {
+    if (!mentionOpen) return
+    if (fetchedFor.current === execId) return
+    fetchedFor.current = execId
+    api.workspaceFiles(execId)
+      .then((r) => { if (fetchedFor.current === execId) setFileList({ id: execId, files: r.files }) })
+      .catch(() => { if (fetchedFor.current === execId) setFileList({ id: execId, files: [] }) }) // 실패해도 입력은 막지 않고 메뉴만 열지 않는다
+  }, [mentionOpen, execId])
+
   // 세션 전환 시 그 세션의 드래프트를 로드(이전 세션 입력은 onChange로 이미 저장됨).
   useEffect(() => {
     if (idRef.current === sessionId) return
@@ -206,6 +233,7 @@ export function Composer({ sessionId }: { sessionId: string }) {
     setAttachNote('')
     setSlashClosed(false)
     setSlashSel(0)
+    closeMention()
     setBrowse({ cursor: null, draft: '' })
   }, [sessionId])
 
@@ -273,6 +301,7 @@ export function Composer({ sessionId }: { sessionId: string }) {
     commit([textBlock('')])
     setAttach([])
     setAttachNote('')
+    closeMention()
   }
   // 슬래시 메뉴에서 명령 선택 → "/model " 채우고 포커스(인자 입력 대기). 메뉴는 공백 때문에 자동 닫힘.
   const acceptSlash = (c: SlashCmd) => {
@@ -368,6 +397,17 @@ export function Composer({ sessionId }: { sessionId: string }) {
     return false
   }
 
+  // 고른 파일 경로로 `@검색어`를 바꾼다. 모델이 경로를 그대로 읽을 수 있게 `@`는 넣지 않는다.
+  const acceptMention = (path: string) => {
+    if (!mention || mentionBlock?.kind !== 'text') return
+    const end = mention.start + 1 + mention.query.length
+    const text = /\s/.test(path) ? `"${path}"` : path // 공백이 든 경로는 어디서 끝나는지 알 수 있게 따옴표로 감싼다
+    const v = mentionBlock.value.slice(0, mention.start) + text + ' ' + mentionBlock.value.slice(end)
+    commit(setBlockValue(blocks, mentionBlock.id, v))
+    armFocus(mentionBlock.id, mention.start + text.length + 1)
+    closeMention()
+  }
+
   // ── textarea 이벤트 핸들러 ──
   // 클로저는 매 렌더 최신 state를 담지만, ref로 안정 식별자를 memo 자식에 넘긴다 → 스트리밍 리렌더로 textarea가 재조정되지 않음.
   const onTextChange = (id: string, value: string) => {
@@ -375,6 +415,11 @@ export function Composer({ sessionId }: { sessionId: string }) {
     setBrowse({ cursor: null, draft: '' })
     setSlashClosed(false) // 다시 타이핑하면 메뉴 재오픈
     setSlashSel(0)
+    const el = fieldRefs.current.get(id)
+    const m = el ? mentionAt(value, el.selectionStart) : null
+    if (m) setMention({ blockId: id, ...m })
+    else closeMention()
+    setMentionSel(0)
   }
   const recall = (text: string, next: HistoryBrowse, at: number) => {
     const only = textBlock(text)
@@ -421,6 +466,29 @@ export function Composer({ sessionId }: { sessionId: string }) {
     return true
   }
   const onTextKeyDown = (id: string, e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // @ 파일 메뉴 열림 중 키 처리 — 슬래시 메뉴와 같다(IME 조합 중에는 가로채지 않는다).
+    if (showMention && !e.nativeEvent.isComposing) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setMentionSel((mentionIdx + 1) % mentionRows.length)
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setMentionSel((mentionIdx - 1 + mentionRows.length) % mentionRows.length)
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        closeMention()
+        return
+      }
+      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+        e.preventDefault()
+        acceptMention(mentionRows[mentionIdx].name)
+        return
+      }
+    }
     // 슬래시 메뉴 열림 중 키 처리(IME 조합 중 제외) — ↑↓ 이동, Enter/Tab 채우기, Esc 닫기.
     if (showSlash && !e.nativeEvent.isComposing) {
       if (e.key === 'ArrowDown') {
@@ -462,7 +530,7 @@ export function Composer({ sessionId }: { sessionId: string }) {
       }
       const index = blocks.findIndex((block) => block.id === id)
       const block = blocks[index]
-      if (block?.kind === 'text' && index === 0 && !showSlash) {
+      if (block?.kind === 'text' && index === 0 && !showSlash && !showMention) {
         if (e.key === 'ArrowUp' && el.selectionStart === 0 && (messageText.trim() === '' || browse.cursor != null)) {
           const next = browseUp(promptsFor(sessionId), browse, el.value)
           if (next) {
@@ -593,6 +661,7 @@ export function Composer({ sessionId }: { sessionId: string }) {
         )}
         <div ref={slashBoxRef} style={{ position: 'relative' }}>
           {showSlash && <SlashMenu cmds={slashCmds} sel={sel} onHover={setSlashSel} onPick={acceptSlash} />}
+          {showMention && <SlashMenu cmds={mentionRows} sel={mentionIdx} onHover={setMentionSel} onPick={(r) => acceptMention(r.name)} />}
           {/* 알약 하나가 두 줄이다. 윗줄은 글 칸이 폭을 다 쓰고, 아랫줄 왼쪽에 ＋, 오른쪽에 마이크·중단·전송이 있다.
               한때 이 버튼들이 글 칸과 한 줄에 있어서 폰에서는 글 칸이 손가락 두 개 폭으로 줄었다(2026-10-06 사용자 판단).
               첨부 미리보기는 알약 안 맨 위에 붙는다. 알약 어디에 파일을 끌어 놓아도 첨부된다. */}
@@ -656,6 +725,7 @@ export function Composer({ sessionId }: { sessionId: string }) {
                 attachDisabled={loading || attach.length >= MAX_ATTACH}
                 size={btn}
                 onFiles={(files) => void addFiles(files)}
+                onBrowse={() => actions.openFileViewer(execId)}
               />
               {/* 칸이 나뉘면 칩을 이 줄의 빈 곳에 둔다. 칩 줄을 따로 만들면 칸마다 대화가 두 줄 가까이 줄어든다. */}
               {split && active && (

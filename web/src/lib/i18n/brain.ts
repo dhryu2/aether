@@ -77,6 +77,7 @@ export const brain: Dict = {
   'brain.review.loadFailed': { ko: '검토할 작업을 불러오지 못했어요', en: "Couldn't load the work to review" },
   'brain.review.detailFailed': { ko: '이 세션의 내용을 불러오지 못했어요', en: "Couldn't load this session" },
   'brain.review.viewInSession': { ko: '세션에서 보기', en: 'View in session' },
+  'brain.review.openFile': { ko: '파일 열기', en: 'Open File' },
   'brain.review.diffFromGit': { ko: '기록에 내용이 없어 커밋 안 된 변경을 보여 줍니다', en: 'The record has no content, so this shows the uncommitted changes' },
   'brain.review.diffNone': { ko: '보여 줄 내용이 없습니다. 이미 커밋된 파일은 세션에서 확인해 주세요', en: 'Nothing to show. For files already committed, check the session' },
   'brain.review.diffPart': { ko: '수정 {n}/{total}', en: 'Edit {n} of {total}' },

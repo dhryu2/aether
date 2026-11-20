@@ -50,6 +50,7 @@ const SettingsModal = overlay(() => import('../SettingsModal').then((m) => ({ de
 const ProviderAuthModal = overlay(() => import('../ProviderAuthModal').then((m) => ({ default: m.ProviderAuthModal })), () => actions.closeProviderAuth())
 const ShortcutsHelp = overlay(() => import('../ShortcutsHelp').then((m) => ({ default: m.ShortcutsHelp })), () => actions.closeShortcuts())
 const HandoffSheet = overlay(() => import('../HandoffSheet').then((m) => ({ default: m.HandoffSheet })), () => actions.closeHandoff())
+const FileViewer = overlay(() => import('../FileViewer').then((m) => ({ default: m.FileViewer })), () => actions.closeFileViewer())
 
 export function Overlays() {
   const s = useStore()
@@ -62,6 +63,7 @@ export function Overlays() {
       <BrainOverlay />
       <SearchPalette />
       {s.handoffSheet && <HandoffSheet />}
+      {s.fileViewer && <FileViewer />}
       {s.settingsOpen && <SettingsModal />}
       {s.providerAuth.open && <ProviderAuthModal />}
       {s.shortcutsOpen && <ShortcutsHelp />}

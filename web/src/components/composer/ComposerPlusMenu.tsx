@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react'
-import { Paperclip, Plus } from 'lucide-react'
+import { FolderOpen, Paperclip, Plus } from 'lucide-react'
 import { C, R } from '../../design/tokens'
 import { useDismiss } from '../../lib/hooks'
 import { useT } from '../../lib/i18n'
@@ -10,11 +10,13 @@ import { PopoverSurface } from '../ui'
 //   한때 첨부·코드 상자·마이크·즐겨찾기가 글 칸과 한 줄에 나란히 있어서, 폰에서는 글 칸이 손가락 두 개 폭으로 줄었다.
 //   자주 누르지 않는 동작을 이 버튼 뒤로 모았다. 붙여넣기·끌어 놓기 첨부와 ``` 뒤 Shift+Enter 코드 상자는 메뉴 없이 된다.
 //   숨은 <input type=file>은 메뉴 밖에 둔다. 메뉴가 닫힌 뒤에도 파일 고르기 창의 결과를 받아야 해서다.
-export function ComposerPlusMenu({ attachDisabled, size, onFiles }: {
+export function ComposerPlusMenu({ attachDisabled, size, onFiles, onBrowse }: {
   attachDisabled: boolean
   /** 버튼 한 변(px). */
   size: number
   onFiles: (files: File[]) => void
+  /** 작업 폴더 파일 열어 보기(읽기 전용). */
+  onBrowse: () => void
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -62,6 +64,16 @@ export function ComposerPlusMenu({ attachDisabled, size, onFiles }: {
               onClick={() => {
                 setOpen(false)
                 fileRef.current?.click()
+              }}
+            />
+            <PlusItem
+              icon={<FolderOpen size={17} />}
+              label={t('composer.plus.browseLabel')}
+              hint={t('composer.plus.browseHint')}
+              disabled={false}
+              onClick={() => {
+                setOpen(false)
+                onBrowse()
               }}
             />
           </div>

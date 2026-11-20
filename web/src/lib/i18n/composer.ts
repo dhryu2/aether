@@ -55,6 +55,8 @@ export const composer: Dict = {
   'composer.plus.title': { ko: '파일 첨부', en: 'Attach a file' },
   'composer.attachButton.aria': { ko: '파일 첨부', en: 'Attach file' },
   'composer.plus.attachHint': { ko: '이미지, PDF, 텍스트 파일', en: 'Images, PDF, text files' },
+  'composer.plus.browseLabel': { ko: '파일 보기', en: 'View Files' },
+  'composer.plus.browseHint': { ko: '작업 폴더의 파일을 읽기 전용으로 열어요', en: 'Open files in the working folder, read-only' },
 
   // 전송 버튼
   'composer.send.aria': { ko: '전송', en: 'Send' },

@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { inboxLabel, inboxRows, plainPreview } from '../src/lib/activityInbox'
+import { inboxLabel, inboxRows, plainPreview, tabTitle } from '../src/lib/activityInbox'
 import { executionId } from '../src/lib/workspaceRooms'
 import type { WorkspaceRoom } from '../src/lib/types'
 
@@ -80,6 +80,12 @@ check(topbar.includes('data-activity-inbox'), 'TopBar data-activity-inbox')
 
 check(plainPreview('`main`을 **올렸다**\n- [가이드](http://x) 두 개') === 'main을 올렸다 가이드 두 개', 'plainPreview 마크다운 기호 제거')
 check(plainPreview('## 제목\n```ts\ncode\n```') === '제목 code', 'plainPreview 제목·코드 울타리')
+
+const mk = (id: string, attention: WorkspaceRoom['attention']): WorkspaceRoom => ({ id, kind: 'dm', title: id, sourceSessionId: id, status: 'active', attention })
+const tabRooms = [mk('a', 'waiting'), mk('b', 'waiting'), mk('c', 'done')]
+check(tabTitle(tabRooms, true) === '(2) Aether', '탭 제목: waiting 2개')
+check(tabTitle(tabRooms, false) === 'Aether', '탭 제목: live 아님')
+check(tabTitle([mk('c', 'done')], true) === 'Aether', '탭 제목: waiting 없음')
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} activityInbox: ${pass} PASS / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

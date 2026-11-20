@@ -12,6 +12,15 @@ const DISPLAYABLE_RATE_LIMIT_KEYS = new Set([
   "extra_usage",
 ]);
 
+// 창 길이(분). 남은 한도 예측에 쓴다. 모델별 창·extra_usage는 길이를 몰라 비운다.
+const WINDOW_MINUTES: Record<string, number> = {
+  five_hour: 300,
+  seven_day: 10080,
+  seven_day_opus: 10080,
+  seven_day_sonnet: 10080,
+  seven_day_oauth_apps: 10080,
+};
+
 function modelScopedLimitLabel(raw: unknown): string | null {
   if (!raw || typeof raw !== "object") return null;
   const label = typeof (raw as { display_name?: unknown }).display_name === "string"
@@ -46,7 +55,8 @@ export function usageFromClaude(u: ClaudeUsageRaw): ProviderUsage {
     // 나머지는 `{utilization, resets_at}` 모양의 창 하나. 그 형태가 아닌 항목(설정 블록 등)은 창이 아니다.
     const w = raw as { utilization?: number | null; resets_at?: string | null };
     if (!("utilization" in w)) continue;
-    windows.push({ key, utilization: w.utilization ?? null, resetsAt: w.resets_at ?? null });
+    const windowMinutes = WINDOW_MINUTES[key];
+    windows.push({ key, utilization: w.utilization ?? null, resetsAt: w.resets_at ?? null, ...(windowMinutes ? { windowMinutes } : {}) });
   }
   // 계약상 못 세는 provider는 이 필드를 비운다. 값이 실제로 온 경우에만 싣는다(0을 지어내지 않는다).
   const cost = u?.session?.total_cost_usd;

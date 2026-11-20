@@ -112,6 +112,7 @@ export const session: Dict = {
   'session.status.contextTokens': { ko: '{used} / {size} 토큰', en: '{used} / {size} tokens' },
   'session.status.sessionCost': { ko: '세션 누적 비용 {amount}.', en: 'Session cost so far {amount}.' },
   'session.status.storageStats': { ko: '저장소 {bytes}, 세션 {count}개.', en: 'Storage {bytes}, {count} sessions.' },
+  'session.status.limitBy': { ko: '{time}쯤 소진', en: 'out ~{time}' },
   'session.status.resetAt': { ko: '{date}에 초기화돼요', en: 'Refills {date}' },
 
   // EffortPicker

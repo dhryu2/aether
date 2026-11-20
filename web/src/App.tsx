@@ -6,6 +6,7 @@ import { useT } from './lib/i18n'
 import { MS } from './design/tokens'
 import { TopBar } from './components/TopBar'
 import { topBarInset } from './components/topBarInset'
+import { tabTitle } from './lib/activityInbox'
 import { Sidebar } from './components/Sidebar'
 import { PaneErrorBoundary } from './components/ErrorBoundary'
 import {
@@ -45,6 +46,8 @@ export default function App() {
   const narrow = s.isNarrow
   const paneObs = useRef<ResizeObserver | null>(null)
   useGlobalShortcuts(s)
+  const title = tabTitle(s.rooms, s.presenceLive)
+  useEffect(() => { if (document.title !== title) document.title = title }, [title])
   // 칸 수는 대화 영역(목록 기둥을 뺀 폭·높이)으로 정한다. 창 크기만으로는 기둥이 빠지지 않는다.
   // 인증 게이트는 준비되기 전에 자식을 그리지 않는다. 빈 의존 효과는 그때 main이 없어 관찰이 끝나고
   // 다시 안 붙으므로, 요소가 실제로 붙을 때 등록한다.

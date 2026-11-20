@@ -10,7 +10,7 @@
  * ③ **모르면 지어내지 않는다.** 이름도 길이도 모르면 받은 이름을 그대로 보여준다 — 표에 없다는 이유로
  *    화면에서 정보가 사라지면 새 창이 생겼을 때 아무도 모르게 된다.
  */
-import { rateLimitLabel, warningWindows } from '../src/lib/usageLabels'
+import { projectedLimitAt, rateLimitLabel, warningWindows } from '../src/lib/usageLabels'
 
 let pass = 0
 let fail = 0
@@ -47,6 +47,15 @@ eq('일주일만 경고', keys([{ key: 'week', utilization: 90 }, { key: 'sessio
 eq('세션만 경고', keys([{ key: 'week', utilization: 10 }, { key: 'session', utilization: 80 }]), 'session')
 eq('경계값 70은 경고', keys([{ key: 'a', utilization: 70 }]), 'a')
 eq('경계 아래와 모르는 값은 뺀다', keys([{ key: 'a', utilization: 69.9 }, { key: 'b', utilization: null }]), '')
+
+// 5시간 창, 시작 뒤 2시간에 80% → 2.5시간째에 찬다.
+const H = 3_600_000
+const t0 = Date.parse('2026-01-01T00:00:00Z')
+const w5 = { utilization: 80, resetsAt: new Date(t0 + 5 * H).toISOString(), windowMinutes: 300 }
+eq('예측: 2.5시간째', projectedLimitAt(w5, t0 + 2 * H), t0 + 2.5 * H)
+eq('예측: 재설정 뒤면 null', projectedLimitAt({ ...w5, utilization: 30 }, t0 + 2 * H), null)
+eq('예측: 창 길이 없으면 null', projectedLimitAt({ ...w5, windowMinutes: undefined }, t0 + 2 * H), null)
+eq('예측: 사용률 0이면 null', projectedLimitAt({ ...w5, utilization: 0 }, t0 + 2 * H), null)
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} usageLabels: ${pass} PASS / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

@@ -3,8 +3,9 @@
 
 export const ACCEPT_IMAGE = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
 // 텍스트/코드: mime이 비어있는 코드파일이 많아 확장자로도 허용.
-export const TEXT_EXT = /\.(txt|md|markdown|json|jsonc|ya?ml|toml|ini|conf|csv|tsv|log|js|jsx|ts|tsx|mjs|cjs|py|rb|go|rs|java|kt|c|h|cpp|hpp|cc|cs|php|swift|scala|sh|bash|zsh|sql|html?|css|scss|less|xml|svg|vue|svelte|astro|env|gitignore|dockerfile|makefile)$/i
-export const ACCEPT_ALL = [...ACCEPT_IMAGE, 'application/pdf', 'text/*', '.md', '.txt', '.py', '.js', '.ts', '.tsx', '.json', '.yaml', '.yml', '.go', '.rs', '.java', '.sh', '.sql', '.csv', '.html', '.css'].join(',')
+const TEXT_EXTS = ['txt', 'md', 'markdown', 'json', 'jsonc', 'jsonl', 'ndjson', 'yaml', 'yml', 'toml', 'ini', 'conf', 'csv', 'tsv', 'log', 'js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs', 'py', 'rb', 'go', 'rs', 'java', 'kt', 'c', 'h', 'cpp', 'hpp', 'cc', 'cs', 'php', 'swift', 'scala', 'sh', 'bash', 'zsh', 'sql', 'html', 'htm', 'css', 'scss', 'less', 'xml', 'svg', 'vue', 'svelte', 'astro', 'env', 'gitignore', 'dockerfile', 'makefile']
+export const TEXT_EXT = new RegExp(`\\.(${TEXT_EXTS.join('|')})$`, 'i')
+export const ACCEPT_ALL = [...ACCEPT_IMAGE, 'application/pdf', 'text/*', ...TEXT_EXTS.map((e) => `.${e}`)].join(',')
 export const MAX_ATTACH = 5
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 이미지 개당 5MB
 export const MAX_PDF_BYTES = 10 * 1024 * 1024 // PDF 개당 10MB
@@ -31,9 +32,12 @@ export async function fileToAttachment(file: File): Promise<Attachment | null> {
   if (!kind) return null
   if (kind === 'text') {
     try {
-      return { kind, name: file.name, media_type: 'text/plain', data: await file.text() }
+      // UTF-8이 아니거나 NUL이 든 파일은 바이너리로 보고 거절한다(깨진 글자를 프롬프트에 넣지 않는다).
+      const data = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (data.includes('\u0000')) return null
+      return { kind, name: file.name, media_type: 'text/plain', data }
     } catch {
-      // 사용자가 고른 파일을 브라우저가 읽지 못하면 첨부에서 제외한다.
+      // 읽지 못하거나 UTF-8로 해독되지 않으면 첨부에서 제외한다.
       return null
     }
   }
@@ -59,6 +63,8 @@ export async function parseFiles(files: File[]): Promise<{ parsed: Attachment[];
     if (!kind || f.size > maxBytesFor(kind)) { rejected = true; continue }
     ok.push(f)
   }
-  const parsed = (await Promise.all(ok.map(fileToAttachment))).filter((a): a is Attachment => !!a)
+  const all = await Promise.all(ok.map(fileToAttachment))
+  if (all.some((a) => !a)) rejected = true
+  const parsed = all.filter((a): a is Attachment => !!a)
   return { parsed, rejected }
 }

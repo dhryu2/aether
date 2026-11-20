@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { __resetAccountUsageForTest, accountUsage } from "../providers/accountUsage";
 import { __registerProviderForTest, listProviders } from "../providers/registry";
+import { usageFromClaude } from "../providers/claude/usage";
 import { usageFromCodexRateLimits } from "../providers/codex/usage";
 import type { ProviderServices, ProviderUsage } from "../providers/types";
 
@@ -115,6 +116,21 @@ const codex = usageFromCodexRateLimits({
 } as never);
 assert.equal(codex.windows[0]!.utilization, 7);
 assert.equal(codex.windows[0]!.windowMinutes, 300);
+
+const cl = usageFromClaude({
+  rate_limits_available: true,
+  rate_limits: {
+    five_hour: { utilization: 10, resets_at: null },
+    seven_day: { utilization: 20, resets_at: null },
+    extra_usage: { utilization: 1, resets_at: null },
+    model_scoped: [{ display_name: "Opus", utilization: 5, resets_at: null }],
+  },
+});
+const wm = (k: string) => cl.windows.find((w) => w.key === k)!.windowMinutes;
+assert.equal(wm("five_hour"), 300);
+assert.equal(wm("seven_day"), 10080);
+assert.equal(wm("Opus"), undefined);
+assert.equal(wm("extra_usage"), undefined);
 
 clearInterval(keepAlive);
 console.log("✓ account_usage");

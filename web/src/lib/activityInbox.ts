@@ -30,6 +30,12 @@ export function inboxRows(rooms: WorkspaceRoom[]): WorkspaceRoom[] {
   })
 }
 
+/** 브라우저 탭 제목 — 사람을 기다리는 방이 있으면 `(2) Aether`. 알림 종과 같게 live일 때만 센다. */
+export function tabTitle(rooms: WorkspaceRoom[], live: boolean): string {
+  const n = live ? rooms.filter((r) => r.attention === 'waiting').length : 0
+  return n > 0 ? `(${n}) Aether` : 'Aether'
+}
+
 /** 알림 목록 미리보기용 — 마크다운 기호(코드 표시·굵게·제목·목록·링크)를 걷어 읽히는 글만 남긴다. */
 export function plainPreview(md: string): string {
   return md

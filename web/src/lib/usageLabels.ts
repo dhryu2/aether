@@ -48,6 +48,19 @@ export function rateLimitLabel(limitType: string | undefined, t: Translate, wind
 /** 입력창에 경고로 보일 사용률. 남은 한도가 30% 이하일 때다. */
 export const LIMIT_WARN_PCT = 70
 
+/** 지금 속도가 창 끝까지 이어지면 한도가 차는 시각(ms). 재설정 전에 차지 않거나 값이 모자라면 null. */
+export function projectedLimitAt(
+  win: { utilization: number | null; resetsAt?: string | null; windowMinutes?: number },
+  now: number,
+): number | null {
+  const { utilization: u, windowMinutes: m } = win
+  const reset = win.resetsAt ? Date.parse(win.resetsAt) : NaN
+  if (u == null || !m || Number.isNaN(reset) || u <= 0 || u >= 100) return null
+  const start = reset - m * 60_000
+  const at = start + ((now - start) * 100) / u
+  return at > now && at < reset ? at : null
+}
+
 /** 경고 수준인 한도 창 전부. 사용률을 모르는 창은 뺀다. */
 export function warningWindows<W extends { utilization: number | null }>(windows: readonly W[]): W[] {
   return windows.filter((w) => w.utilization != null && w.utilization >= LIMIT_WARN_PCT)

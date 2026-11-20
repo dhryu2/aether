@@ -38,6 +38,7 @@ const NOT_A_SUITE = new Set(["run-all"]);
 
 /** test/ 밖에 있어 파일 목록에 안 잡히는 스위트(경로 그대로 실행). */
 const EXTRA_SUITES: { name: string; file: string }[] = [
+  { name: "web:attachments", file: path.join(TEST_DIR, "..", "..", "web", "test", "attachments.test.ts") },
   { name: "web:errorQueue", file: path.join(TEST_DIR, "..", "..", "web", "test", "errorQueue.test.ts") },
   { name: "web:errorLog", file: path.join(TEST_DIR, "..", "..", "web", "test", "errorLog.test.ts") },
   { name: "web:authGate", file: path.join(TEST_DIR, "..", "..", "web", "test", "authGate.test.ts") },

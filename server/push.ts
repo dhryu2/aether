@@ -11,9 +11,10 @@ import path from "node:path";
 import webpush from "web-push";
 import { config } from "./config";
 import { credentialStamp } from "./auth/jwt";
+import { isTokenRevoked } from "./auth/passwordHash";
 import type { NotifyIntent } from "./notify/worthNotifying";
 
-type Sub = webpush.PushSubscription & { stamp?: string }; // stamp: 등록 때의 로그인 자격 지문(password 모드만)
+type Sub = webpush.PushSubscription & { stamp?: string; tokenId?: string }; // stamp: 등록 때의 로그인 자격 지문, tokenId: 등록한 로그인 토큰(둘 다 password 모드만)
 
 function vapidPublic(): string | undefined {
   const v = process.env.AETHER_VAPID_PUBLIC;
@@ -85,17 +86,17 @@ const MAX_SUBS = 50; // 구독 무제한 증식 방지(인증 off에서도 디�
 /** password 모드에서 지금 자격의 지문. 다른 모드는 자격 폐기가 없어 지문을 쓰지 않는다. */
 const currentStamp = () => (config.authMode === "password" ? credentialStamp() : undefined);
 
-export function addSubscription(sub: Sub) {
+export function addSubscription(sub: Sub, tokenId?: string) {
   if (!sub?.endpoint) return;
   const stamp = currentStamp();
   const list = load();
   const hit = list.find((s) => s.endpoint === sub.endpoint); // dedup
   if (hit) {
     // 같은 endpoint의 재등록: 자격이 바뀐 뒤라면 새 지문으로 갱신해야 다시 전송 대상이 된다.
-    if (hit.stamp !== stamp) { hit.stamp = stamp; save(); }
+    if (hit.stamp !== stamp || hit.tokenId !== tokenId) { hit.stamp = stamp; hit.tokenId = tokenId; save(); }
     return;
   }
-  list.push({ ...sub, stamp });
+  list.push({ ...sub, stamp, tokenId });
   if (list.length > MAX_SUBS) list.splice(0, list.length - MAX_SUBS);
   save();
 }
@@ -104,6 +105,16 @@ export function removeSubscription(endpoint: string) {
   if (!endpoint) return;
   const list = load();
   const next = list.filter((s) => s.endpoint !== endpoint);
+  if (next.length !== list.length) {
+    subs = next;
+    save();
+  }
+}
+
+/** 로그아웃시킨 기기의 알림 구독을 지운다. */
+export function removeSubscriptionsByToken(tokenId: string) {
+  const list = load();
+  const next = list.filter((s) => s.tokenId !== tokenId);
   if (next.length !== list.length) {
     subs = next;
     save();
@@ -143,7 +154,8 @@ function liveSubs(): Sub[] {
     void reportError(e, { component: "push", operation: "push.subscriptions.stamp" }); // 지문을 못 구하면 보내지 않는다
     return [];
   }
-  const keep = list.filter((s) => s.stamp === stamp);
+  // 토큰이 폐기된 기기의 구독도 뺀다. tokenId가 없는 옛 구독은 그대로 둔다.
+  const keep = list.filter((s) => s.stamp === stamp && !(s.tokenId && isTokenRevoked(s.tokenId)));
   if (keep.length !== list.length) {
     subs = keep;
     save();

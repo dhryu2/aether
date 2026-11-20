@@ -70,6 +70,13 @@ export async function revokeSession(token: string): Promise<void> {
   if (payload.jti && typeof payload.exp === "number") revokeTokenId(payload.jti, payload.exp);
 }
 
+/** 이미 검증한 토큰의 번호·발급·만료(unix초). 서명은 다시 보지 않는다. 모양이 틀리면 undefined. */
+export async function tokenClaims(token: string): Promise<{ jti: string; iat: number; exp: number } | undefined> {
+  const { decodeJwt } = await import("jose");
+  const { jti, iat, exp } = decodeJwt(token);
+  return jti && typeof iat === "number" && typeof exp === "number" ? { jti, iat, exp } : undefined;
+}
+
 /** 푸시 구독에 찍는 자격 지문. 서명 키에서 나온 값이라 비밀번호나 세대 값이 바뀌면 달라지고, 키는 드러나지 않는다. */
 export function credentialStamp(): string {
   // 해시를 읽지 못하면(파일 깨짐·권한) 빈 해시로 지문을 만들지 않고 throw — 호출자가 "보내지 않음"으로만 처리하게.

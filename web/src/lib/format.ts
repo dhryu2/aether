@@ -65,6 +65,11 @@ export function fmtDate(ts: number, now = new Date()): string {
   return `${d.toLocaleDateString(loc, { month: 'long', day: 'numeric' })} ${hm}`
 }
 
+/** "11월 2일"처럼 월일만. 로그인한 날처럼 시각이 필요 없는 자리에 쓴다. */
+export function fmtMonthDay(ts: number): string {
+  return new Date(ts).toLocaleDateString(bcp47(), { month: 'long', day: 'numeric' })
+}
+
 /** 짧은 날짜+시각("1/1 09:00") — 한도 초기화 예정 시각처럼 가까운 미래를 가리킬 때. */
 export function fmtShortDateTime(ts: number): string {
   const d = new Date(ts)

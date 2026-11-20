@@ -2,7 +2,7 @@
  * 비밀번호 해시 저장소. 데이터 폴더의 auth-password.json이 먼저, 없으면 .env의 AETHER_PASSWORD_HASH.
  * 캐시하지 않고 매번 읽는다 — 파일을 지우면 재시작 없이 .env 값으로 돌아간다.
  * 파일이 있는데 읽지 못하면(깨짐·권한) 없는 것으로 보지 않고 해시 없음으로 거절한다.
- * 같은 폴더의 auth-state.json은 로그인 토큰 서명 키에 섞는 세대 값(무작위)과 로그아웃한 토큰 번호 목록이다.
+ * 같은 폴더의 auth-state.json은 로그인 토큰 서명 키에 섞는 세대 값(무작위)과 로그아웃한 토큰 번호 목록, 로그인한 기기 기록이다.
  * 세대 값은 비밀번호를 저장할 때마다 바뀌고, 파일이 없어지면 새로 만든다(옛 토큰은 되살아나지 않는다).
  * ⚠️ 해시를 로깅하지 않는다.
  */
@@ -54,14 +54,16 @@ export function currentPasswordHash(): string | undefined {
   return stored ?? (process.env.AETHER_PASSWORD_HASH || undefined);
 }
 
-type AuthState = { epoch: string; revoked: Record<string, number> };
+/** 로그인한 기기 기록. 인증을 통과할 때 미루어 채운다(발급 시점에는 적지 않는다). */
+type SessionRecord = { iat: number; exp: number; seen: number; ua?: string };
+type AuthState = { epoch: string; revoked: Record<string, number>; sessions: Record<string, SessionRecord> };
 
 function writeState(state: AuthState, dir?: string): void {
   atomicWrite(stateFile(dir), JSON.stringify(state));
 }
 
 function freshState(dir?: string): AuthState {
-  const state: AuthState = { epoch: crypto.randomBytes(32).toString("hex"), revoked: {} };
+  const state: AuthState = { epoch: crypto.randomBytes(32).toString("hex"), revoked: {}, sessions: {} };
   writeState(state, dir);
   return state;
 }
@@ -79,7 +81,11 @@ function readState(): AuthState {
     const v = JSON.parse(raw);
     const revoked = v?.revoked;
     if (typeof v?.epoch === "string" && /^[0-9a-f]{64}$/.test(v.epoch) && revoked && typeof revoked === "object" && !Array.isArray(revoked)
-      && Object.values(revoked).every((e) => typeof e === "number")) return v as AuthState;
+      && Object.values(revoked).every((e) => typeof e === "number")) {
+      // sessions 칸은 옛 파일에 없을 수 있다. 없거나 모양이 틀려도 세대 값을 새로 만들지 않고 빈 값으로 본다.
+      const sessions = v.sessions;
+      return { epoch: v.epoch, revoked, sessions: sessions && typeof sessions === "object" && !Array.isArray(sessions) ? sessions : {} };
+    }
   } catch { /* 아래에서 새로 만든다 */ }
   return freshState();
 }
@@ -99,7 +105,37 @@ export function revokeTokenId(jti: string, exp: number): void {
   const nowSec = Math.floor(Date.now() / 1000);
   for (const [id, e] of Object.entries(state.revoked)) if (e <= nowSec) delete state.revoked[id];
   state.revoked[jti] = exp;
+  delete state.sessions[jti];
   writeState(state);
+}
+
+/** 세대 값을 새로 만들어 모든 토큰을 무효로 한다(기기 기록도 비워진다). */
+export function revokeAllTokens(): void {
+  freshState();
+}
+
+const SEEN_WRITE_GAP_SEC = 5 * 60; // 이 안의 재요청은 파일에 쓰지 않는다
+const UA_MAX = 300;
+
+/** 검증을 통과한 토큰의 기기 기록을 갱신한다. 최근에 같은 ua로 적었으면 쓰지 않는다. 만료된 항목은 이때 정리한다. */
+export function noteSessionSeen(jti: string, iat: number, exp: number, ua?: string): void {
+  const state = readState();
+  const nowSec = Math.floor(Date.now() / 1000);
+  const userAgent = ua?.slice(0, UA_MAX) || undefined;
+  const prev = state.sessions[jti];
+  if (prev && nowSec - prev.seen < SEEN_WRITE_GAP_SEC && prev.ua === userAgent) return;
+  for (const [id, r] of Object.entries(state.sessions)) if (r.exp <= nowSec) delete state.sessions[id];
+  state.sessions[jti] = { iat, exp, seen: nowSec, ...(userAgent ? { ua: userAgent } : {}) };
+  writeState(state);
+}
+
+/** 지금 유효한 기기 기록(폐기·만료 제외). */
+export function listSessions(): (SessionRecord & { id: string })[] {
+  const state = readState();
+  const nowSec = Math.floor(Date.now() / 1000);
+  return Object.entries(state.sessions)
+    .filter(([id, r]) => r.exp > nowSec && !Object.hasOwn(state.revoked, id))
+    .map(([id, r]) => ({ id, ...r }));
 }
 
 /** 새 비밀번호 규칙: 8자 이상이고 bcrypt가 자르지 않는 72바이트 이하. 변경 API와 첫 설정이 같이 쓴다. */

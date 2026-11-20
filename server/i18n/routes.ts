@@ -11,6 +11,8 @@ export const routes: Dict = {
 
   // 인증(비밀번호 모드)
   "routes.auth.failed": { ko: "로그인에 실패했어요", en: "Authentication failed" },
+  "routes.auth.deviceCurrent": { ko: "지금 쓰는 기기는 이 방법으로 로그아웃할 수 없어요", en: "This device cannot be signed out this way" },
+  "routes.auth.deviceNotFound": { ko: "로그인한 기기를 찾을 수 없어요", en: "Signed-in device not found" },
   "routes.auth.passwordInvalid": { ko: "새 비밀번호는 8자 이상, 72바이트 이하여야 해요", en: "The new password must be at least 8 characters and at most 72 bytes" },
   "routes.auth.currentWrong": { ko: "현재 비밀번호가 맞지 않아요", en: "The current password is incorrect" },
   "routes.auth.saveFailed": { ko: "비밀번호를 저장하지 못했어요", en: "Could not save the password" },

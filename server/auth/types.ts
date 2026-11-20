@@ -10,6 +10,8 @@ export interface AuthIdentity {
   via: AuthMode;
   /** 이 신원을 만든 자격이 아직 유효한지. 오래 열려 있는 스트림이 주기적으로 묻는다. 없으면 폐기 개념이 없는 방식이다. */
   stillValid?: () => Promise<boolean>;
+  /** 로그인 토큰 번호(password 방식만). 기기 목록에서 지금 기기를 가리고 알림 구독을 토큰에 묶는 데 쓴다. */
+  tokenId?: string;
 }
 
 export interface AuthStrategy {

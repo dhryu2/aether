@@ -272,6 +272,8 @@ export type AutoResumePlan = {
   attempts: number;
   /** 사람 확인 필요(3번을 다 썼거나 보내지 못함). */
   gaveUp?: true;
+  /** 서버 재시작으로 끊긴 턴. 저절로 보내지 않고 사람이 누르면 이어 간다. 값은 끊긴 시각(ms). */
+  restartCutAt?: number;
 };
 
 /** 자동 재개 전역 설정. text는 비워 두면 기본 문장이 채워져 온다. */
@@ -586,3 +588,7 @@ export type BackupListResponse = RestoreStatus & { items: BackupItem[]; running:
 
 /** 비밀번호 변경 성공 응답. 새 세션 토큰을 함께 준다. */
 export type ChangePasswordResponse = { ok: true; token: string };
+
+/** 로그인한 기기 한 줄. 시각은 ms. 접속 주소는 위조될 수 있어 담지 않는다. */
+export type AuthDevice = { id: string; issuedAt: number; lastSeenAt?: number; userAgent?: string; current: boolean };
+export type AuthDevicesResponse = { devices: AuthDevice[] };

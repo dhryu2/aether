@@ -231,6 +231,84 @@ try {
     check(notifyPush(payload).attempted === 1, "P6 인증 off에서는 자격 비교 없이 보낸다");
     (config as { authMode: string }).authMode = "password";
   }
+  console.log("\n[기기 목록] 로그인한 기기 보기와 원격 로그아웃");
+  {
+    const { config } = await import("../config");
+    const { authRouter } = await import("../routes/auth");
+    const { addSubscription, notifyPush } = await import("../push");
+    const express = (await import("express")).default;
+    const cookieParser = (await import("cookie-parser")).default;
+    const app = express();
+    app.use(express.json());
+    app.use(cookieParser());
+    app.use("/api/auth", authRouter);
+    const server = app.listen(0);
+    await new Promise((r) => server.once("listening", r));
+    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/api/auth`;
+    const call = (method: string, p: string, token: string, ua = "UA-test") =>
+      fetch(base + p, { method, headers: { Cookie: `aether_session=${token}`, "User-Agent": ua } });
+    type Dev = { id: string; current: boolean; userAgent?: string; lastSeenAt?: number };
+    const devices = async (token: string, ua?: string) => ((await (await call("GET", "/devices", token, ua)).json()) as { devices: Dev[] }).devices;
+    const payload = { title: "t", body: "b", sessionId: "s" };
+
+    clean();
+    const tA = await signSession();
+    const tB = await signSession();
+    // 옛 상태 파일(sessions 칸 없음)에서도 토큰이 통과한다
+    fs.writeFileSync(stateFile, JSON.stringify({ epoch: epochOf(), revoked: {} }));
+    const first = await devices(tA, "UA-A");
+    check(first.length === 1 && first[0]!.current && first[0]!.userAgent === "UA-A", "D1 옛 상태 파일에서도 통과하고 첫 요청 뒤 목록에 오른다(ua·current)");
+    const both = await devices(tB, "UA-B");
+    check(both.length === 2 && both.filter((d) => d.current).length === 1 && both.find((d) => d.current)!.userAgent === "UA-B", "D2 다른 기기가 보이고 current는 지금 기기 하나");
+    const snap = fs.readFileSync(stateFile, "utf8");
+    await devices(tB, "UA-B");
+    check(fs.readFileSync(stateFile, "utf8") === snap, "D3 5분 안의 같은 ua 재요청은 파일에 쓰지 않는다");
+    await devices(tB, "UA-B2");
+    check(fs.readFileSync(stateFile, "utf8") !== snap, "D3 ua가 바뀌면 다시 쓴다");
+
+    const idA = both.find((d) => d.userAgent === "UA-A")!.id;
+    const idB = both.find((d) => d.current)!.id;
+    check((await call("DELETE", `/devices/${idB}`, tB)).status === 400, "D4 지금 기기 id로 DELETE하면 400");
+    check((await call("DELETE", "/devices/no-such-id", tB)).status === 404, "D4 목록에 없는 id는 404");
+
+    // 알림 구독은 기기 로그아웃 때 함께 빠진다
+    const sub = (n: number) => ({ endpoint: `https://push.example.test/dev${n}`, keys: { p256dh: "example-p256dh", auth: "example-auth" } });
+    addSubscription(sub(1), idA);
+    addSubscription(sub(2), idB);
+    addSubscription(sub(3)); // tokenId 없는 옛 구독
+    check(notifyPush(payload).attempted === 3, "D5 구독 셋이 대상");
+    check((await call("DELETE", `/devices/${idA}`, tB)).status === 200, "D5 다른 기기 로그아웃은 200");
+    check((await call("GET", "/devices", tA)).status === 401, "D5 로그아웃한 기기의 토큰은 거부");
+    check((await devices(tB)).length === 1, "D5 지금 기기는 통과하고 목록에서 그 기기는 빠진다");
+    check(notifyPush(payload).attempted === 2 && !fs.readFileSync(path.join(dataDir, "push-subs.json"), "utf8").includes("dev1"), "D5 폐기한 기기의 알림 구독은 대상에서 빠진다");
+    revokeTokenId(idB, Math.floor(Date.now() / 1000) + 3600);
+    check(notifyPush(payload).attempted === 1, "D5 토큰만 폐기돼도(liveSubs 거름) 그 구독은 보내지 않는다, 옛 구독은 유지");
+
+    // 나머지 전체 로그아웃
+    clean();
+    const o1 = await signSession(), o2 = await signSession(), me = await signSession();
+    await devices(o1, "UA-1"); await devices(o2, "UA-2"); await devices(me, "UA-me");
+    const res = await call("POST", "/devices/sign-out-others", me);
+    const body = (await res.json()) as { ok: boolean; token: string };
+    check(res.status === 200 && body.ok && typeof body.token === "string", "D6 sign-out-others가 새 토큰을 준다");
+    check((await call("GET", "/devices", o1)).status === 401 && (await call("GET", "/devices", o2)).status === 401 && (await call("GET", "/devices", me)).status === 401, "D6 옛 토큰은 지금 기기 것까지 모두 거부");
+    const after = await devices(body.token, "UA-me");
+    check(after.length === 1 && after[0]!.current, "D6 새 토큰은 통과하고 목록엔 지금 기기만");
+
+    // 비밀번호를 바꾸면 목록이 초기화된다
+    savePasswordHash(HASH_B);
+    const t3 = await signSession();
+    check((await devices(t3)).length === 1, "D7 비밀번호를 바꾸면 목록이 초기화된다");
+
+    // 모드가 password가 아니면 404
+    for (const mode of ["off", "tailscale"]) {
+      (config as { authMode: string }).authMode = mode;
+      const codes = [(await call("GET", "/devices", t3)).status, (await call("DELETE", "/devices/x", t3)).status, (await call("POST", "/devices/sign-out-others", t3)).status];
+      check(codes.every((c) => c === 404), `D8 ${mode} 모드에서는 404`, codes.join(","));
+    }
+    (config as { authMode: string }).authMode = "password";
+    server.close();
+  }
 } finally {
   fs.rmSync(dataDir, { recursive: true, force: true });
 }

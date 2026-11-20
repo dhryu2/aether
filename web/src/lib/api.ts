@@ -20,7 +20,7 @@ import type {
 } from './types'
 import type { DeletedSessionRow, SearchHit } from './brain'
 import type { ReviewDetailResponse, ReviewFileDiffResponse, ReviewListResponse, ReviewMarkResponse } from '@shared/brain'
-import type { PermissionMode, PermissionModesResponse, AutoResumePlan, AutoResumeSettings, HandoffInfo, HandoffRequestBody, BackupItem, BackupListResponse, ChangePasswordResponse, EventsPageResponse, ServerInfoResponse, ServerLogLevel, RemoteAccessResponse, ServerLogResponse, UpdateStatusResponse } from '@shared/http'
+import type { PermissionMode, PermissionModesResponse, AutoResumePlan, AutoResumeSettings, HandoffInfo, HandoffRequestBody, BackupItem, BackupListResponse, AuthDevicesResponse, ChangePasswordResponse, EventsPageResponse, ServerInfoResponse, ServerLogLevel, RemoteAccessResponse, ServerLogResponse, UpdateStatusResponse } from '@shared/http'
 import type { ErrorGroupDetailResponse, ErrorGroupListResponse, ErrorLogPeriod, ErrorLogSource } from '@shared/errors'
 import { authHeaders } from './clientAuth'
 
@@ -209,6 +209,9 @@ export const api = {
   cancelRestore: () => req<BackupListResponse>('/api/system/backups/restore', { method: 'DELETE' }),
   changePassword: (current: string, next: string) =>
     req<ChangePasswordResponse>('/api/auth/password', { method: 'POST', body: JSON.stringify({ current, next }) }),
+  authDevices: () => req<AuthDevicesResponse>('/api/auth/devices'),
+  signOutDevice: (id: string) => req<{ ok: true }>(`/api/auth/devices/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  signOutOtherDevices: () => req<ChangePasswordResponse>('/api/auth/devices/sign-out-others', { method: 'POST' }),
 
   // 백엔드 프로세스 재시작(process.exit(1) → launchd 재기동). 응답 직후 서버가 죽으므로 200을 받는 것 = 요청 접수 성공.
   restartServer: () => req<{ ok: true }>('/api/system/restart', { method: 'POST' }),

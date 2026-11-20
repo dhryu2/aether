@@ -38,7 +38,7 @@ function validSubscription(sub: unknown): boolean {
 pushRouter.post("/subscribe", (req: Request, res: Response) => {
   const sub = req.body?.subscription;
   if (!validSubscription(sub)) return res.status(400).json({ error: st("routes.push.invalidSubscription") });
-  addSubscription(sub);
+  addSubscription(sub, req.auth?.tokenId);
   res.json({ ok: true });
 });
 

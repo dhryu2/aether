@@ -11,6 +11,7 @@ import { BackupView } from './settings/BackupView'
 import { ErrorLogView } from './settings/ErrorLogView'
 import { useErrorTodayCount } from './settings/useErrorTodayCount'
 import { Group, GroupTitle, Sep, TextRow } from './settings/parts'
+import { DevicesSection } from './settings/DevicesSection'
 import { PasswordSection } from './settings/PasswordSection'
 import { LlmSection, ServerInfoSection } from './settings/ServerInfoSection'
 import { RemoteAccessSection } from './settings/RemoteAccessSection'
@@ -48,7 +49,7 @@ function PaneBody({ pane }: { pane: Pane }) {
     case 'general': return <GeneralSection hideTitle />
     case 'push': return <PushSection hideTitle />
     case 'autoResume': return <AutoResumeSection hideTitle />
-    case 'account': return <><AccountSection /><PasswordSection /></>
+    case 'account': return <><AccountSection /><PasswordSection /><DevicesSection /></>
     case 'usage': return <SessionStatus />
     case 'info': return <><ServerInfoSection hideTitle /><RemoteAccessSection /></>
     case 'llm': return <LlmSection hideTitle />

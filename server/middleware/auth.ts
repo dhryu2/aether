@@ -9,7 +9,9 @@ import { config } from "../config";
 import type { AuthStrategy, IdentityResolver } from "../auth/types";
 import { clientAddr } from "../auth/clientAddr";
 import { tailscaleResolver } from "../auth/tailscale";
-import { verifySession } from "../auth/jwt";
+import { tokenClaims, verifySession } from "../auth/jwt";
+import { noteSessionSeen } from "../auth/passwordHash";
+import { reportError } from "../observability/report";
 import { st } from "../i18n";
 
 /** off: 인증 없음(기본). 항상 통과. */
@@ -55,7 +57,18 @@ export function createPasswordStrategy(opts: { verify?: (t: string) => Promise<b
       const cookie = req.cookies?.aether_session as string | undefined;
       const token = cookie || bearerToken(req); // 쿠키가 있는데 실패하면 Bearer로 우회하지 않는다
       if (!token) return null;
-      return (await verify(token)) ? { login: "owner", via: "password", stillValid: () => verify(token) } : null;
+      if (!(await verify(token))) return null;
+      // 기기 기록 실패는 보고만 한다. 인증은 막지 않는다.
+      let tokenId: string | undefined;
+      try {
+        const claims = await tokenClaims(token);
+        tokenId = claims?.jti;
+        const ua = req.headers?.["user-agent"];
+        if (claims) noteSessionSeen(claims.jti, claims.iat, claims.exp, typeof ua === "string" ? ua : undefined);
+      } catch (error) {
+        void reportError(error, { component: "auth", operation: "auth.session.note" });
+      }
+      return { login: "owner", via: "password", tokenId, stillValid: () => verify(token) };
     },
   };
 }

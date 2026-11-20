@@ -3,17 +3,19 @@
  *   POST /api/auth/login  { password } → bcrypt 검증 → httpOnly 쿠키에 JWT 발급
  *   POST /api/auth/logout → 동일 옵션으로 쿠키 clear + 그 토큰을 서버에서 폐기(이 기기만)
  *   POST /api/auth/password { current, next } → 비밀번호 변경(게이트 통과 + password 모드만)
+ *   GET /api/auth/devices · DELETE /api/auth/devices/:id · POST /api/auth/devices/sign-out-others → 로그인한 기기 목록과 원격 로그아웃(password 모드만)
  * 로그인은 시도 제한(auth/loginLimiter.ts)을 거친다. 잠기면 429 + Retry-After(초).
  * ⚠️ 비번/해시를 로깅하지 않는다(시크릿 평문 금지).
  */
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import bcrypt from "bcryptjs";
 import { config } from "../config";
 import { revokeSession, signSession } from "../auth/jwt";
-import { currentPasswordHash, isValidNewPassword, savePasswordHash } from "../auth/passwordHash";
+import { currentPasswordHash, isValidNewPassword, listSessions, revokeAllTokens, revokeTokenId, savePasswordHash } from "../auth/passwordHash";
+import { removeSubscriptionsByToken } from "../push";
 import { bearerToken, createAuthMiddleware, selectStrategy } from "../middleware/auth";
 import { reportError } from "../observability/report";
-import type { ChangePasswordResponse } from "../../shared/http";
+import type { AuthDevicesResponse, ChangePasswordResponse } from "../../shared/http";
 import { createLoginLimiter } from "../auth/loginLimiter";
 import { st } from "../i18n";
 
@@ -113,4 +115,43 @@ authRouter.post("/password", createAuthMiddleware(selectStrategy()), async (req,
   } finally {
     passwordLimiter.release(ok);
   }
+});
+
+// 로그인한 기기 목록과 원격 로그아웃. password 모드가 아니면 404.
+const gate = createAuthMiddleware(selectStrategy());
+const passwordOnly: RequestHandler = (_req, res, next) => {
+  if (config.authMode === "password") return next();
+  res.status(404).json({ error: st("routes.common.apiNotFound") });
+};
+
+authRouter.get("/devices", gate, passwordOnly, (req, res) => {
+  const devices = listSessions()
+    .sort((a, b) => b.seen - a.seen)
+    .map((r) => ({ id: r.id, issuedAt: r.iat * 1000, lastSeenAt: r.seen * 1000, ...(r.ua ? { userAgent: r.ua } : {}), current: r.id === req.auth?.tokenId }));
+  const body: AuthDevicesResponse = { devices };
+  res.json(body);
+});
+
+authRouter.delete("/devices/:id", gate, passwordOnly, (req, res) => {
+  const id = String(req.params.id);
+  if (id === req.auth?.tokenId) {
+    res.status(400).json({ error: st("routes.auth.deviceCurrent") }); // 이 기기는 기존 로그아웃을 쓴다
+    return;
+  }
+  const target = listSessions().find((r) => r.id === id);
+  if (!target) {
+    res.status(404).json({ error: st("routes.auth.deviceNotFound") });
+    return;
+  }
+  revokeTokenId(id, target.exp);
+  removeSubscriptionsByToken(id);
+  res.json({ ok: true });
+});
+
+authRouter.post("/devices/sign-out-others", gate, passwordOnly, async (req, res) => {
+  revokeAllTokens(); // 세대 값이 바뀌어 이 기기 토큰도 무효가 되므로 새 토큰을 준다. 옛 구독은 자격 지문이 달라져 보낼 때 걸러진다.
+  const token = await signSession();
+  res.cookie(COOKIE, token, cookieOpts(req.secure));
+  const body: ChangePasswordResponse = { ok: true, token };
+  res.json(body);
 });

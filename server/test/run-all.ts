@@ -46,6 +46,7 @@ const EXTRA_SUITES: { name: string; file: string }[] = [
   { name: "web:passwordForm", file: path.join(TEST_DIR, "..", "..", "web", "test", "passwordForm.test.ts") },
   { name: "web:deriveTurn", file: path.join(TEST_DIR, "..", "..", "web", "test", "deriveTurn.test.ts") },
   { name: "web:modelLabel", file: path.join(TEST_DIR, "..", "..", "web", "test", "modelLabel.test.ts") },
+  { name: "web:deviceLabel", file: path.join(TEST_DIR, "..", "..", "web", "test", "deviceLabel.test.ts") },
   { name: "web:paneView", file: path.join(TEST_DIR, "..", "..", "web", "test", "paneView.test.ts") },
   { name: "web:searchPalette", file: path.join(TEST_DIR, "..", "..", "web", "test", "searchPalette.test.ts") },
   { name: "web:contractVersion", file: path.join(TEST_DIR, "..", "..", "web", "test", "contractVersion.test.ts") },

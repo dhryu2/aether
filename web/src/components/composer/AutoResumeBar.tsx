@@ -49,6 +49,7 @@ export function AutoResumeBar({ plan, sessionId, execId }: { plan: AutoResumePla
   const t = useT()
   const uid = useId()
   const gaveUp = plan.gaveUp === true
+  const restartCut = plan.restartCutAt !== undefined
   // 인계서 쓰기 예약에는 보낼 문장이 없다. 문장 편집과 지금 보내기는 문장 예약에만 있다.
   const sentence = plan.action.type === 'send' ? plan.action.text : null
   const [editing, setEditing] = useState(false)
@@ -89,7 +90,7 @@ export function AutoResumeBar({ plan, sessionId, execId }: { plan: AutoResumePla
     }
   }
 
-  const summary = gaveUp ? t('composer.autoResume.gaveUp') : t('composer.autoResume.next', { time: autoResumeTimeText(plan.at ?? 0) })
+  const summary = restartCut ? t('composer.autoResume.restartCut') : gaveUp ? t('composer.autoResume.gaveUp') : t('composer.autoResume.next', { time: autoResumeTimeText(plan.at ?? 0) })
   const Icon = gaveUp ? CircleAlert : Clock
 
   return (
@@ -108,12 +109,14 @@ export function AutoResumeBar({ plan, sessionId, execId }: { plan: AutoResumePla
           <span className="flex flex-wrap items-center" style={{ gap: 6 }}>
             {sentence !== null && (
               <button type="button" className="press hit-44" style={btn} onClick={() => void actions.send(sentence, undefined, undefined, sessionId)}>
-                {t('composer.autoResume.sendNow')}
+                {restartCut ? t('composer.autoResume.continue') : t('composer.autoResume.sendNow')}
               </button>
             )}
-            <button type="button" className="press hit-44" style={btn} aria-expanded={false} onClick={open}>
-              {sentence !== null ? t('composer.autoResume.edit') : t('composer.autoResume.editTime')}
-            </button>
+            {!restartCut && (
+              <button type="button" className="press hit-44" style={btn} aria-expanded={false} onClick={open}>
+                {sentence !== null ? t('composer.autoResume.edit') : t('composer.autoResume.editTime')}
+              </button>
+            )}
             <button type="button" className="press hit-44" style={btn} onClick={() => void api.cancelAutoResume(execId).catch(fail)}>
               {t('composer.autoResume.cancel')}
             </button>

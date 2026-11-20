@@ -277,6 +277,66 @@ console.log("\n=== 재시작 복원 ===");
   for (const id of ["ar-past-1", "ar-waiting-1", "ar-gaveup-1"]) sessionManager.delete(id);
 }
 
+console.log("\n=== 서버 재시작으로 끊긴 턴 ===");
+{
+  const mk = (id: string, opts: { open?: boolean; archived?: boolean; hold?: unknown } = {}) => {
+    const dir = path.join(DATA, id);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "meta.json"), JSON.stringify({ id, cwd: ROOT, createdAt: 1, resumeKey: "mock-thread-rc", ...(opts.archived ? { archivedAt: 5 } : {}), ...(opts.hold ? { attentionHold: opts.hold } : {}) }));
+    store.appendEvent(id, { seq: 1, ts: 1000, kind: "user_msg", text: "일해" } as never);
+    if (!opts.open) store.appendEvent(id, { seq: 2, ts: 2000, kind: "status", status: "completed" } as never);
+  };
+  const attn = (id: string) => sessionManager.list().find((s) => s.id === id);
+  const ids = ["rc-open", "rc-marked", "rc-plain", "rc-archived", "rc-hold"];
+  mk("rc-open", { open: true });
+  mk("rc-marked");
+  mk("rc-plain");
+  mk("rc-archived", { open: true, archived: true });
+  mk("rc-hold", { open: true, hold: { kind: "interrupted_request", preview: "카드 미리보기", since: 7 } });
+  ar.writeRestartCut(["rc-marked", "rc-archived"]);
+  sessionManager.restoreFromDisk();
+  eq("강제 종료: 열린 턴에서 예약이 생긴다", [planOf("rc-open")?.gaveUp, planOf("rc-open")?.at], [true, undefined]);
+  check(typeof planOf("rc-open")?.restartCutAt === "number", "끊긴 시각이 실린다");
+  eq("강제 종료: 주의 상태", [attn("rc-open")?.attention, attn("rc-open")?.attentionKind], ["waiting", "interrupted_request"]);
+  eq("정상 종료: 표시 파일에 있으면 예약이 생긴다", attn("rc-marked")?.autoResume?.gaveUp, true);
+  eq("표시 파일은 읽고 지운다", ar.takeRestartCut().size, 0);
+  eq("표시도 없고 열린 턴도 아니면 예약 없음", planOf("rc-plain"), undefined);
+  eq("보관된 세션에는 예약이 없다", planOf("rc-archived"), undefined);
+  eq("승인 카드가 있던 경우 카드 미리보기가 유지된다", attn("rc-hold")?.attentionPreview, "카드 미리보기");
+
+  const cutAt = planOf("rc-open")?.restartCutAt;
+  sessionManager.restoreFromDisk();
+  eq("다시 복원해도 끊긴 시각이 바뀌지 않는다", planOf("rc-open")?.restartCutAt, cutAt);
+
+  sessionManager.cancelAutoResume("rc-marked");
+  eq("취소하면 idle", attn("rc-marked")?.attention, "idle");
+  const del = await fetch(`${base}/api/sessions/rc-open/auto-resume`, { method: "DELETE" });
+  check(del.ok, "DELETE 성공", del.status);
+  eq("DELETE 뒤 idle", [planOf("rc-open"), attn("rc-open")?.attention], [undefined, "idle"]);
+
+  mk("rc-human", { open: true });
+  sessionManager.restoreFromDisk();
+  check(planOf("rc-human")?.restartCutAt !== undefined, "사람 글 시험용 예약 생성");
+  sessionManager.getOrResume("rc-human").push("사람이 보낸 글");
+  check(await waitUntil(() => planOf("rc-human") === undefined), "사람이 글을 보내면 예약이 사라진다");
+  check(attn("rc-human")?.attentionKind !== "interrupted_request", "주의 표시도 함께 사라진다", attn("rc-human")?.attention);
+
+  const live = sessionManager.create({ cwd, provider: mock.MOCK_PROVIDER });
+  try {
+    const idle = sessionManager.create({ cwd, provider: mock.MOCK_PROVIDER });
+    live.push("ASK:busy", undefined, undefined, undefined, { sentBy: "aether" });
+    check(await waitUntil(() => live.isTurnOpen), "턴이 열려 있다");
+    sessionManager.noteRestartCut();
+    const noted = JSON.parse(fs.readFileSync(path.join(DATA, "restart-cut.json"), "utf8")) as { ids: string[] };
+    eq("noteRestartCut은 턴이 열린 세션만 적는다", [noted.ids.includes(live.id), noted.ids.includes(idle.id)], [true, false]);
+    ar.takeRestartCut();
+    sessionManager.delete(idle.id);
+  } finally {
+    sessionManager.delete(live.id);
+  }
+  for (const id of [...ids, "rc-human"]) sessionManager.delete(id);
+}
+
 console.log("\n=== 설정을 끄면 ===");
 {
   ar.writeAutoResumeSettings({ enabled: false });

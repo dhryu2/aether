@@ -127,3 +127,27 @@ export function writeAutoResumeSettings(patch: { enabled?: boolean; text?: strin
   fs.writeFileSync(settingsFile(), JSON.stringify(stored), "utf8");
   return readAutoResumeSettings();
 }
+
+// ── 서버 재시작으로 끊긴 턴 표시 — 종료 직전에 쓰고 다음 부팅이 읽으면서 지운다. ──
+
+const restartCutFile = () => path.join(config.dataDir, "restart-cut.json");
+
+export function writeRestartCut(ids: string[]): void {
+  fs.mkdirSync(config.dataDir, { recursive: true });
+  fs.writeFileSync(restartCutFile(), JSON.stringify({ ids, at: Date.now() }), "utf8");
+}
+
+/** 표시 파일을 읽고 지운다. 없거나 깨졌으면 빈 집합. */
+export function takeRestartCut(): Set<string> {
+  try {
+    const raw = JSON.parse(fs.readFileSync(restartCutFile(), "utf8")) as { ids?: unknown };
+    fs.rmSync(restartCutFile(), { force: true });
+    return new Set(Array.isArray(raw.ids) ? raw.ids.filter((x): x is string => typeof x === "string") : []);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException)?.code !== "ENOENT") {
+      void reportError(e, { component: "session", operation: "auto_resume.restart_cut.load" });
+      fs.rmSync(restartCutFile(), { force: true });
+    }
+    return new Set();
+  }
+}

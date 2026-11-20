@@ -174,6 +174,8 @@ export const nav: Dict = {
   // 할 일 칩 — 에이전트가 만든 할 일 목록의 진행 상황
   'nav.autoResume.at': { ko: '{time} 자동 재개', en: 'Auto-resume {time}' },
   'nav.autoResume.gaveUp': { ko: '확인 필요', en: 'Needs your check' },
+  'nav.autoResume.restartCut': { ko: '재시작으로 끊김', en: 'Cut off by restart' },
+  'nav.autoResume.restartCutAria': { ko: '서버 재시작으로 작업이 끊겼어요. 이어 가려면 여세요', en: 'The server restarted and this task was cut off. Open to continue' },
   'nav.autoResume.atAria': { ko: '한도가 풀리면 {time}에 자동으로 이어 가요', en: 'Resumes automatically at {time} when the limit lifts' },
   'nav.autoResume.gaveUpAria': { ko: '자동 재개가 3번 모두 막혀 멈췄어요. 확인이 필요해요', en: 'Auto-resume stopped after 3 blocked tries. Please check' },
   'nav.todo.progress': { ko: '체크리스트 {done}/{total}', en: 'To-do {done}/{total}' },

@@ -251,7 +251,7 @@ function RailChip({ room }: { room: WorkspaceRoom }) {
   const Icon = waiting ? toneIcon('attn', room.attentionKind) : resume?.gaveUp ? CircleAlert : Clock
   const title = room.title || t('nav.session.untitled')
   const age = room.attentionSince != null ? waitAgeText(room.attentionSince, now) : ''
-  const resumeText = resume ? (resume.gaveUp ? t('nav.autoResume.gaveUp') : t('nav.autoResume.at', { time: autoResumeTimeText(resume.at ?? now, now) })) : ''
+  const resumeText = resume ? (resume.restartCutAt !== undefined ? t('nav.autoResume.restartCut') : resume.gaveUp ? t('nav.autoResume.gaveUp') : t('nav.autoResume.at', { time: autoResumeTimeText(resume.at ?? now, now) })) : ''
   const label = [waiting ? t('nav.sidebar.railItem', { title, status: t('nav.session.status.waiting'), age }).trim() : title, resumeText].filter(Boolean).join(' · ')
   return (
     <button

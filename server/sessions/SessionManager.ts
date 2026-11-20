@@ -30,7 +30,7 @@ import { PERMISSION_MODES, type SlashCommandInfo, type AutoResumePlan, type Hand
 import { computeAttention, isStickyAttentionKind } from "./attention";
 import { changedFiles, handoffForceWriteText, handoffRequest, handoffTurnAwaitsWork, handoffTurnOutcome, HANDOFF_ASK_ROUNDS_MAX, HANDOFF_CLIENT_ID_PREFIX, latestTodoItems, limitResetsAt, pickHandoffText, recentUserTexts, skeletonHandoff, withHandoffFrame } from "./handoff";
 import { autoResumeStoppedIntent, waitingFromPending, type NotifyIntent } from "../notify/worthNotifying";
-import { AUTO_RESUME_MAX_ATTEMPTS, AUTO_RESUME_TEXT_MAX, nextAttemptAt, readAutoResumeSettings, type AutoResumeVerdict } from "./autoResume";
+import { AUTO_RESUME_MAX_ATTEMPTS, AUTO_RESUME_TEXT_MAX, nextAttemptAt, readAutoResumeSettings, takeRestartCut, writeRestartCut, type AutoResumeVerdict } from "./autoResume";
 import { st } from "../i18n";
 import { deriveWorkTitle, resolveWorkTitle } from "../../shared/workTitle";
 import { forgetRewoundLetters, parseHiddenRanges, previewRewind, rewindDisk, RewindError, sessionWasRewound, type HiddenRange, type RewindOutcome } from "./rewind";
@@ -481,6 +481,7 @@ class SessionManager {
       }
     }
     this.restoreAutoResumes();
+    this.restoreRestartCuts(takeRestartCut());
     // 인계서를 쓰던 턴은 재시작으로 끊겼다. 한도 대기와 복사 결과만 남긴다.
     for (const [id, e] of this.disk) {
       if (e.meta.handoffJob?.state !== "writing") continue;
@@ -519,6 +520,33 @@ class SessionManager {
         void reportError(error, { component: "session", operation: "session.auto_resume.restore", session_id: id });
       }
     }
+  }
+
+  /** 종료 직전에 턴이 열린 세션 id를 남긴다. 정상 종료는 턴 종료가 기록돼 부팅 때 끊긴 줄 알 수 없기 때문이다. */
+  noteRestartCut() {
+    try {
+      writeRestartCut(this.all().filter((s) => s.isTurnOpen).map((s) => s.id));
+    } catch (error) {
+      void reportError(error, { component: "session", operation: "session.restart_cut.note" });
+    }
+  }
+
+  /** 재시작으로 끊긴 세션에 "사람이 누르면 이어 간다"는 예약을 둔다. 저절로 보내지 않는다(gaveUp). */
+  private restoreRestartCuts(marked: Set<string>) {
+    for (const [id, e] of [...this.disk]) {
+      if (e.status === "corrupted" || e.meta.archivedAt || e.meta.autoResume || e.meta.handoffJob?.state === "writing") continue;
+      if (e.status !== "interrupted" && !marked.has(id)) continue;
+      try {
+        this.writeAutoResume(id, { action: { type: "send", text: st("autoResume.restartText") }, attempts: 0, gaveUp: true, restartCutAt: e.lastActivityAt ?? Date.now() });
+      } catch (error) {
+        void reportError(error, { component: "session", operation: "session.restart_cut.restore", session_id: id });
+      }
+    }
+  }
+
+  /** 재시작으로 끊긴 예약이면 그 표시를 주의 상태로 바꾼다. 승인 카드 보류(attentionHold)가 있으면 그쪽이 먼저다. */
+  private restartHold(plan: AutoResumePlan | undefined): SessionMeta["attentionHold"] {
+    return plan?.restartCutAt ? { kind: "interrupted_request", preview: st("autoResume.restartCut"), since: plan.restartCutAt } : undefined;
   }
 
   /**
@@ -1011,11 +1039,12 @@ class SessionManager {
     if (!plan) return "notFound";
     // 인계서 쓰기 예약은 문장이 없다. 시각만 바꿀 수 있다.
     const text = patch.text !== undefined && plan.action.type === "send" ? patch.text.trim().slice(0, AUTO_RESUME_TEXT_MAX) : plan.action.type === "send" ? plan.action.text : "";
-    const next: AutoResumePlan = { action: plan.action.type === "handoff" ? plan.action : { type: "send", text }, at: plan.at, attempts: plan.attempts, ...(plan.gaveUp ? { gaveUp: true as const } : {}) };
+    const next: AutoResumePlan = { action: plan.action.type === "handoff" ? plan.action : { type: "send", text }, at: plan.at, attempts: plan.attempts, ...(plan.gaveUp ? { gaveUp: true as const } : {}), ...(plan.restartCutAt ? { restartCutAt: plan.restartCutAt } : {}) };
     if (patch.at !== undefined) {
       next.at = patch.at;
       next.attempts = 0;
       delete next.gaveUp;
+      delete next.restartCutAt;
     }
     this.writeAutoResume(id, next);
     return next;
@@ -1603,7 +1632,7 @@ class SessionManager {
       waitingPreview: waiting?.preview,
       waitingSince: waiting?.since,
       turnOpen: s.isTurnOpen,
-      hold: withHold ? s.attentionHold : undefined,
+      hold: withHold ? s.attentionHold ?? this.restartHold(s.autoResume) : undefined,
       backgroundCount: backgroundTasks.length,
       lastViewedAt: s.lastViewedAt,
       sticky: s.attentionSticky,
@@ -1615,7 +1644,7 @@ class SessionManager {
     if (e.meta.archivedAt) return { attention: "idle", lastViewedAt: e.meta.lastViewedAt };
     const computed = computeAttention({
       turnOpen: false,
-      hold: withHold ? e.meta.attentionHold : undefined,
+      hold: withHold ? e.meta.attentionHold ?? this.restartHold(e.meta.autoResume) : undefined,
       lastViewedAt: e.meta.lastViewedAt,
       sticky: e.meta.attentionSticky,
     });

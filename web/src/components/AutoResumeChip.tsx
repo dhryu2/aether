@@ -12,8 +12,9 @@ export function AutoResumeChip({ plan, placement, compact }: { plan: AutoResumeP
   if (!plan || (plan.at === undefined && !plan.gaveUp)) return null
   const gaveUp = plan.gaveUp === true
   const time = plan.at !== undefined ? autoResumeTimeText(plan.at) : ''
-  const text = gaveUp ? t('nav.autoResume.gaveUp') : compact ? time : t('nav.autoResume.at', { time })
-  const aria = gaveUp ? t('nav.autoResume.gaveUpAria') : t('nav.autoResume.atAria', { time })
+  const restartCut = plan.restartCutAt !== undefined
+  const text = restartCut ? t('nav.autoResume.restartCut') : gaveUp ? t('nav.autoResume.gaveUp') : compact ? time : t('nav.autoResume.at', { time })
+  const aria = restartCut ? t('nav.autoResume.restartCutAria') : gaveUp ? t('nav.autoResume.gaveUpAria') : t('nav.autoResume.atAria', { time })
   const Icon = gaveUp ? CircleAlert : Clock
   const island = placement === 'island'
   return (

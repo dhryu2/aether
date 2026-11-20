@@ -83,6 +83,7 @@ async function shutdown(code = 0) {
   shuttingDown = true;
   // 정리 중 무엇이 실패해도 프로세스는 끝나야 한다. shuttingDown 때문에 다시 부를 수 없어, 여기서 못 끝내면 서버가 영구히 남는다.
   try {
+    sessionManager.noteRestartCut();
     const sessions = sessionManager.all();
     // interrupt 병렬화 + 3s 상한(어떤 interrupt가 매달려도 종료 지연 방지). drainPending은 동기·멱등이라 무조건 실행.
     await Promise.race([

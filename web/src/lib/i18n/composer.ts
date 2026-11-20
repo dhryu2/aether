@@ -11,6 +11,8 @@ export const composer: Dict = {
   'composer.autoResume.gaveUp': { ko: '자동 재개를 3번 시도했지만 실패했어요. 확인이 필요해요', en: 'Auto-resume was blocked 3 times, needs your check' },
   'composer.autoResume.sendNow': { ko: '지금 보내기', en: 'Send now' },
   'composer.autoResume.edit': { ko: '시간과 메시지 변경', en: 'Change time · text' },
+  'composer.autoResume.restartCut': { ko: '서버 재시작으로 작업이 끊겼어요', en: 'The server restarted and this task was cut off' },
+  'composer.autoResume.continue': { ko: '이어 가기', en: 'Continue' },
   'composer.autoResume.cancel': { ko: '취소', en: 'Cancel' },
   'composer.autoResume.save': { ko: '저장', en: 'Save' },
   'composer.autoResume.close': { ko: '닫기', en: 'Close' },

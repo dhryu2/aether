@@ -38,6 +38,8 @@ export const notify: Dict = {
   "notify.autoResume.sendFailed.title": { ko: "{name} · 자동 재개 실패", en: "{name} · Auto-resume failed" },
   "notify.autoResume.sendFailed.body": { ko: "자동 재개를 보내지 못했어요. {detail}", en: "Could not send the auto-resume message. {detail}" },
   "autoResume.defaultText": { ko: "한도로 멈춘 곳부터 이어서 진행해", en: "Continue from where the limit stopped you" },
+  "autoResume.restartText": { ko: "서버 재시작으로 끊긴 곳부터 이어서 진행해", en: "Continue from where the server restart cut you off" },
+  "autoResume.restartCut": { ko: "서버 재시작으로 작업이 끊겼어요", en: "Cut off by a server restart" },
 
   // 비정상 종료
   "notify.crashed.title": { ko: "{name} · 비정상 종료", en: "{name} · Crashed" },

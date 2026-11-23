@@ -62,7 +62,7 @@ function turnStatus(s: unknown): TurnStatus | null {
 }
 
 /** ThreadItem(의 type) → 도구 종별. 메시지/추론/플랜 아이템은 도구 아님(null). */
-function itemToolKind(itemType: ThreadItem["type"]): ToolKind | null {
+export function itemToolKind(itemType: ThreadItem["type"]): ToolKind | null {
   switch (itemType) {
     case "commandExecution":
       return "bash";

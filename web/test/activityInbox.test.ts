@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { inboxLabel, inboxRows, plainPreview, tabTitle } from '../src/lib/activityInbox'
+import { inboxLabel, inboxRows, inlinePermissionOk, liveSelection, plainPreview, resolveInOrder, tabTitle } from '../src/lib/activityInbox'
 import { executionId } from '../src/lib/workspaceRooms'
 import type { WorkspaceRoom } from '../src/lib/types'
 
@@ -86,6 +86,39 @@ const tabRooms = [mk('a', 'waiting'), mk('b', 'waiting'), mk('c', 'done')]
 check(tabTitle(tabRooms, true) === '(2) Aether', '탭 제목: waiting 2개')
 check(tabTitle(tabRooms, false) === 'Aether', '탭 제목: live 아님')
 check(tabTitle([mk('c', 'done')], true) === 'Aether', '탭 제목: waiting 없음')
+
+// 줄에서 바로 승인: 파일 변경 없음·한 줄·120자 이하만.
+const bashReq = { id: 'a', toolKind: 'bash' }
+check(inlinePermissionOk({ ...bashReq, input: { command: 'ls -la' } }), 'inline: bash 짧은 명령 참')
+check(inlinePermissionOk({ ...bashReq }), 'inline: 인자 없음 참')
+check(!inlinePermissionOk({ id: 'a', input: { command: 'ls' } }), 'inline: toolKind 없으면 거짓')
+check(!inlinePermissionOk({ id: 'a', toolKind: 'file_change', input: { path: 'a.txt' } }), 'inline: file_change는 미리보기 없어도 거짓')
+check(!inlinePermissionOk({ ...bashReq, input: { command: 'ls' }, blockedPath: '/etc/x' }), 'inline: blockedPath 거짓')
+check(!inlinePermissionOk({ ...bashReq, input: { command: 'ls' }, mutation: { kind: 'write' } }), 'inline: mutation 거짓')
+check(!inlinePermissionOk({ ...bashReq, input: { command: 'a\nb' } }), 'inline: 줄바꿈 거짓')
+check(!inlinePermissionOk({ ...bashReq, input: { command: 'a\u202Eb' } }), 'inline: 방향 바꿈 문자 거짓')
+check(!inlinePermissionOk({ ...bashReq, input: { command: 'a\u200Bb' } }), 'inline: 폭 없는 문자 거짓')
+check(!inlinePermissionOk({ ...bashReq, input: { command: 'a\rb' } }), 'inline: CR 거짓')
+check(!inlinePermissionOk({ ...bashReq, input: { command: 'x'.repeat(121) } }), 'inline: 121자 거짓')
+check(inlinePermissionOk({ ...bashReq, input: { command: 'x'.repeat(120) } }), 'inline: 120자 참')
+
+const k = { toolKind: 'bash' }
+const live = [{ id: 'p1', ...k, input: { c: 'a' } }, { id: 'p2', ...k, input: { c: 'b' } }, { id: 'p3', ...k, input: { c: 'a\nb' } }, { id: 'new', ...k, input: { c: 'n' } }]
+const sel = liveSelection(new Set(['p1', 'gone', 'p3']), live)
+check(sel.length === 1 && sel[0] === 'p1', 'liveSelection: 사라진·승인 불가 id 빠짐', sel)
+check(!liveSelection(['p1'], live).includes('new'), 'liveSelection: 새 요청 미포함')
+
+const order: string[] = []
+const res = await resolveInOrder(
+  [1, 2, 3, 4].map((n) => ({ sessionId: `s${n}`, permissionId: `p${n}` })),
+  async (sid) => {
+    order.push(sid)
+    if (sid === 's2') throw Object.assign(new Error('nf'), { status: 404 })
+    if (sid === 's3') throw Object.assign(new Error('boom'), { status: 500 })
+  },
+)
+check(order.join() === 's1,s2,s3,s4', 'resolveInOrder: 순서·실패 뒤에도 계속', order)
+check(res.done === 2 && res.gone === 1 && res.failed === 1, 'resolveInOrder: done/gone/failed', res)
 
 console.log(`\n${fail === 0 ? '✅' : '❌'} activityInbox: ${pass} PASS / ${fail} FAIL`)
 process.exit(fail === 0 ? 0 : 1)

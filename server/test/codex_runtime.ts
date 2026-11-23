@@ -505,6 +505,7 @@ async function main() {
     h.rt.push({ text: "@@outpatch@@ 고쳐줘" });
     await until(() => turnsDone(h) === 1, 8000);
     check(asks.length === 1 && asks[0].toolName === "fileChange", "④e 폴더 밖 변경은 카드로 묻는다", asks);
+    check(asks[0]?.toolKind === "file_change", "④e 파일 변경 승인 요청은 file_change를 싣는다", asks[0]?.toolKind);
     await h.rt.dispose();
   }
   for (const tag of ["@@movepatch@@", "@@movepatch2@@"]) {
@@ -857,6 +858,7 @@ async function main() {
     check(asks.length === 1, "⑨ 승인 요청이 카드로 올라온다", asks.length);
     check(asks[0]?.input.command === "rm -rf /tmp/demo", "⑨ 카드에 실행될 명령 전문이 실린다", asks[0]?.input);
     check(asks[0]?.input.cwd === "/tmp", "⑨ 어느 폴더에서 도는지도 실린다");
+    check(asks[0]?.toolKind === "bash", "⑨ 명령 실행 승인 요청은 bash를 싣는다", asks[0]?.toolKind);
     check(asks[0]?.description === "위험한 명령입니다", "⑨ 왜 물어보는지가 실린다", asks[0]?.description);
     check(!!asks[0]?.displayName, "⑨ 카드 제목이 사람 말로 붙는다", asks[0]?.displayName);
     const answer = (await h.calls()).find((c) => c.method === "approvalAnswer");

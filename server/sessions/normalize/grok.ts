@@ -56,7 +56,7 @@ function jsonText(v: unknown): string {
   }
 }
 
-function toolKindOf(name: string, kind?: string): ToolKind {
+export function toolKindOf(name: string, kind?: string): ToolKind {
   // ACP의 도구 종류(kind)가 있으면 이름보다 먼저 본다. 이름 규칙은 kind가 없는 도구의 대비책이다.
   if (kind === "execute") return "bash";
   if (kind === "edit" || kind === "delete" || kind === "move") return "file_change";
@@ -68,6 +68,11 @@ function toolKindOf(name: string, kind?: string): ToolKind {
   if (/(mcp|search_tool|use_tool)/.test(n)) return "mcp";
   if (/(agent|task|subagent)/.test(n)) return "task";
   return "other";
+}
+
+/** 승인 요청(session/request_permission)의 toolCall도 도구 호출 사건과 같은 기준으로 가른다. */
+export function grokToolKind(update: Record<string, unknown>): ToolKind {
+  return toolKindOf(toolName(update), typeof update.kind === "string" ? update.kind : undefined);
 }
 
 function stopStatus(stop: unknown): TurnStatus {

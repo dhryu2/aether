@@ -11,7 +11,7 @@
  * 8d 범위 주의: 이벤트 *수명주기* 판정(라이브 전용·턴 종료·영속 축소)은 아직 LiveSession/persistFilter에 있다.
  *   `ProviderEventCodec`(D2.6)으로 모으는 것은 8d-1 작업이다. 여기선 실행 코어만 추상화한다.
  */
-import type { Provider, TodoItem } from "../../shared/agentEvent";
+import type { Provider, TodoItem, ToolKind } from "../../shared/agentEvent";
 import type {
   AetherQuestion,
   DocAttachment,
@@ -77,6 +77,8 @@ export type PermissionAsk = {
   description?: string;
   decisionReason?: string;
   blockedPath?: string;
+  /** 도구 종류. 어댑터가 도구 호출 사건과 같은 기준으로 채운다. 화면이 파일 변경 요청을 가려내는 데 쓴다. */
+  toolKind?: ToolKind;
   /** 진행 턴이 interrupt되면 abort — 세션이 보류 카드를 거부로 정리하는 신호. */
   signal: AbortSignal;
 };

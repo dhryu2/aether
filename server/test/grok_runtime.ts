@@ -19,7 +19,7 @@ process.env.AETHER_GROK_BIN = fake.bin;
 const { GrokRuntime } = await import("../sessions/runtimes/grok");
 const { grokServices } = await import("../providers/grok/services");
 const { grokCodec } = await import("../sessions/codec/grok");
-const { normalizeGrok } = await import("../sessions/normalize/grok");
+const { normalizeGrok, grokToolKind } = await import("../sessions/normalize/grok");
 type GrokRuntimeT = InstanceType<typeof GrokRuntime>;
 type RuntimeStartOptions = import("../providers/types").RuntimeStartOptions;
 type RawProviderEventBody = import("../types").RawProviderEventBody;
@@ -216,6 +216,7 @@ async function main() {
     const h = start();
     h.rt.push({ text: "@@ask@@ 써라" });
     check(await until(() => h.asks.length === 1, 8000), "⑤ 승인 카드가 온다");
+    check(h.asks[0]?.toolKind === "file_change", "⑤ 편집 승인 요청은 file_change를 싣는다", h.asks[0]?.toolKind);
     check(typeof h.asks[0]?.input?.file_path === "string" || typeof h.asks[0]?.input?.path === "string", "⑤ 카드에 경로가 실린다", h.asks[0]?.input);
     check(await until(() => turnsDone(h) === 1), "⑤ 승인 뒤 턴이 끝난다");
     const permCalls = (await h.calls()).filter((c) => c.method === "permissionAnswer");
@@ -226,6 +227,9 @@ async function main() {
     );
     await h.rt.dispose();
   }
+
+  check(grokToolKind({ kind: "execute", title: "Run" }) === "bash", "⑤ 명령 실행 승인 요청은 bash로 가른다");
+  check(grokToolKind({ kind: "edit", title: "Write" }) === "file_change", "⑤ content가 없는 편집 승인 요청도 file_change로 가른다");
 
   {
     const h = start();

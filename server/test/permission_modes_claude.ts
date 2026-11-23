@@ -87,6 +87,23 @@ console.log("=== 가짜 qh로 이어서 ===");
   check(restored.permissionMode === "manual", "복원 세션은 모델을 바꿔도 기본값 재설정을 하지 않는다(낮추는 일은 공통 계층 몫)");
   check(restored.autoDefault === false, "복원 세션의 기본값 재설정 표시는 꺼져 있다");
 }
+console.log("=== 승인 요청에 도구 종류가 실린다 ===");
+{
+  const asks: { toolKind?: string; mutation?: unknown }[] = [];
+  const rt = new ClaudeRuntime({
+    sessionId: "claude-toolkind",
+    cwd: os.tmpdir(),
+    permissionMode: "manual",
+    onPermission: async (a) => { asks.push(a); return { allow: false, message: "시험" }; },
+    onQuestion: async () => ({ answered: false, reason: "시험" }),
+    onResumeKey: () => {},
+  }) as unknown as { requestPermission(n: string, i: Record<string, unknown>, c: object): Promise<unknown> };
+  const ctx = { signal: new AbortController().signal, toolUseID: "t" };
+  await rt.requestPermission("Write", { file_path: "/example-outside/a.txt", content: "x" }, ctx); // 작업 폴더 밖 → 미리보기 없음
+  await rt.requestPermission("Bash", { command: "ls" }, ctx);
+  check(asks[0]?.toolKind === "file_change" && asks[0]?.mutation === undefined, "작업 폴더 밖 파일 쓰기: 미리보기가 없어도 file_change", asks[0]);
+  check(asks[1]?.toolKind === "bash", "Bash 승인 요청은 bash", asks[1]);
+}
 await new Promise((r) => setTimeout(r, 30));
 check(unhandled === 0, "처리되지 않은 거부가 없다", { unhandled });
 console.log(`\n${fail ? "❌" : "✅"} permission_modes_claude: ${pass} PASS / ${fail} FAIL`);

@@ -12,7 +12,7 @@ import { ActionCard, ActionCardActions, ActionCardFooter, ActionCardHeader, Acti
 import { UnifiedDiff } from './UnifiedDiff'
 import { useReportPermButtons } from '../lib/permButtonsVisibility'
 
-function titleFor(req: PermissionRequest): { title: string; Icon: typeof FilePen } {
+export function titleFor(req: PermissionRequest): { title: string; Icon: typeof FilePen } {
   const k = req.mutation?.kind
   if (k === 'write') return { title: req.mutation?.isCreate ? t('session.permission.createTitle') : t('session.permission.writeTitle'), Icon: FilePlus }
   if (k === 'edit' || k === 'multiedit') return { title: t('session.permission.editTitle'), Icon: FilePen }

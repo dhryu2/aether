@@ -1564,6 +1564,7 @@ export class LiveSession {
       decisionReason: ask.decisionReason,
       blockedPath: ask.blockedPath,
       mutation: ask.mutation,
+      toolKind: ask.toolKind,
     };
     return new Promise<PermissionOutcome>((resolve) => {
       // resolve/abort/drainPending 중 무엇이 먼저 와도 한 번만 정리한다. 일반 resolve 뒤에도

@@ -248,4 +248,13 @@ export const nav: Dict = {
   'nav.inbox.waiting': { ko: '대기', en: 'Waiting' },
   'nav.inbox.done': { ko: '완료', en: 'Done' },
   'nav.inbox.failed': { ko: '실패', en: 'Failed' },
+  'nav.inbox.allowSelected': { ko: '선택한 {n}개 승인', en: 'Allow {n} selected' },
+  'nav.inbox.confirmTitle': { ko: '요청 {n}개를 승인할까요?', en: 'Allow {n} requests?' },
+  'nav.inbox.confirmMessage': { ko: '승인하면 되돌릴 수 없어요. 고른 요청만 승인하고, 그 뒤에 온 요청은 넣지 않아요.', en: "This can't be undone. Only the requests you picked are allowed. Requests that arrive later aren't included." },
+  'nav.inbox.confirmLabel': { ko: '{n}개 승인', en: 'Allow {n}' },
+  'nav.inbox.openSession': { ko: '세션에서 보기', en: 'View in session' },
+  'nav.inbox.needsSession': { ko: '전체 내용은 세션에서 확인해요', en: 'Review the full request in the session' },
+  'nav.inbox.select': { ko: '이 요청 고르기', en: 'Select this request' },
+  // nav.inbox.failed는 상태 라벨('실패')이 이미 쓰고 있어 키를 달리한다.
+  'nav.inbox.failedCount': { ko: '{n}개를 처리하지 못했어요. 다시 시도해 주세요.', en: "Couldn't handle {n}. Please try again." },
 }

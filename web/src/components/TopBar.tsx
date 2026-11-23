@@ -3,13 +3,14 @@
 //   로고·Agent Brain·설정은 목록 기둥(Sidebar)으로 옮겼다. 섬 사이로는 대화가 비쳐 보인다.
 //   칸이 둘 이상이면 이 상단바를 그리지 않는다. 포커스 칸의 정보가 다른 칸 위에 떠서 어느 칸 것인지 헷갈리고, 윗줄 칸만 62px을 잃어서다.
 //   그때 제목은 칸 머리, 칩·사용량은 입력창 아랫줄, 찾기·내려받기는 칸 메뉴, 종·연결은 Sidebar로 간다.
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Bell, Columns2, Menu, TextSearch } from 'lucide-react'
+import { Bell, Columns2, Menu, ShieldCheck, TextSearch } from 'lucide-react'
 import { actions, chromeRoomId, chromeSessionId, convoLoading, isSplit, providerName, showProviderTag, useStore } from '../lib/store'
 import { sessionWorkTitle } from '../lib/workTitle'
-import { inboxLabel, inboxRows, plainPreview } from '../lib/activityInbox'
-import { findRoom } from '../lib/workspaceRooms'
+import { inboxLabel, inboxRows, inlinePermissionOk, liveSelection, plainPreview, resolveInOrder } from '../lib/activityInbox'
+import { executionId, findRoom } from '../lib/workspaceRooms'
+import { api } from '../lib/api'
 import { MOD, relTime } from '../lib/format'
 import { hiddenPaneIds, visibleCapacity, visibleSessionIds } from '../lib/splitPane'
 import { useT } from '../lib/i18n'
@@ -24,12 +25,13 @@ import { ctxOf } from './ctxOf'
 import { ModelPicker } from './ModelPicker'
 import { EffortPicker } from './EffortPicker'
 import { PermissionPicker } from './PermissionPicker'
-import { AttentionDot, IconButton, PopoverSurface } from './ui'
+import { AttentionDot, Button, IconButton, PopoverSurface } from './ui'
+import { InboxPermissions } from './InboxPermissions'
 import { MenuItem } from './WorkMenu'
 import { sessionContextMenu } from './sessionMenu'
 import { copyItem, menuOf, onContextMenuFor } from './contextMenuFor'
 import { C, R, Z } from '../design/tokens'
-import type { WorkspaceRoom } from '../lib/types'
+import type { PermissionRequest, WorkspaceRoom } from '../lib/types'
 
 /**
  * 손길 알림 — 종 아이콘과 주황 숫자. 대기·끝남·실패만 센다. 주의 통로가 없거나 0이면 그리지 않는다.
@@ -42,7 +44,27 @@ export function HandChip({ inSidebar }: { inSidebar?: boolean }) {
   const open = s.handListOpen
   const setOpen = actions.setHandListOpen
   const ref = useRef<HTMLDivElement>(null)
-  useDismiss(ref, () => setOpen(false), open, '[data-attention-chip],[data-hand-list]')
+  // 승인 요청 줄: 세션별로 받아 둔 요청, 고른 id, 처리 중, 실패 수. 확인 창이 떠 있는 동안은 목록이 닫히지 않게 한다.
+  const [perms, setPerms] = useState<Record<string, PermissionRequest[]>>({})
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(0)
+  useDismiss(ref, () => setOpen(false), open && !s.dialog, '[data-attention-chip],[data-hand-list],[data-window="confirm"]')
+  // 권한 줄만 요청을 받아 온다. 질문·계획·끊긴 요청 줄은 지금처럼 미리보기만 보인다.
+  const permIds = inboxRows(s.rooms).flatMap((r) => (r.attentionKind === 'permission' && executionId(r) ? [executionId(r)!] : []))
+  // shortcut: 줄의 attentionSince·attentionPreview가 바뀔 때만 다시 받는다. 첫 요청이 그대로인 채 새 요청이 끼면 목록을 다시 열 때까지 안 보인다. 필요하면 요청 도착 사건을 구독한다.
+  const permKey = inboxRows(s.rooms).filter((r) => r.attentionKind === 'permission').map((r) => `${executionId(r)}|${r.attentionSince}|${r.attentionPreview}`).join(',')
+  const refresh = (ids: string[]) => Promise.all([...new Set(ids)].map(async (id) => {
+    try {
+      const { pending } = await api.getPendingPermissions(id)
+      setPerms((p) => ({ ...p, [id]: pending }))
+    } catch {
+      setPerms((p) => Object.fromEntries(Object.entries(p).filter(([k]) => k !== id))) // 못 받으면 미리보기로 돌아간다
+    }
+  }))
+  useEffect(() => {
+    if (open) void refresh(permIds)
+  }, [open, permKey]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!s.presenceLive) return null
   const items = inboxRows(s.rooms)
   if (items.length === 0) return null
@@ -61,6 +83,36 @@ export function HandChip({ inSidebar }: { inSidebar?: boolean }) {
     if (row.status !== 'corrupted') actions.openBeside(row.id)
   }
   const size = s.isNarrow ? 44 : 36
+  const shownPerms = permIds.flatMap((id) => perms[id] ?? [])
+  const showCheck = shownPerms.filter(inlinePermissionOk).length >= 2
+  const picked = liveSelection(selected, shownPerms)
+  const resolveOne = async (sessionId: string, permissionId: string, decision: 'allow' | 'deny') => {
+    setPerms((p) => ({ ...p, [sessionId]: (p[sessionId] ?? []).filter((x) => x.id !== permissionId) }))
+    const r = await resolveInOrder([{ sessionId, permissionId }], (sid, pid) => api.resolvePermission(sid, pid, decision))
+    setFailed(r.failed)
+    void refresh([sessionId])
+  }
+  const allowPicked = () => {
+    // 누른 순간의 id만 보낸다. 확인하는 사이에 온 요청은 넣지 않는다.
+    const ids = new Set(picked)
+    const pairs = permIds.flatMap((sid) => (perms[sid] ?? []).filter((x) => ids.has(x.id)).map((x) => ({ sessionId: sid, permissionId: x.id })))
+    actions.showConfirm({
+      tone: 'warn',
+      icon: ShieldCheck,
+      title: t('nav.inbox.confirmTitle', { n: pairs.length }),
+      message: t('nav.inbox.confirmMessage'),
+      confirmLabel: t('nav.inbox.confirmLabel', { n: pairs.length }),
+      onConfirm: () => {
+        setBusy(true)
+        void resolveInOrder(pairs, (sid, pid) => api.resolvePermission(sid, pid, 'allow')).then(async (r) => {
+          setSelected(new Set())
+          setFailed(r.failed)
+          await refresh(pairs.map((x) => x.sessionId))
+          setBusy(false)
+        })
+      },
+    })
+  }
   const sideRight = inSidebar ? (document.querySelector('aside')?.getBoundingClientRect().right ?? 0) : 0
   const list = open && (
     <PopoverSurface
@@ -75,7 +127,7 @@ export function HandChip({ inSidebar }: { inSidebar?: boolean }) {
       {items.map((row) => (
         <div
           key={row.id}
-          className="flex w-full items-start"
+          className="flex w-full flex-col"
           onContextMenu={sessionContextMenu(row, row.attention === 'waiting' || row.attention === 'running' || row.attention === 'background')}
           style={{
             gap: 8,
@@ -83,6 +135,7 @@ export function HandChip({ inSidebar }: { inSidebar?: boolean }) {
             background: row.id === chromeRoomId(s) ? C.fill : 'transparent',
           }}
         >
+          <div className="flex w-full items-start" style={{ gap: 8 }}>
           <button
             type="button"
             role="option"
@@ -110,7 +163,7 @@ export function HandChip({ inSidebar }: { inSidebar?: boolean }) {
                   )}
                 </span>
               ) : null}
-              {row.attentionPreview ? (
+              {row.attentionPreview && !(row.attentionKind === 'permission' && perms[executionId(row) ?? ''] !== undefined) ? (
                 // 두 줄까지 보여 주고 자른다. 마크다운 기호는 걷어 낸다(목록에서는 렌더하지 않으므로 기호가 그대로 보였다).
                 <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginTop: 2, fontSize: 12.5, color: C.label2, lineHeight: 1.4 }}>
                   {plainPreview(row.attentionPreview)}
@@ -133,8 +186,30 @@ export function HandChip({ inSidebar }: { inSidebar?: boolean }) {
               <Columns2 size={14} />
             </IconButton>
           )}
+          </div>
+          {row.attentionKind === 'permission' && perms[executionId(row) ?? ''] !== undefined && (
+            <InboxPermissions
+              requests={perms[executionId(row)!]}
+              selected={selected}
+              showCheck={showCheck}
+              narrow={s.isNarrow}
+              onToggle={(id) => setSelected((cur) => { const n = new Set(cur); if (!n.delete(id)) n.add(id); return n })}
+              onResolve={(id, d) => void resolveOne(executionId(row)!, id, d)}
+              onOpen={() => pick(row)}
+            />
+          )}
         </div>
       ))}
+      {(showCheck || failed > 0) && (
+        <div className="flex flex-col" style={{ gap: 8, padding: '10px 12px', borderTop: `1px solid ${C.sepSoft}` }}>
+          {failed > 0 && <div role="alert" style={{ fontSize: 12.5, color: C.del }}>{t('nav.inbox.failedCount', { n: failed })}</div>}
+          {showCheck && (
+            <Button tone="primary" height={s.isNarrow ? 44 : 32} fontSize={13} disabled={picked.length === 0 || busy} onClick={allowPicked}>
+              {t('nav.inbox.allowSelected', { n: picked.length })}
+            </Button>
+          )}
+        </div>
+      )}
     </PopoverSurface>
   )
   return (

@@ -33,6 +33,7 @@ import {
 
 import { AttachmentStore, type MaterializedAttachment } from "../attachments";
 import { previewFromDisk } from "../mutationPreview";
+import { grokToolKind, toolKindOf } from "../normalize/grok";
 import { isSecretPath } from "../secretPaths";
 import { mapQuestionOption } from "../questionParse";
 import type { AetherQuestion, PermissionMode } from "../../../shared/http";
@@ -388,6 +389,7 @@ export class GrokRuntime implements AgentRuntime {
           displayName: st("notice.grok.tool.knowledge", { name: def.name }),
           input: args,
           toolUseID: `knowledge-${randomUUID()}`,
+          toolKind: toolKindOf(def.name),
           signal: this.turnSignal(),
         });
         return out.allow ? { allow: true } : { allow: false, message: out.message };
@@ -914,6 +916,7 @@ export class GrokRuntime implements AgentRuntime {
           input,
           ...(mutation ? { mutation } : {}),
           toolUseID: toolId || `perm-${randomUUID()}`,
+          toolKind: grokToolKind(toolCall),
           signal: abortAny(signal, this.permHold.abort.signal),
         } satisfies PermissionAsk);
         const optionId = pickOptionId(p.options, out.allow ? "allow" : "deny");

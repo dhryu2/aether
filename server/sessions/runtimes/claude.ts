@@ -29,6 +29,7 @@ import { claudeServices } from "../../providers/claude/services";
 import { modelEnv } from "../../providers/modelEnv";
 import { claudePermissionPolicy } from "../../providers/claude/permissionPolicy";
 import { compactOutcome, endsClaudeTurn } from "../../providers/claude/compactSignal";
+import { claudeToolKind } from "../normalize/claude";
 import { buildMutationPreview, isSecretToolInput, redactToolInputContent } from "../../providers/claude/mutationPreview";
 import { parseAskQuestions } from "../questionParse";
 import type { AetherQuestion, DocAttachment, ImageAttachment, RawProviderEventBody, SessionEffort } from "../../types";
@@ -383,6 +384,7 @@ export class ClaudeRuntime implements AgentRuntime {
       description: ctx.description,
       decisionReason: ctx.decisionReason,
       blockedPath: ctx.blockedPath,
+      toolKind: claudeToolKind(toolName),
       signal: ctx.signal,
     });
     // ★ H1: allow는 항상 SDK가 준 원본 toolInput을 실행 인자로 되돌린다. 세션·클라이언트는 인자를 수정할 통로가 없다

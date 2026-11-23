@@ -7,7 +7,7 @@
  *
  * 런타임 검사: `server/test/door_wire.ts`가 실제 SSE와 `GET /events` 모양을 고정한다.
  */
-import type { AgentEvent, BackgroundTask } from "./agentEvent";
+import type { AgentEvent, BackgroundTask, ToolKind } from "./agentEvent";
 
 /** REST 오류 본문. 라우트가 실패를 JSON으로 줄 때 이 칸만 쓴다. */
 export type ApiErrorBody = { error: string };
@@ -402,6 +402,8 @@ export type PermissionRequest = {
   decisionReason?: string;
   blockedPath?: string;
   mutation?: MutationPreview;
+  /** 도구 종류. 화면이 파일 변경 요청을 가려내는 데 쓴다. 옛 서버가 보낸 요청에는 없다. */
+  toolKind?: ToolKind;
 };
 
 export type AetherQuestion = {

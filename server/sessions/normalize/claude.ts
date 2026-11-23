@@ -64,7 +64,7 @@ function textFromContent(content: unknown): string {
 }
 
 /** Claude 툴 이름 → ToolKind. 카드·검색 요약·아이콘 분기용(색인엔 무영향). */
-function claudeToolKind(name: string): ToolKind {
+export function claudeToolKind(name: string): ToolKind {
   switch (name) {
     case "Bash":
       return "bash";

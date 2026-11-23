@@ -38,6 +38,7 @@ import type { PermissionMode } from "../../../shared/http";
 import { codexServices } from "../../providers/codex/services";
 import { modelEnv } from "../../providers/modelEnv";
 import { previewFromUnifiedDiff } from "../mutationPreview";
+import { itemToolKind } from "../normalize/codex";
 import { mapQuestionOption } from "../questionParse";
 import type { DocAttachment, ImageAttachment, RawProviderEventBody, SessionEffort } from "../../types";
 import type {
@@ -470,6 +471,7 @@ export class CodexRuntime implements AgentRuntime {
           displayName: st("notice.codex.tool.knowledge", { name: def.name }),
           input: args,
           toolUseID: `knowledge-${randomUUID()}`,
+          toolKind: itemToolKind("mcpToolCall") ?? "other",
           signal: this.turnSignal(),
         });
         return out.allow ? { allow: true } : { allow: false, message: out.message };
@@ -1043,6 +1045,7 @@ export class CodexRuntime implements AgentRuntime {
           },
           toolUseID: p.itemId,
           description: p.reason ?? undefined,
+          toolKind: itemToolKind("commandExecution") ?? "bash",
           signal,
         });
         return { decision: out.allow ? "accept" : "decline" };
@@ -1062,6 +1065,7 @@ export class CodexRuntime implements AgentRuntime {
           mutation: previewFromUnifiedDiff(changes, this.opts.cwd),
           toolUseID: p.itemId,
           description: p.reason ?? undefined,
+          toolKind: itemToolKind("fileChange") ?? "file_change",
           signal,
         });
         return { decision: out.allow ? "accept" : "decline" };

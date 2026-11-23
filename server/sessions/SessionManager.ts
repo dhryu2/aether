@@ -986,6 +986,20 @@ class SessionManager {
     this.writeAutoResume(live.id, { ...plan, at: nextAttemptAt(plan.attempts, until) });
   }
 
+  /** 지금 대화를 받을 수 없을 만큼 바쁜가. 살아 있든 잠들어 있든 같은 기준이다(작업 대기열이 쓴다). */
+  isBusy(id: string): boolean {
+    const live = this.sessions.get(id);
+    return live ? this.isBusyLive(live) : !store.diaryAcceptsInput(id);
+  }
+
+  /** 세션 하나의 주의 통로 칸. 없는 세션이면 undefined. */
+  presenceOf(id: string): PresenceSession | undefined {
+    const live = this.sessions.get(id);
+    if (live) return this.toPresenceFromLive(live);
+    const entry = this.disk.get(id);
+    return entry ? this.toPresenceFromDisk(id, entry) : undefined;
+  }
+
   /** 알림에 쓸 이름. 살아 있는 세션이든 잠든 디스크 세션이든 같은 규칙으로 만든다. */
   private autoResumeNameOf(id: string): { id: string; name: string } {
     const live = this.sessions.get(id);

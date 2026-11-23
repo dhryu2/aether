@@ -276,6 +276,35 @@ export type AutoResumePlan = {
   restartCutAt?: number;
 };
 
+/** 맡겨 두는 작업 대기열. 줄은 서버에 하나이고 한 번에 한 작업만 돈다. */
+export type TaskQueueRun = "stopped" | "scheduled" | "running";
+export type TaskQueueItemState = "waiting" | "running" | "done" | "failed" | "cut";
+export type TaskQueueItem = {
+  id: string;
+  /** 미리 만들어 둔 작업 복사본 세션. 차례가 오면 text를 첫 글로 보낸다. */
+  sessionId: string;
+  text: string;
+  state: TaskQueueItemState;
+  addedAt: number;
+  startedAt?: number;
+  endedAt?: number;
+  /** 끝난 이유. failed·cut일 때만 온다. */
+  reason?: "restart" | "deadline" | "gone" | "send_failed" | "limit";
+};
+export type TaskQueueStopReason = "all_done" | "deadline" | "failures" | "limit" | "missed" | "manual";
+export type TaskQueueResponse = {
+  run: TaskQueueRun;
+  /** 예약 시작 시각(ms). scheduled일 때만 온다. */
+  startAt?: number;
+  /** 전체 시간 상한이 닿는 시각(ms). */
+  deadlineAt?: number;
+  limitHours: number;
+  limitChoices: number[];
+  stopReason?: TaskQueueStopReason;
+  items: TaskQueueItem[];
+  maxItems: number;
+};
+
 /** 자동 재개 전역 설정. text는 비워 두면 기본 문장이 채워져 온다. */
 export type AutoResumeSettings = { enabled: boolean; text: string; defaultText: string };
 

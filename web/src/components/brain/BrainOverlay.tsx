@@ -12,6 +12,7 @@ import { BRAIN_TABS } from './brainTabList'
 import { BrainChrome } from './BrainChrome'
 import { useBrainChrome } from './useBrainChrome'
 import { ReviewView } from './ReviewView'
+import { QueueView } from './QueueView'
 import { projectLabel } from './helpers'
 
 const FOCUSABLE = 'button, a[href], input, select, textarea, [tabindex="0"]'
@@ -189,7 +190,7 @@ function BrainSheet({ openerRef, open, closing }: { openerRef: RefObject<HTMLEle
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
               <PanelHead label={t(BRAIN_TABS.find((tb) => tb.id === tab)?.labelKey ?? 'brain.tabs.review')} back={back} narrow={narrow} />
               <div key={tab} className={dir} style={{ flex: 1, minHeight: 0 }} {...(showTabs ? { id: 'brain-tabpanel', role: 'tabpanel', 'aria-labelledby': `brain-tab-${tab}` } : {})}>
-                <ReviewView />
+                {tab === 'queue' ? <QueueView /> : <ReviewView />}
               </div>
             </div>
           </div>

@@ -47,6 +47,8 @@ import { emitDesktopNotify } from "./notify/desktop";
 import { attachNotify } from "./notify/coordinator";
 import type { NotifyIntent } from "./notify/worthNotifying";
 import { autoResumeRouter } from "./routes/autoResume";
+import { createTaskQueueRouter } from "./routes/taskQueue";
+import { TaskQueueRunner, sessionManagerPort } from "./sessions/taskQueue";
 import { idleSleepRouter } from "./routes/idleSleep";
 import { titleSummaryRouter } from "./routes/titleSummary";
 import { sessionManager } from "./sessions/SessionManager";
@@ -84,6 +86,7 @@ async function shutdown(code = 0) {
   shuttingDown = true;
   // 정리 중 무엇이 실패해도 프로세스는 끝나야 한다. shuttingDown 때문에 다시 부를 수 없어, 여기서 못 끝내면 서버가 영구히 남는다.
   try {
+    taskQueue.dispose(); // 세션을 멈추면 턴 종료 사건이 쏟아진다. 그 사건으로 다음 작업을 시작하지 않게 먼저 푼다
     sessionManager.noteRestartCut();
     const sessions = sessionManager.all();
     // interrupt 병렬화 + 3s 상한(어떤 interrupt가 매달려도 종료 지연 방지). drainPending은 동기·멱등이라 무조건 실행.
@@ -108,6 +111,12 @@ async function shutdown(code = 0) {
 }
 process.on("SIGTERM", () => void shutdown(0));
 process.on("SIGINT", () => void shutdown(0));
+
+// 맡겨 두는 작업 대기열. 알림 출구(notifyOut)는 아래에서 정해지고, 실제로 부르는 것은 서버가 뜬 뒤다.
+const taskQueue = new TaskQueueRunner(sessionManagerPort(sessionManager), (n, sessionId) => {
+  const message = n.type === "finished" ? st("notify.taskQueue.finished") : st("notify.taskQueue.stopped", { reason: st(`notify.taskQueue.reason.${n.reason}`) });
+  notifyOut({ title: st("notify.taskQueue.title"), body: message, sessionId });
+});
 
 const app = express();
 app.use(errorRequestContext);
@@ -204,6 +213,10 @@ if (adminToken) {
 // 자동 재개 설정(보호) — 한도가 풀리면 이어 가기의 켜기·기본 문장.
 app.use("/api/auto-resume", createAuthMiddleware(selectStrategy()));
 app.use("/api/auto-resume", autoResumeRouter);
+
+// 맡겨 두는 작업 대기열(보호).
+app.use("/api/task-queue", createAuthMiddleware(selectStrategy()));
+app.use("/api/task-queue", createTaskQueueRouter(taskQueue));
 
 // 쉬는 세션 잠재우기 대기 시간(보호) — 고를 수 있는 값은 서버가 정한다.
 app.use("/api/idle-sleep", createAuthMiddleware(selectStrategy()));
@@ -325,6 +338,11 @@ async function boot() {
       void reportError(listErr, { component: "server", operation: "session.list.restore" }); console.error("[aether] 세션 목록 복원 실패:", listErr);
       restored = 0;
     }
+  }
+  try {
+    taskQueue.boot(); // 세션 복원(예약·끊김 표시 포함)이 끝난 뒤에 켠다
+  } catch (err) {
+    void reportError(err, { component: "session", operation: "task_queue.boot" });
   }
   app.listen(config.port, config.host, onListen).on("error", onListenError);
   (await import("./update/check")).updateChecker.start();

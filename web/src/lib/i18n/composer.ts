@@ -59,6 +59,11 @@ export const composer: Dict = {
   'composer.plus.browseHint': { ko: '작업 폴더의 파일을 읽기 전용으로 열어요', en: 'Open files in the working folder, read-only' },
 
   // 전송 버튼
+  'composer.queue.add': { ko: '대기열에 넣기', en: 'Add to Queue' },
+  'composer.queue.textOnly': { ko: '대기열에는 글만 넣을 수 있어요', en: 'Only text can be queued' },
+  'composer.queue.added': { ko: '대기열 {n}번째에 넣었어요', en: 'Added as #{n} in the queue' },
+  'composer.queue.note': { ko: '이 세션은 작업 대기열에 들어 있어요', en: 'This session is in the task queue' },
+  'composer.queue.view': { ko: '대기열 보기', en: 'View Queue' },
   'composer.send.aria': { ko: '전송', en: 'Send' },
   'composer.send.branch': { ko: '보내는 방법', en: 'How to send' },
   'composer.send.plain': { ko: '보내기', en: 'Send' },

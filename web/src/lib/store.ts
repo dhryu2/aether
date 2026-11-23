@@ -53,6 +53,7 @@ import { Archive, type LucideIcon } from 'lucide-react'
 import type { AetherEvent, ConnState, HandoffRequestBody, ImageAttachment, DocAttachment, ModelInfo, PermissionMode, PermissionPolicy, PlanRequest, ProviderList, QuestionRequest, PermissionRequest, SessionEffort, SessionListItem, SlashCommandInfo, TurnState, WorkspaceRoom } from './types'
 import type { SearchHit, BrainTab } from './brain'
 import type { Locale } from './i18n/types'
+import type { TaskQueueResponse } from '@shared/http'
 import { parseTranscriptView, nextTranscriptView, type TranscriptView } from './transcriptView'
 import { deriveWorkTitle } from '../../../shared/workTitle'
 import { mergeOlderPageEvents, nextOlderBoundary } from '../components/stream/olderHistorySearch'
@@ -330,6 +331,8 @@ export type State = {
   isWide: boolean
   /** 전역 주의 통로가 스냅샷을 한 번이라도 줬는가. 없으면 손길 칩을 그리지 않는다. */
   presenceLive: boolean
+  /** 작업 대기열(서버 전체에 줄 하나). 아직 못 읽었거나 옛 서버면 null. */
+  taskQueue: TaskQueueResponse | null
   coarsePointer: boolean // 입력수단이 터치(hover 없음)인가 — 넓이(isNarrow)와 분리. 태블릿(아이패드=넓음+터치) 대응.
   scrollBottom: { id: string; nonce: number } | null // 사용자 전송(send/enqueue) 시 그 칸만 최하단으로. 다른 칸은 안 끌어내린다.
   // ── Agent Brain(7e) ──
@@ -436,6 +439,7 @@ let state: State = {
   isNarrow: typeof window !== 'undefined' ? window.innerWidth < 760 : false,
   isWide: typeof window !== 'undefined' ? window.innerWidth >= 1100 : false,
   presenceLive: false,
+  taskQueue: null,
   coarsePointer: typeof window !== 'undefined' ? window.matchMedia('(pointer: coarse)').matches : false,
   scrollBottom: null,
   brainOpen: false,
@@ -466,6 +470,18 @@ let stream: StreamHandle | null = null
 const sideStreams = new Map<string, StreamHandle>()
 let controlStream: StreamHandle | null = null
 let presence: StreamHandle | null = null
+// 줄에 든 세션의 상태가 바뀌면 줄을 다시 읽는다. 읽는 중이면 새로 부르지 않고 끝난 뒤 한 번만 더 읽는다.
+let tqReading = false
+let tqAgain = false
+function refreshTaskQueueSoon(sessionId: string) {
+  if (!state.taskQueue?.items.some((x) => x.sessionId === sessionId && (x.state === 'waiting' || x.state === 'running'))) return
+  if (tqReading) { tqAgain = true; return }
+  tqReading = true
+  void actions.refreshTaskQueue().finally(() => {
+    tqReading = false
+    if (tqAgain) { tqAgain = false; refreshTaskQueueSoon(sessionId) }
+  })
+}
 let desktopNotify: SseHandle | null = null
 const everCaughtUp = new Set<string>() // 세션별 초기 replay 완료 여부 — 재진입 시 로딩 스킵(convos가 이미 메모리에 있음)
 const loadingTimers: Record<string, ReturnType<typeof setTimeout>> = {}
@@ -1693,6 +1709,7 @@ export const actions = {
           const before = state.rooms
           set({ rooms: mergeRoomPresenceUpdate(state.rooms, row), sessions: mergePresenceUpdate(state.sessions, row) })
           reactToHandoff(before, state.rooms)
+          refreshTaskQueueSoon(row.id)
         },
       )
     }
@@ -1829,6 +1846,7 @@ export const actions = {
     const reconnected = conn === 'connected' && state.conn === 'reconnecting'
     set({ conn })
     if (conn === 'connected') {
+      void actions.refreshTaskQueue()
       if (reconnectMaskTimer) { clearTimeout(reconnectMaskTimer); reconnectMaskTimer = null }
       if (state.reconnectMask) set({ reconnectMask: false })
       if (reconnected) void actions.reconcileActiveSession()
@@ -2851,6 +2869,52 @@ export const actions = {
   // 알리기만 하는 소식은 가운데 창으로 막지 않고 위에 잠깐 띄운다(apple-design: 정보만 주는 창은 쓰지 않는다).
   showNotice: (notice: Notice) => set({ notice, noticeSeq: state.noticeSeq + 1 }),
   clearNotice: () => set({ notice: null }),
+
+  // ── 작업 대기열 ──
+  /** 줄을 다시 읽는다. 실패(옛 서버의 404 포함)는 조용히 false를 돌려주고 이전 값을 둔다. */
+  async refreshTaskQueue(): Promise<boolean> {
+    try {
+      set({ taskQueue: await api.taskQueue() })
+      return true
+    } catch {
+      return false
+    }
+  },
+  /** 세션과 첫 글을 줄 끝에 넣는다. 서버가 거절하면 그 문구를 오류로 띄우고 false를 돌려준다. */
+  async addToTaskQueue(sessionId: string, text: string): Promise<boolean> {
+    try {
+      const { item } = await api.taskQueueAdd(sessionId, text)
+      await actions.refreshTaskQueue()
+      const n = (state.taskQueue?.items.findIndex((x) => x.id === item.id) ?? -1) + 1
+      actions.showNotice({ title: t('composer.queue.added', { n: n || (state.taskQueue?.items.length ?? 1) }) })
+      return true
+    } catch (e) {
+      set({ error: errMsg(e) })
+      return false
+    }
+  },
+  async removeFromTaskQueue(itemId: string) {
+    try {
+      await api.taskQueueRemove(itemId)
+    } catch (e) {
+      set({ error: errMsg(e) })
+    }
+    await actions.refreshTaskQueue()
+  },
+  async startTaskQueue(body: { startAt?: number; limitHours: number }) {
+    try {
+      set({ taskQueue: await api.taskQueueStart(body) })
+    } catch (e) {
+      set({ error: errMsg(e) })
+    }
+  },
+  async stopTaskQueue() {
+    try {
+      set({ taskQueue: await api.taskQueueStop() })
+    } catch (e) {
+      set({ error: errMsg(e) })
+    }
+  },
 
   // ── Agent Brain(7e) ──
   openBrain(tab?: BrainTab) {

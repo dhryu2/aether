@@ -92,6 +92,7 @@ const EXTRA_SUITES: { name: string; file: string }[] = [
   { name: "web:contextMenu", file: path.join(TEST_DIR, "..", "..", "web", "test", "contextMenu.test.ts") },
   { name: "web:rewindFlow", file: path.join(TEST_DIR, "..", "..", "web", "test", "rewindFlow.test.ts") },
   { name: "web:permissionCard", file: path.join(TEST_DIR, "..", "..", "web", "test", "permissionCard.test.ts") },
+  { name: "web:taskQueue", file: path.join(TEST_DIR, "..", "..", "web", "test", "taskQueue.test.ts") },
 ];
 
 const filters = process.argv.slice(2);

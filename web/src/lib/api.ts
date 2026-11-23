@@ -21,7 +21,7 @@ import type {
 } from './types'
 import type { DeletedSessionRow, SearchHit } from './brain'
 import type { FileTraceResponse, ProjectRecapResponse, ReviewDetailResponse, ReviewFileDiffResponse, ReviewListResponse, ReviewMarkResponse, ReviewRequestBody, ReviewRequestResponse } from '@shared/brain'
-import type { WorkspaceFileResponse, WorkspaceFilesResponse, PermissionMode, PermissionModesResponse, AutoResumePlan, AutoResumeSettings, HandoffInfo, HandoffRequestBody, BackupItem, BackupListResponse, AuthDevicesResponse, ChangePasswordResponse, EventsPageResponse, ServerInfoResponse, ServerLogLevel, RemoteAccessResponse, ServerLogResponse, UpdateStatusResponse } from '@shared/http'
+import type { WorkspaceFileResponse, WorkspaceFilesResponse, PermissionMode, PermissionModesResponse, AutoResumePlan, AutoResumeSettings, HandoffInfo, HandoffRequestBody, BackupItem, BackupListResponse, AuthDevicesResponse, ChangePasswordResponse, EventsPageResponse, ServerInfoResponse, ServerLogLevel, RemoteAccessResponse, ServerLogResponse, UpdateStatusResponse, TaskQueueResponse, TaskQueueItem } from '@shared/http'
 import type { ErrorGroupDetailResponse, ErrorGroupListResponse, ErrorLogPeriod, ErrorLogSource } from '@shared/errors'
 import { authHeaders } from './clientAuth'
 
@@ -384,6 +384,15 @@ export const api = {
   // ── 작업 폴더 파일(읽기 전용) ──
   workspaceFiles: (id: string) => req<WorkspaceFilesResponse>(`/api/files/${encodeURIComponent(id)}`),
   workspaceFile: (id: string, path: string) => req<WorkspaceFileResponse>(`/api/files/${encodeURIComponent(id)}/content?path=${encodeURIComponent(path)}`),
+
+  // ── 작업 대기열(서버 전체에 줄 하나) ──
+  taskQueue: () => req<TaskQueueResponse>('/api/task-queue'),
+  taskQueueAdd: (sessionId: string, text: string) =>
+    req<{ item: TaskQueueItem }>('/api/task-queue/items', { method: 'POST', body: JSON.stringify({ sessionId, text }) }),
+  taskQueueRemove: (itemId: string) => req<{ ok: true }>(`/api/task-queue/items/${encodeURIComponent(itemId)}`, { method: 'DELETE' }),
+  taskQueueStart: (body: { startAt?: number; limitHours: number }) =>
+    req<TaskQueueResponse>('/api/task-queue/start', { method: 'POST', body: JSON.stringify(body) }),
+  taskQueueStop: () => req<TaskQueueResponse>('/api/task-queue/stop', { method: 'POST' }),
 
   // ── 작업 검토함 ──
   reviewList: () => req<ReviewListResponse>('/api/review'),

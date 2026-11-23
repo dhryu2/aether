@@ -50,6 +50,8 @@ import { api } from '../../lib/api'
 import { BackgroundAnnouncer, BackgroundTasksStrip } from './BackgroundTasksStrip'
 import { AutoResumeBar } from './AutoResumeBar'
 import { HandoffNote } from './HandoffNote'
+import { QueueAddButton } from './QueueAddButton'
+import { QueueNote } from './QueueNote'
 import type { BackgroundTask, HandoffSource, ImageAttachment, DocAttachment } from '../../lib/types'
 import { findRoom, executionId as roomExecutionId } from '../../lib/workspaceRooms'
 
@@ -150,7 +152,16 @@ export function Composer({ sessionId }: { sessionId: string }) {
   const plain = soleText(blocks)
   const messageText = plain ?? serializeBlocks(blocks)
   // busy 중에도 전송 허용 — idle이면 즉시 전송, busy면 큐에 추가(다음 턴 자동 발사). 단 로딩 중엔 비활성. 첨부만도 전송 가능.
-  const canSend = (messageText.trim().length > 0 || attach.length > 0) && !loading
+  // 작업 대기열: 줄에서 차례를 기다리는 세션에 사람이 먼저 글을 보내면 차례가 왔을 때 글이 둘째 메시지가 된다. 그래서 막는다.
+  const queueItems = s.taskQueue?.items.filter((x) => x.sessionId === execId) ?? []
+  // 줄이 보낸 첫 글이 대화에 나타나면(비어 있지 않으면) 줄 상태를 아직 못 읽었어도 막힘이 풀린다.
+  const emptyConvo = !(s.convos[execId] ?? []).some((it) => it.kind === 'user_msg' || it.kind === 'local_user') && queuedFor(s, execId).length === 0
+  const queueWaiting = emptyConvo && queueItems.some((x) => x.state === 'waiting')
+  const canSend = (messageText.trim().length > 0 || attach.length > 0) && !loading && !queueWaiting
+  // [대기열에 넣기]는 작업 복사본으로 만든, 아직 글을 보내지 않은 새 세션에만 그린다. 최종 판정은 서버가 한다.
+  // 줄 상태를 못 읽은(옛 서버) 때는 그리지 않는다.
+  const canQueueHere = !!active?.isolated && !!active.workspaceSource && emptyConvo && queueItems.length === 0 && s.taskQueue !== null
+  const [queuing, setQueuing] = useState(false)
 
   // 칸이 바뀐 뒤에 커서를 옮긴다. 상자가 방금 붙었을 때는 그 칸이 그려진 다음에 포커스한다.
   const fieldRefs = useRef(new Map<string, HTMLTextAreaElement>())
@@ -341,7 +352,7 @@ export function Composer({ sessionId }: { sessionId: string }) {
   }
   const submit = () => {
     const trimmed = messageText.trim()
-    if ((!trimmed && attach.length === 0) || loading) return // 텍스트·이미지 둘 다 없거나 로딩 중이면 차단
+    if ((!trimmed && attach.length === 0) || loading || queueWaiting) return // 텍스트·이미지 둘 다 없거나 로딩 중이거나 대기열에서 차례를 기다리면 차단
     setSent((n) => n + 1)
     // 코드 상자가 섞여 있으면 슬래시 명령으로 보지 않는다. 글 전체가 명령일 때만 실행한다.
     const slash = plain !== null && trimmed ? parseSlashCommand(trimmed, SLASH_CMDS) : null
@@ -368,10 +379,22 @@ export function Composer({ sessionId }: { sessionId: string }) {
   // 갈래는 입력 전체를 요구로 보낸다. 슬래시 명령으로 실행하지 않고, 다음 글에 남지 않는다.
   const submitBrief = () => {
     const trimmed = messageText.trim()
-    if ((!trimmed && attach.length === 0) || loading) return
+    if ((!trimmed && attach.length === 0) || loading || queueWaiting) return
     setSent((n) => n + 1)
     const packed = pack()
     deliver(packed.finalText, packed.images, packed.documents, true)
+  }
+  const queueText = messageText.trim()
+  // 대기열은 글만 받는다. 첨부가 있거나 슬래시 명령(/brief 별칭 포함)이면 못 넣는다.
+  const queueTextOnly = attach.length === 0 && !queueText.startsWith('/')
+  const addToQueue = async () => {
+    if (!queueText || !queueTextOnly || loading || queuing) return
+    setQueuing(true)
+    try {
+      if (await actions.addToTaskQueue(execId, queueText)) reset()
+    } finally {
+      setQueuing(false)
+    }
   }
 
   // 접힌 코드 상자로 커서를 옮기면 먼저 펼친다. 칸이 그려진 뒤에 포커스한다.
@@ -638,6 +661,7 @@ export function Composer({ sessionId }: { sessionId: string }) {
       >
         {pendingPerm && !loading && <PermissionQuickBar perm={pendingPerm} isNarrow={s.isNarrow} seq={s.convos[execId]?.find((e) => e.kind === 'permission_request' && e.req.id === pendingPerm.id)?.seq} sessionId={sessionId} />}
         {handoffFrom && !loading && <HandoffNote fromId={handoffFrom} source={handoffSource} />}
+        {queueItems.some((x) => x.state === 'waiting' || x.state === 'running') && <QueueNote />}
         {room?.autoResume && <AutoResumeBar plan={room.autoResume} sessionId={sessionId} execId={execId} />}
         <BackgroundAnnouncer count={bgTasks.length} />
         <BackgroundTasksStrip
@@ -751,6 +775,9 @@ export function Composer({ sessionId }: { sessionId: string }) {
               />
               <MicButton disabled={loading} size={btn} onText={appendSpoken} />
               {busy && !loading && <InterruptButton sessionId={sessionId} size={btn} />}
+              {canQueueHere && (
+                <QueueAddButton enabled={queueText.length > 0 && queueTextOnly && !loading} onlyText={!queueTextOnly} busy={queuing} size={btn} narrow={s.isNarrow} onClick={() => void addToQueue()} />
+              )}
               <SendButton enabled={canSend} size={btn} sent={sent} onClick={submit} onSendBrief={submitBrief} />
             </div>
           </div>

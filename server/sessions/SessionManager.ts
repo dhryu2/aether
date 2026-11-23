@@ -1428,6 +1428,17 @@ class SessionManager {
     }
   }
 
+  /**
+   * 다른 AI에게 검토 맡기기. 같은 폴더에 수동 권한 새 세션을 열고 검토 요청 글을 입력창 초안으로 넣는다. 모델은 부르지 않는다.
+   * workspaceSource를 넘기지 않는다(검토 세션을 지울 때 원래 세션의 복사본이 함께 버려진다). 원래 세션의 handoffTo도 건드리지 않는다.
+   */
+  createReviewSession(fromId: string, o: { provider: string; cwd: string; name: string; text: string }): LiveSession {
+    const next = this.create({ cwd: o.cwd, provider: o.provider, name: o.name, permissionMode: "manual" });
+    next.setHandoff({ handoffFrom: fromId, handoffDraft: { text: o.text, source: "review" } });
+    this.emitPresence(this.toPresenceFromLive(next));
+    return next;
+  }
+
   /** 한도 대기 끝에 예약이 실행됐다. 인계서 요청을 다시 보낸다(Aether가 보낸 글로 표시). */
   async resumeHandoff(id: string): Promise<void> {
     const job = this.handoffMeta(id)?.handoffJob;

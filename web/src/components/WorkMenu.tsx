@@ -5,7 +5,7 @@ import type { SessionListItem } from '../lib/types'
 import { canCopy, copyWithNotice } from '../lib/copyNotice'
 import { useT } from '../lib/i18n'
 import { IconButton } from './ui'
-import { HandoffMenuItems } from './HandoffMenuItems'
+import { HandoffMenuItems, ReviewMenuItem } from './HandoffMenuItems'
 import { C, R } from '../design/tokens'
 
 type WorkMenuActions = {
@@ -105,6 +105,7 @@ export function WorkMenuItems({
         </MenuItem>
       )}
       <HandoffMenuItems id={session.id} close={close} />
+      <ReviewMenuItem id={session.id} close={close} />
       {session.isolated && (
         <>
           <MenuItem

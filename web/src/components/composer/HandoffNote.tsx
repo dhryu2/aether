@@ -17,7 +17,7 @@ export function HandoffNote({ fromId, source }: { fromId: string; source: Handof
     >
       <FileText size={16} aria-hidden style={{ flexShrink: 0, color: C.tint }} />
       <span role="status" className="truncate" style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.label2 }}>
-        {source === 'skeleton' ? t('handoff.note.skeleton') : t('handoff.note.model')}
+        {source === 'skeleton' ? t('handoff.note.skeleton') : source === 'review' ? t('handoff.note.review') : t('handoff.note.model')}
       </span>
       <button
         type="button"

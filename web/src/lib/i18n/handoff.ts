@@ -6,6 +6,16 @@ export const handoff: Dict = {
   'handoff.usage.hint': { ko: ', 눌러서 새 세션으로 넘기기', en: ', click to hand off to a new session' },
   'handoff.menu.item': { ko: '새 세션으로 넘기기…', en: 'Hand off to a new session…' },
   'handoff.menu.busy': { ko: '작업 중이라 지금은 넘길 수 없어요', en: 'Working now, so it cannot be handed off yet' },
+  'handoff.review.menuItem': { ko: '검토 맡기기…', en: 'Ask for a Review…' },
+  'handoff.review.busy': { ko: '작업 중이라 지금은 맡길 수 없어요', en: "Working now, so a review can't start yet" },
+  'handoff.review.button': { ko: '검토 맡기기', en: 'Ask for a Review' },
+  'handoff.review.title': { ko: '검토 맡기기', en: 'Ask for a Review' },
+  'handoff.review.ai': { ko: '검토할 AI', en: 'Reviewing AI' },
+  'handoff.review.current': { ko: '지금 AI', en: 'current' },
+  'handoff.review.note': { ko: '같은 작업 폴더에서 새 세션이 수동 권한으로 열려요. 검토 요청 글은 입력창에 들어가니 확인하고 보내세요.', en: 'A new session opens in the same working folder with manual permissions. The review request goes into the input box, so check it and send.' },
+  'handoff.review.submit': { ko: '세션 만들기', en: 'Create Session' },
+  'handoff.review.submitting': { ko: '만드는 중', en: 'Creating' },
+  'handoff.review.error': { ko: '검토를 맡기지 못했어요: {error}', en: "Couldn't ask for a review: {error}" },
   'handoff.menu.inProgress': { ko: '이미 넘기는 중이에요', en: 'A handoff is already in progress' },
   'handoff.menu.cancel': { ko: '넘기기 취소', en: 'Cancel handoff' },
   'handoff.menu.showResult': { ko: '넘기기 결과 열기', en: 'Open handoff result' },
@@ -60,6 +70,7 @@ export const handoff: Dict = {
   // 입력창 위 안내 줄
   'handoff.note.model': { ko: '이전 세션에서 쓴 인계서예요. 확인하고 보내세요', en: 'This handoff was written in the previous session. Check it, then send' },
   'handoff.note.skeleton': { ko: 'AI가 인계서를 쓰지 못해 Aether가 대화 기록으로 초안을 만들었어요. 확인하고 보내 주세요', en: 'The AI could not write it, so Aether made an outline. Check it, then send' },
+  'handoff.note.review': { ko: '이전 세션의 작업을 검토해 달라는 글이에요. 확인하고 보내세요', en: "This asks for a review of the previous session's work. Check it and send." },
   'handoff.note.open': { ko: '이전 세션 열기', en: 'Open previous session' },
 
   // 대화 속 접힌 카드

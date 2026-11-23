@@ -20,7 +20,7 @@ import type {
   FsPlaces,
 } from './types'
 import type { DeletedSessionRow, SearchHit } from './brain'
-import type { FileTraceResponse, ProjectRecapResponse, ReviewDetailResponse, ReviewFileDiffResponse, ReviewListResponse, ReviewMarkResponse } from '@shared/brain'
+import type { FileTraceResponse, ProjectRecapResponse, ReviewDetailResponse, ReviewFileDiffResponse, ReviewListResponse, ReviewMarkResponse, ReviewRequestBody, ReviewRequestResponse } from '@shared/brain'
 import type { WorkspaceFileResponse, WorkspaceFilesResponse, PermissionMode, PermissionModesResponse, AutoResumePlan, AutoResumeSettings, HandoffInfo, HandoffRequestBody, BackupItem, BackupListResponse, AuthDevicesResponse, ChangePasswordResponse, EventsPageResponse, ServerInfoResponse, ServerLogLevel, RemoteAccessResponse, ServerLogResponse, UpdateStatusResponse } from '@shared/http'
 import type { ErrorGroupDetailResponse, ErrorGroupListResponse, ErrorLogPeriod, ErrorLogSource } from '@shared/errors'
 import { authHeaders } from './clientAuth'
@@ -401,6 +401,9 @@ export const api = {
   /** seq를 생략하면 검토 위치를 지운다. expected는 그 완료가 저장한 값이고, 지금 값과 다르면 서버가 409로 거절한다. */
   reviewUndo: (id: string, seq: number | undefined, expected: number | null) =>
     req<ReviewMarkResponse>(`/api/review/${encodeURIComponent(id)}/undo`, { method: 'POST', body: JSON.stringify({ ...(seq === undefined ? {} : { seq }), expected }) }),
+  /** 다른 AI에게 검토 맡기기. 같은 폴더에 새 세션이 열리고 검토 요청 글이 그 입력창 초안으로 들어간다. */
+  requestReview: (id: string, provider: string) =>
+    req<ReviewRequestResponse>(`/api/review/${encodeURIComponent(id)}/request`, { method: 'POST', body: JSON.stringify({ provider } satisfies ReviewRequestBody) }),
 
   // ── Agent Brain(7e) ──
   /** 지운 세션의 대화 글 한 쪽(검색 색인, 읽기 전용). after는 앞 쪽 마지막 줄의 id. */

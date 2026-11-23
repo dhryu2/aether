@@ -60,3 +60,34 @@ export function HandoffMenuItems({ id, close }: { id: string; close: () => void 
     </>
   )
 }
+
+/** 「검토 맡기기」 항목. 보관·손상된 세션은 숨기고, 일하는 중이면 이유와 함께 막는다. */
+export function ReviewMenuItem({ id, close }: { id: string; close: () => void }) {
+  const t = useT()
+  const s = useStore()
+  const noteId = useId()
+  const room = findRoom(s.rooms, id) ?? s.rooms.find((r) => executionId(r) === id)
+  const execId = executionId(room)
+  if (!room || !execId || handoffMenuState(room).kind === 'hidden') return null
+  const busy = room.attention === 'running' || room.attention === 'waiting' || room.attention === 'background'
+  return (
+    <>
+      <MenuItem
+        data-session-opt="review-request"
+        disabled={busy}
+        aria-describedby={busy ? noteId : undefined}
+        onClick={() => {
+          close()
+          actions.openReview(execId)
+        }}
+      >
+        {t('handoff.review.menuItem')}
+      </MenuItem>
+      {busy && (
+        <span id={noteId} style={{ padding: '0 10px 4px', fontSize: 12, color: C.label3 }}>
+          {t('handoff.review.busy')}
+        </span>
+      )}
+    </>
+  )
+}

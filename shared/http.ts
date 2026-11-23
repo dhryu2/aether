@@ -215,8 +215,8 @@ export type SessionListItem = {
   autoResume?: AutoResumePlan;
 } & HandoffFields;
 
-/** 인계서가 만들어진 방식. skeleton은 모델이 쓰지 못해 Aether가 기록에서 모은 것이다. */
-export type HandoffSource = "model" | "skeleton";
+/** 인계서가 만들어진 방식. skeleton은 모델이 쓰지 못해 Aether가 기록에서 모은 것이고, review는 검토 맡기기가 만든 검토 요청 글이다. */
+export type HandoffSource = "model" | "skeleton" | "review";
 /** asking은 이전 세션 AI가 넘기기 전에 사람에게 물어 답을 기다리는 중이다. */
 export type HandoffState = "writing" | "asking" | "waiting_limit" | "copy_ready";
 

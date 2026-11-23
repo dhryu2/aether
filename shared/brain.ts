@@ -115,6 +115,10 @@ export type ReviewFileDiffResponse = {
 /** 검토 완료·되돌리기 응답. previous는 되돌릴 때 쓸 이전 위치(없으면 처음 처리한 것). 되돌릴 때 본문의 expected는 그 완료가 저장한 reviewedSeq이고, 지금 값과 다르면 409다. */
 export type ReviewMarkResponse = { reviewedSeq: number | null; previous: number | null };
 
+/** 다른 AI에게 검토 맡기기. provider는 검토할 AI의 id, 응답 id는 새로 열린 검토 세션이다. */
+export type ReviewRequestBody = { provider: string };
+export type ReviewRequestResponse = { id: string };
+
 /** 파일을 고친 세션 하나. 그 파일을 고친 턴마다의 사람 지시와 실행 명령이 붙는다. */
 export type FileTraceEntry = {
   sessionId: string;

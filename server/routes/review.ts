@@ -7,6 +7,7 @@
  *   GET  /api/review/:id/diff?path=  바뀐 파일 하나의 변경 내용(기록 → 없으면 커밋 안 된 git 변경). path는 요약의 바뀐 파일 목록에 든 값만
  *   POST /api/review/:id/done      { seq }  검토 완료 위치 저장
  *   POST /api/review/:id/undo      { seq? } 이전 위치로 되돌림(없으면 지움)
+ *   POST /api/review/:id/request   { provider } 다른 AI에게 검토 맡기기 — 같은 폴더에 수동 권한 새 세션을 열고 검토 요청 글을 초안으로 넣는다(모델 호출 없음). 201 {id}
  * 요약은 AI 없이 저장된 기록(중립 사건)에서만 모은다. 경로는 diff 주소에서만 받고, 그것도 요약의 바뀐 파일 목록에 든 값만 허용한다(그 밖의 경로는 읽지 않는다).
  */
 import fs from "node:fs";
@@ -14,17 +15,20 @@ import os from "node:os";
 import path from "node:path";
 import { Router, type Request, type Response } from "express";
 import type { AgentEvent } from "../../shared/agentEvent";
-import type { FileTraceEntry, FileTraceResponse, ProjectRecapResponse, ProjectRecapSession, ReviewDetailResponse, ReviewFileDiffResponse, ReviewLeftover, ReviewListResponse, ReviewMarkResponse, ReviewRow, ReviewSessionHead, ReviewSummary } from "../../shared/brain";
+import type { FileTraceEntry, FileTraceResponse, ProjectRecapResponse, ProjectRecapSession, ReviewDetailResponse, ReviewFileDiffResponse, ReviewLeftover, ReviewListResponse, ReviewMarkResponse, ReviewRequestResponse, ReviewRow, ReviewSessionHead, ReviewSummary } from "../../shared/brain";
 import { st } from "../i18n";
 import { reportResponseError, rejectRequest } from "../observability/http";
-import { folderFileDiffAsync, folderGrepAsync, folderReviewStateAsync, isolatedWorkspaceExists, type FolderReviewState } from "../sessions/isolatedWorkspace";
+import { folderFileDiffAsync, folderGrepAsync, folderReviewStateAsync, folderUncommittedChanges, isGitRepo, isolatedWorkspaceExists, type FolderReviewState } from "../sessions/isolatedWorkspace";
 import { lastSeqFromDisk, readEventsPage } from "../sessions/persistence";
 import { isHiddenSeq } from "../sessions/rewind";
 import { sessionManager } from "../sessions/SessionManager";
 import { summarizeReview } from "../sessions/reviewSummary";
+import { recentUserTexts } from "../sessions/handoff";
+import { reviewRequestText } from "../sessions/reviewRequest";
+import { listProviders, providerAvailability } from "../providers/registry";
 import { deletedFileStems, removedDefinitions } from "../sessions/reviewLeftovers";
 import { createFileTouches, type FileTouch } from "../sessions/fileTrace";
-import { isSensitivePath, resolveFileUnderCwd } from "../sessions/safePath";
+import { isSensitivePath, resolveFileUnderCwd, resolveWorkFolder } from "../sessions/safePath";
 import { fileEditPreview } from "../sessions/fileEdits";
 import { canonPath, isSecretTarget } from "../sessions/workspaceFiles";
 import type { FileEdit } from "../sessions/codec/types";
@@ -471,3 +475,43 @@ function mark(kind: "done" | "undo") {
 
 reviewRouter.post("/:id/done", mark("done"));
 reviewRouter.post("/:id/undo", mark("undo"));
+
+// 다른 AI에게 검토 맡기기. 형식 → 존재 → 보관·일하는 중 → provider → 폴더 → 변경 있음 순으로 거르고, 모델은 부르지 않는다.
+reviewRouter.post("/:id/request", async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  if (!SESSION_ID_RE.test(id) || (!sessionManager.get(id) && !sessionManager.hasDiskSession(id))) {
+    return rejectRequest(res, 404, { error: st("routes.common.sessionNotFound") });
+  }
+  const rawProvider = (req.body ?? {}).provider;
+  const provider = typeof rawProvider === "string" ? rawProvider.trim() : "";
+  if (!provider) return rejectRequest(res, 400, { error: st("routes.reviewRequest.bodyInvalid") });
+  try {
+    const item = sessionManager.list().find((s) => s.id === id);
+    if (!item) return rejectRequest(res, 404, { error: st("routes.common.sessionNotFound") });
+    if (sessionManager.isArchived(id)) return rejectRequest(res, 409, { error: st("routes.sessions.archivedReadOnly") });
+    if (["running", "waiting", "background"].includes(item.attention ?? "idle")) return rejectRequest(res, 409, { error: st("routes.reviewRequest.busy") });
+    const entry = listProviders().find((e) => e.id === provider);
+    if (!entry) return rejectRequest(res, 409, { error: st("routes.reviewRequest.providerUnknown") });
+    const availability = await providerAvailability(entry);
+    if (!availability.available) {
+      const key = availability.requires ? "requires" : availability.reason;
+      return rejectRequest(res, 409, { error: st(`routes.sessions.providerUnavailable.${key}`, { provider: entry.services.displayName, requires: availability.requires ?? "" }) });
+    }
+    try {
+      resolveWorkFolder(item.cwd);
+    } catch {
+      return rejectRequest(res, 409, { error: st("routes.reviewRequest.folderMissing") });
+    }
+    // 세션 전체를 한 번 읽어 요약과 사람 말을 함께 만든다.
+    const { codec, raw, partial } = readRange(id, 0, lastSeqFromDisk(id));
+    const summary = summarizeReview(raw.flatMap((ev) => codec.normalize(ev)));
+    if (!summary.changedFiles.length && !folderUncommittedChanges(item.cwd)?.length) return rejectRequest(res, 409, { error: st("routes.reviewRequest.nothingToReview") });
+    const text = reviewRequestText({ name: item.displayName, id, cwd: item.cwd, isGit: isGitRepo(item.cwd), partial, userTexts: recentUserTexts(raw), summary });
+    const next = sessionManager.createReviewSession(id, { provider: entry.id, cwd: item.cwd, name: st("routes.reviewRequest.title", { name: item.displayName }), text });
+    const body: ReviewRequestResponse = { id: next.id };
+    res.status(201).json(body);
+  } catch (error) {
+    void reportResponseError(res, error, { component: "routes", operation: "review.request", session_id: id });
+    res.status(500).json({ error: st("routes.review.readFailed") });
+  }
+});

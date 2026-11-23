@@ -260,6 +260,20 @@ export function ReviewDetail({ row, narrow, busy, onOpen, onDone }: {
 
       <div style={{ flexShrink: 0, display: 'flex', gap: 8, justifyContent: narrow ? undefined : 'flex-end', padding: '10px 0 0', borderTop: `0.5px solid ${C.sepSoft}`, background: C.bg }}>
         <Button tone="gray" height={narrow ? 44 : 36} grow={narrow} onClick={() => onOpen()} disabled={busy}>{t('brain.review.openSession')}</Button>
+        <Button
+          tone="gray"
+          height={narrow ? 44 : 36}
+          grow={narrow}
+          disabled={busy}
+          onClick={() => {
+            // 검토함 창(z 70)이 넘기기 창(z 52)보다 위라서 먼저 닫는다.
+            actions.closeBrain()
+            actions.selectSession(row.id)
+            actions.openReview(row.id)
+          }}
+        >
+          {t('handoff.review.button')}
+        </Button>
         <Button tone="primary" height={narrow ? 44 : 36} grow={narrow} onClick={onDone} disabled={busy} aria-busy={busy}>
           {busy ? t('brain.review.working') : t('brain.review.markDone')}
         </Button>

@@ -8,7 +8,7 @@ import { canCopy, copyWithNotice } from '../../lib/copyNotice'
 import { useT } from '../../lib/i18n'
 import { IconButton, PopoverSurface } from '../ui'
 import { MenuItem } from '../WorkMenu'
-import { HandoffMenuItems } from '../HandoffMenuItems'
+import { HandoffMenuItems, ReviewMenuItem } from '../HandoffMenuItems'
 import { executionId, findRoom } from '../../lib/workspaceRooms'
 import { C } from '../../design/tokens'
 
@@ -134,6 +134,7 @@ export function PaneMenuItems({ sessionId, visibleIds, zoomed, onClose, close }:
       )}
       <MenuItem keepMenu onClick={() => setPicking(true)}>{t('nav.split.replaceSession')}</MenuItem>
       <HandoffMenuItems id={sessionId} close={close} />
+      <ReviewMenuItem id={sessionId} close={close} />
       {onClose && (
         <>
           <div role="separator" style={{ height: 0.5, margin: '5px 4px', background: C.sep }} />

@@ -313,7 +313,7 @@ export type State = {
   deleteTarget: SessionListItem | null // 삭제/초기화 확인 다이얼로그 대상(null = 닫힘)
   deleteMode: 'delete' | 'reset' | 'discard' // deleteTarget이 null이 아닐 때만 의미 있음
   fileViewer: { sessionId: string; path?: string } | null // 작업 폴더 파일 열어 보기(null = 닫힘). path가 없으면 찾기 화면. sessionId는 실행 id.
-  handoffSheet: { sessionId: string; mode: 'form' | 'waiting' | 'result' } | null // 새 세션으로 넘기기 창(null = 닫힘). sessionId는 실행 id.
+  handoffSheet: { sessionId: string; mode: 'form' | 'waiting' | 'result' | 'review' } | null // 새 세션으로 넘기기 창(null = 닫힘). sessionId는 실행 id.
   dialog: DialogState | null // 범용 확인 다이얼로그(null = 닫힘)
   /**
    * 우클릭 메뉴(null = 닫힘). 한 벌만 shell/ContextMenu.tsx가 그린다. 위젯은 items(메뉴 항목 요소)만 넘긴다.
@@ -2799,7 +2799,20 @@ export const actions = {
   // ── 새 세션으로 넘기기 ── 서버가 끝까지 진행하고, 화면은 창을 띄우고 결과를 받아 칸을 바꾸기만 한다.
   openHandoff: (sessionId: string) => set({ handoffSheet: { sessionId, mode: 'form' } }),
   openHandoffResult: (sessionId: string) => set({ handoffSheet: { sessionId, mode: 'result' } }),
+  openReview: (sessionId: string) => set({ handoffSheet: { sessionId, mode: 'review' } }),
   closeHandoff: () => set({ handoffSheet: null }),
+  /** 다른 AI에게 검토 맡기기. 새 검토 세션이 열리면 창을 닫고 그 세션으로 옮긴다. */
+  async requestReview(sessionId: string, provider: string): Promise<{ ok: true } | { ok: false; error: string }> {
+    try {
+      const r = await api.requestReview(sessionId, provider)
+      await actions.refreshSessions()
+      set({ handoffSheet: null })
+      actions.selectSession(roomIdForExecution(getState().rooms, r.id))
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: errMsg(e) }
+    }
+  },
   openFileViewer: (sessionId: string, path?: string) => set({ fileViewer: { sessionId, ...(path ? { path } : {}) } }),
   closeFileViewer: () => set({ fileViewer: null }),
   /** 사람의 답을 기다리는 넘기기를 취소한다(서버가 작업을 지운다). 결과 알림은 실시간 갱신으로 온다. */

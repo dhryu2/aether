@@ -12,7 +12,7 @@ import { errMsg } from '../lib/errors'
 import { useT } from '../lib/i18n'
 import { HANDOFF_FOCUS_MAX } from '../lib/handoff'
 import { recentFolders } from '../lib/sessionGroups'
-import type { HandoffInfo } from '../lib/types'
+import type { HandoffInfo, ProviderAvailabilityResponse } from '../lib/types'
 import { C, FONT, Z } from '../design/tokens'
 import { Button, ModalCard, ModalFooter, ModalHeader, ModalShell, SegmentedControl, Switch } from './ui'
 import { GroupTitle } from './settings/parts'
@@ -26,6 +26,7 @@ export function HandoffSheet() {
   const sheet = useStore().handoffSheet
   if (!sheet) return null
   if (sheet.mode === 'result') return <ResultWindow sessionId={sheet.sessionId} />
+  if (sheet.mode === 'review') return <ReviewWindow sessionId={sheet.sessionId} />
   if (sheet.mode === 'waiting') return <WaitingWindow sessionId={sheet.sessionId} />
   return <FormWindow sessionId={sheet.sessionId} />
 }
@@ -235,6 +236,89 @@ function RecipientFolders({ defaultFolder, picked, onPick, disabled }: { default
         onRetry={() => void browser.loadPlaces()}
       />
     </div>
+  )
+}
+
+/** 다른 AI에게 검토 맡기기. 검토할 AI를 고르면 같은 폴더에 새 세션이 열리고 검토 요청 글이 입력창에 들어간다. */
+function ReviewWindow({ sessionId }: { sessionId: string }) {
+  const s = useStore()
+  const t = useT()
+  const rect = useAnchor(sessionId)
+  const narrow = s.isNarrow
+  const errorId = useId()
+  const item = s.sessions.find((x) => x.id === sessionId)
+  const [availability, setAvailability] = useState<ProviderAvailabilityResponse['availability'] | null>(null)
+  const [picked, setPicked] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  // 쓸 수 있는 AI만 보인다. 받지 못하면 전부 보이고 서버가 만들 때 다시 확인한다.
+  useEffect(() => {
+    let alive = true
+    api.providerAvailability().then((r) => alive && setAvailability(r.availability)).catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+  const usable = (s.providers ?? []).filter((p) => !availability || availability[p.id]?.available !== false)
+  // 원래 세션과 다른 AI를 앞에 둔다. 같은 AI도 고를 수 있다.
+  const choices = [...usable.filter((p) => p.id !== item?.provider), ...usable.filter((p) => p.id === item?.provider)]
+  const chosen = choices.some((p) => p.id === picked) ? picked : choices[0]?.id ?? ''
+
+  async function submit() {
+    if (busy || !chosen) return
+    setBusy(true)
+    setError('')
+    const r = await actions.requestReview(sessionId, chosen)
+    setBusy(false)
+    if (!r.ok) setError(r.error)
+  }
+
+  const submitBtn = (
+    <Button key="submit" tone="primary" height={narrow ? 50 : 40} paddingX={18} fontSize={15} fullWidth={narrow} disabled={busy || !chosen} aria-describedby={error ? errorId : undefined} data-session-opt="review-submit" onClick={() => void submit()}>
+      {busy ? t('handoff.review.submitting') : t('handoff.review.submit')}
+    </Button>
+  )
+  const cancelBtn = (
+    <Button key="cancel" tone="gray" height={narrow ? 50 : 40} paddingX={18} fontSize={15} fullWidth={narrow} disabled={busy} onClick={actions.closeHandoff}>
+      {t('handoff.cancel')}
+    </Button>
+  )
+  return (
+    <ModalShell onClose={actions.closeHandoff} zIndex={Z.root.handoff}>
+      <Anchor rect={rect}>
+        <ModalCard variant="sheet" maxWidth={480} style={CARD_CLICKABLE} data-window="handoff" data-modal="review-request">
+          <ModalHeader title={t('handoff.review.title')} onClose={actions.closeHandoff} closeLabel={t('common.close')} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+            <section>
+              <GroupTitle>{t('handoff.review.ai')}</GroupTitle>
+              <SegmentedControl
+                items={choices.map((p) => ({ value: p.id, label: p.id === item?.provider ? `${p.displayName} (${t('handoff.review.current')})` : p.displayName }))}
+                value={chosen}
+                onChange={setPicked}
+                fullWidth
+                scrollable
+                fontSize={13.5}
+                itemHeight={narrow ? 44 : 32}
+              />
+            </section>
+            <p style={{ margin: 0, fontSize: 13, color: C.label2, lineHeight: 1.45 }}>{t('handoff.review.note')}</p>
+          </div>
+          <ModalFooter>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', alignItems: 'stretch', padding: error ? '8px 0' : undefined }}>
+              {error && (
+                <p id={errorId} role="alert" style={{ margin: 0, padding: '0 4px', fontSize: 13, lineHeight: 1.45, color: C.del, textAlign: 'left' }}>
+                  {t('handoff.review.error', { error })}
+                </p>
+              )}
+              <div style={{ display: 'flex', flexDirection: narrow ? 'column' : 'row', justifyContent: 'flex-end', gap: 8 }}>
+                {narrow ? [submitBtn, cancelBtn] : [cancelBtn, submitBtn]}
+              </div>
+            </div>
+          </ModalFooter>
+        </ModalCard>
+      </Anchor>
+    </ModalShell>
   )
 }
 

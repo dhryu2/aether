@@ -161,5 +161,13 @@ eq("마지막 목록의 끝나지 않은 항목만", shape(neutral(codecs.claude
 eq("범위 안에 목록이 없으면 할 일도 없다", shape(neutral(codecs.claude, [claude.bash("c1", "ls"), claude.res("c1")])).todos, []);
 eq("전부 끝난 목록이면 할 일이 없다", shape(neutral(codecs.claude, [claude.plan([["a", "completed"]])])).todos, []);
 
+console.log("\n=== 마지막 지시와 턴 오류 ===");
+const ne = (seq: number, c: object) => ({ provider: "claude", seq, part: 0, ts: seq, ...c }) as AgentEvent;
+const sp = summarizeReview([ne(1, { type: "user_text", text: "첫 지시" }), ne(2, { type: "user_text", text: "x".repeat(400) }), ne(3, { type: "turn_completed", status: "failed", error: "boom" })]);
+eq("마지막 지시는 300자로 잘리고 순번이 붙는다", [sp.lastPrompt?.text.length, sp.lastPrompt?.seq], [300, 2]);
+eq("실패한 턴의 오류", sp.turnError, { text: "boom", seq: 3 });
+eq("뒤 턴이 성공하면 오류가 없다", summarizeReview([ne(1, { type: "turn_completed", status: "failed", error: "boom" }), ne(2, { type: "turn_completed", status: "ok" })]).turnError, undefined);
+eq("지시가 없으면 lastPrompt도 없다", summarizeReview([]).lastPrompt, undefined);
+
 console.log(`\n${fail === 0 ? "✅" : "❌"} review_summary: ${pass} pass / ${fail} fail`);
 process.exit(fail === 0 ? 0 : 1);

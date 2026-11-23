@@ -1,23 +1,30 @@
 /**
  * 작업 검토함 라우트(인증 게이트 뒤).
  *   GET  /api/review               끝난 세션 중 검토할 것이 있는 목록(기록만 읽고 git은 부르지 않는다)
+ *   GET  /api/review/recap?project=  같은 프로젝트(폴더)의 최근 세션 5개 요약(새 세션 빈 화면용)
+ *   GET  /api/review/trace?session=&path=  그 파일을 고친 같은 프로젝트의 세션 기록(최신이 위)
  *   GET  /api/review/:id[?git=0]   상세. git 상태는 ?git=0이면 건너뛴다
  *   GET  /api/review/:id/diff?path=  바뀐 파일 하나의 변경 내용(기록 → 없으면 커밋 안 된 git 변경). path는 요약의 바뀐 파일 목록에 든 값만
  *   POST /api/review/:id/done      { seq }  검토 완료 위치 저장
  *   POST /api/review/:id/undo      { seq? } 이전 위치로 되돌림(없으면 지움)
  * 요약은 AI 없이 저장된 기록(중립 사건)에서만 모은다. 경로는 diff 주소에서만 받고, 그것도 요약의 바뀐 파일 목록에 든 값만 허용한다(그 밖의 경로는 읽지 않는다).
  */
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { Router, type Request, type Response } from "express";
 import type { AgentEvent } from "../../shared/agentEvent";
-import type { ReviewDetailResponse, ReviewFileDiffResponse, ReviewListResponse, ReviewMarkResponse, ReviewRow, ReviewSessionHead, ReviewSummary } from "../../shared/brain";
+import type { FileTraceEntry, FileTraceResponse, ProjectRecapResponse, ProjectRecapSession, ReviewDetailResponse, ReviewFileDiffResponse, ReviewLeftover, ReviewListResponse, ReviewMarkResponse, ReviewRow, ReviewSessionHead, ReviewSummary } from "../../shared/brain";
 import { st } from "../i18n";
 import { reportResponseError, rejectRequest } from "../observability/http";
-import { folderFileDiffAsync, folderReviewStateAsync, isolatedWorkspaceExists, type FolderReviewState } from "../sessions/isolatedWorkspace";
+import { folderFileDiffAsync, folderGrepAsync, folderReviewStateAsync, isolatedWorkspaceExists, type FolderReviewState } from "../sessions/isolatedWorkspace";
 import { lastSeqFromDisk, readEventsPage } from "../sessions/persistence";
 import { isHiddenSeq } from "../sessions/rewind";
 import { sessionManager } from "../sessions/SessionManager";
 import { summarizeReview } from "../sessions/reviewSummary";
+import { deletedFileStems, removedDefinitions } from "../sessions/reviewLeftovers";
+import { createFileTouches, type FileTouch } from "../sessions/fileTrace";
+import { isSensitivePath, resolveFileUnderCwd } from "../sessions/safePath";
 import { fileEditPreview } from "../sessions/fileEdits";
 import { canonPath, isSecretTarget } from "../sessions/workspaceFiles";
 import type { FileEdit } from "../sessions/codec/types";
@@ -188,6 +195,194 @@ reviewRouter.get("/:id/diff", async (req: Request, res: Response) => {
   }
 });
 
+const RECAP_SESSIONS = 5;
+const RECAP_CANDIDATES = 20;
+const TRACE_SESSIONS = 100;
+const TRACE_ENTRIES = 50;
+const TRACE_BUDGET_MS = 8000;
+const TRACE_PAGE = 2000;
+
+/** 끝 슬래시만 걷어 같은 글자인지 본다(web/src/lib/sessionGroups.ts와 같은 규칙). */
+const projectOf = (item: Item) => (item.workspaceSource || item.cwd || "").trim().replace(/\/+$/, "") || (item.workspaceSource || item.cwd || "").trim();
+
+export function recapState(item: Item, s: ReviewSummary): ProjectRecapSession["state"] {
+  const att = item.attention ?? "idle";
+  if (att === "running" || att === "background") return "running";
+  if (att === "waiting") return "waiting";
+  if (att === "failed" || s.turnFailed === "failed") return "failed";
+  if (s.turnFailed === "interrupted") return "interrupted";
+  return "done";
+}
+
+reviewRouter.get("/recap", async (req: Request, res: Response) => {
+  const project = req.query.project;
+  if (typeof project !== "string" || !project.trim()) return rejectRequest(res, 400, { error: st("routes.review.pathInvalid") });
+  try {
+    const want = project.trim().replace(/\/+$/, "") || project.trim();
+    const candidates = sessionManager
+      .list()
+      .filter((s) => !s.archivedAt && projectOf(s) === want)
+      .sort((a, b) => (b.lastActivityAt ?? b.createdAt) - (a.lastActivityAt ?? a.createdAt))
+      .slice(0, RECAP_CANDIDATES);
+    const sessions: ProjectRecapSession[] = [];
+    for (const item of candidates) {
+      if (sessions.length >= RECAP_SESSIONS) break;
+      try {
+        const c = compute(item.id, 0);
+        const s = c.summary;
+        if (!s.lastPrompt) continue;
+        const err = s.turnError ?? s.failedCommands[s.failedCommands.length - 1];
+        sessions.push({
+          id: item.id,
+          title: item.displayName,
+          lastActivityAt: item.lastActivityAt ?? item.createdAt,
+          lastSeq: c.lastSeq,
+          state: recapState(item, s),
+          lastPrompt: s.lastPrompt,
+          ...(err ? { lastError: { text: err.text, seq: err.seq } } : {}),
+          recentFiles: s.changedFiles.slice(-3),
+          openTodos: s.openTodos.slice(0, 5),
+        });
+      } catch (error) {
+        void reportResponseError(res, error, { component: "routes", operation: "review.recap.session", session_id: item.id });
+      }
+      await new Promise((r) => setImmediate(r));
+    }
+    const body: ProjectRecapResponse = { sessions };
+    res.json(body);
+  } catch (error) {
+    void reportResponseError(res, error, { component: "routes", operation: "review.recap" });
+    res.status(500).json({ error: st("routes.review.readFailed") });
+  }
+});
+
+// 세션 하나의 "파일 → 고친 턴" 지도. 칸은 세션 id 하나이고 마지막 순번이 같으면 다시 훑지 않는다(다르면 덮어쓴다).
+//   열쇠 규칙은 세션의 cwd·workspaceSource에만 달려 있어 값에 넣지 않는다.
+const traceCache = new Map<string, { lastSeq: number; map: Map<string, FileTouch[]> }>();
+
+/**
+ * 세션 기록을 오래된 것부터 2,000건씩 읽어 파일별로 고친 턴을 모은다. 숨긴 구간은 뺀다.
+ * 경로 열쇠: 기록의 경로를 세션 cwd 기준 절대 경로로 풀고, 복사본 세션이면 cwd 아래를 원본 폴더 아래로 옮긴 뒤 실제 경로로 푼다.
+ * shortcut: 사용자가 저장소의 하위 폴더를 골라 복사본을 만든 세션은 옮긴 경로가 어긋날 수 있다. 어긋나면 그 세션의 기록은 이 파일에서 안 보인다.
+ */
+function traceKeyOf(item: Item): (p: string) => string {
+  const cwd = path.resolve(item.cwd);
+  const source = item.workspaceSource && path.resolve(item.workspaceSource) !== cwd ? path.resolve(item.workspaceSource) : null;
+  return (p) => {
+    const abs = path.resolve(item.cwd, p);
+    return canonPath(source && abs.startsWith(cwd + path.sep) ? path.join(source, abs.slice(cwd.length + 1)) : abs);
+  };
+}
+
+/** 제한 시간(deadline) 안에 다 못 읽으면 지금까지 모은 것과 complete:false를 주고 캐시에 넣지 않는다. */
+async function traceOf(item: Item, deadline: number): Promise<{ map: Map<string, FileTouch[]>; complete: boolean }> {
+  const diskLast = lastSeqFromDisk(item.id);
+  const hit = traceCache.get(item.id);
+  if (hit && hit.lastSeq === diskLast) return { map: hit.map, complete: true };
+  const touches = createFileTouches(traceKeyOf(item));
+  const codec = sessionManager.codecOf(item.id);
+  const ranges = sessionManager.hiddenRangesOf(item.id);
+  for (let from = 1; from <= diskLast; from += TRACE_PAGE) {
+    if (from > 1) {
+      await new Promise((r) => setImmediate(r)); // 긴 기록도 2,000건마다 다른 요청에 차례를 넘긴다
+      if (Date.now() > deadline) return { map: touches.result(), complete: false };
+    }
+    const page = readEventsPage(item.id, from + TRACE_PAGE, TRACE_PAGE, from);
+    for (const ev of page.events) {
+      if (ranges.length && isHiddenSeq(ev.seq, ranges)) continue;
+      for (const e of codec.normalize(ev)) touches.add(e);
+    }
+  }
+  const out = touches.result();
+  traceCache.set(item.id, { lastSeq: diskLast, map: out });
+  if (traceCache.size > CACHE_MAX) traceCache.delete(traceCache.keys().next().value as string);
+  return { map: out, complete: true };
+}
+
+reviewRouter.get("/trace", async (req: Request, res: Response) => {
+  const id = req.query.session;
+  const want = req.query.path;
+  if (typeof id !== "string" || !SESSION_ID_RE.test(id) || typeof want !== "string" || !want) {
+    return rejectRequest(res, 400, { error: st("routes.review.pathInvalid") });
+  }
+  const origin = sessionManager.list().find((s) => s.id === id);
+  if (!origin) return rejectRequest(res, 404, { error: st("routes.common.sessionNotFound") });
+  try {
+    // /api/files와 같은 경계·비밀 검사. 폴더 밖이면 거절하고 비밀 파일이면 빈 결과다. 응답에 서버 절대 경로를 싣지 않는다.
+    let real: string;
+    try {
+      real = resolveFileUnderCwd(fs.realpathSync(origin.cwd), want).real;
+    } catch {
+      return rejectRequest(res, 400, { error: st("routes.files.pathInvalid") });
+    }
+    const empty: FileTraceResponse = { path: want, entries: [], partial: false };
+    if (isSecretTarget(origin.cwd, want) || isSecretTarget(origin.cwd, real) || isSensitivePath(real)) return res.json(empty);
+    const target = traceKeyOf(origin)(want); // 경계는 real로 이미 확인했다. 열쇠는 기록 쪽과 같은 규칙으로 want에서 만든다
+    const project = projectOf(origin);
+    const items = sessionManager
+      .list()
+      .filter((s) => projectOf(s) === project)
+      .sort((a, b) => (b.lastActivityAt ?? b.createdAt) - (a.lastActivityAt ?? a.createdAt))
+      .slice(0, TRACE_SESSIONS);
+    const deadline = Date.now() + TRACE_BUDGET_MS;
+    const entries: FileTraceEntry[] = [];
+    let partial = false;
+    for (const item of items) {
+      if (Date.now() > deadline) { partial = true; break; }
+      try {
+        const traced = await traceOf(item, deadline);
+        if (!traced.complete) partial = true;
+        for (const t of traced.map.get(target) ?? []) {
+          entries.push({ sessionId: item.id, title: item.displayName, at: t.at, seq: t.seq, ...(t.prompt ? { prompt: t.prompt } : {}), commands: t.commands });
+        }
+      } catch (error) {
+        void reportResponseError(res, error, { component: "routes", operation: "review.trace.session", session_id: item.id });
+      }
+      await new Promise((r) => setImmediate(r)); // 다른 요청에 차례를 넘긴다
+    }
+    entries.sort((a, b) => b.at - a.at);
+    const body: FileTraceResponse = { path: want, entries: entries.slice(0, TRACE_ENTRIES), partial };
+    res.json(body);
+  } catch (error) {
+    void reportResponseError(res, error, { component: "routes", operation: "review.trace", session_id: id });
+    res.status(500).json({ error: st("routes.review.readFailed") });
+  }
+});
+
+/** 이 세션이 성공시킨 파일 수정 조각(순번 포함)과 셸 명령 글. 지운 이름 찾기가 쓴다. */
+function sessionWork(id: string, reviewedSeq: number) {
+  const { codec, raw } = readRange(id, reviewedSeq, lastSeqFromDisk(id));
+  const failed = new Map<string, boolean>();
+  const commands: string[] = [];
+  for (const e of raw.flatMap((ev) => codec.normalize(ev))) {
+    if (e.type === "tool_result") failed.set(e.toolId, e.isError === true);
+    else if (e.type === "tool_call" && e.toolKind === "bash" && e.target) commands.push(e.target);
+  }
+  // 같은 도구 호출의 뒤 사건이 앞 사건의 내용을 통째로 대체한다.
+  const byTool = new Map<string, (FileEdit & { seq: number })[]>();
+  for (const ev of raw) {
+    const group = new Map<string, (FileEdit & { seq: number })[]>();
+    for (const e of codec.fileEdits(ev)) group.set(e.toolId, [...(group.get(e.toolId) ?? []), { ...e, seq: ev.seq }]);
+    for (const [toolId, edits] of group) byTool.set(toolId, edits);
+  }
+  const edits = [...byTool].filter(([toolId]) => failed.get(toolId) !== true).flatMap(([, v]) => v);
+  return { edits, commands };
+}
+
+/** 지운 파일·정의의 이름이 저장소에 아직 남은 곳. git 상태를 읽은 경우에만 부른다. */
+async function leftoversOf(item: Item, id: string, files: string[], state: FolderReviewState): Promise<{ leftovers: ReviewLeftover[]; incomplete: boolean }> {
+  const { edits, commands } = sessionWork(id, sessionManager.reviewedSeqOf(id) ?? 0);
+  const stems = deletedFileStems(state.deleted, files, commands);
+  const defs = removedDefinitions(edits).filter((d) => !stems.includes(d.name));
+  const found = await folderGrepAsync(item.cwd, [...stems, ...defs.map((d) => d.name)], (rel) => isSecretTarget(item.cwd, rel));
+  if (!found) return { leftovers: [], incomplete: false };
+  const leftovers: ReviewLeftover[] = [
+    ...stems.map((name): ReviewLeftover => ({ name, from: "file", hits: found.hits.get(name) ?? [] })),
+    ...defs.map((d): ReviewLeftover => ({ name: d.name, from: "definition", ...(d.seq !== undefined ? { seq: d.seq } : {}), hits: found.hits.get(d.name) ?? [] })),
+  ].filter((l) => l.hits.length > 0);
+  return { leftovers, incomplete: found.incomplete };
+}
+
 reviewRouter.get("/:id", async (req: Request, res: Response) => {
   const id = String(req.params.id);
   if (!SESSION_ID_RE.test(id) || (!sessionManager.get(id) && !sessionManager.hasDiskSession(id))) {
@@ -201,14 +396,18 @@ reviewRouter.get("/:id", async (req: Request, res: Response) => {
     const skipGit = req.query.git === "0";
     // 기록의 경로와 저장소 경로는 실제 경로로 풀어 비교한다(맥의 /var와 /private/var 차이).
     const files = c.summary.changedFiles.map((f) => canonPath(path.resolve(item.cwd, f.path)));
+    const cwdReal = canonPath(item.cwd);
+    const tmpRoots = [os.tmpdir(), "/tmp"].map(canonPath);
+    const under = (p: string, root: string) => p === root || p.startsWith(root + path.sep);
+    const outsideFiles = c.summary.changedFiles.filter((_, i) => !under(files[i], cwdReal) && !tmpRoots.some((r) => under(files[i], r))).map((f) => f.path);
     const state = skipGit ? null : await gitState(item.cwd, files);
     if (!state) {
-      const body: ReviewDetailResponse = { ...base, git: skipGit ? "skipped" : "unavailable", fileStates: [], unrecorded: [] };
+      const body: ReviewDetailResponse = { ...base, git: skipGit ? "skipped" : "unavailable", fileStates: [], unrecorded: [], outsideFiles, leftovers: [] };
       return res.json(body);
     }
     const dirty = state.dirty.map(canonPath);
     const covers = (g: string, f: string) => g === f || (g.endsWith("/") && f.startsWith(g));
-    const cwdReal = canonPath(item.cwd);
+    const left = await leftoversOf(item, id, files, state);
     const unrecorded = dirty
       .filter((g) => !files.some((f) => covers(g, f)))
       .slice(0, MAX_UNRECORDED)
@@ -222,6 +421,9 @@ reviewRouter.get("/:id", async (req: Request, res: Response) => {
         return f.startsWith(state.root + path.sep) && state.ignored && !state.ignored.has(f) ? "clean" : "unknown";
       }),
       unrecorded,
+      outsideFiles,
+      leftovers: left.leftovers,
+      ...(left.incomplete ? { leftoversIncomplete: true as const } : {}),
     };
     res.json(body);
   } catch (error) {

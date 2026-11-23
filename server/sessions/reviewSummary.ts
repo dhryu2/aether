@@ -13,6 +13,7 @@ import type { AgentEvent } from "../../shared/agentEvent";
 import type { ReviewSummary } from "../../shared/brain";
 
 const COMMAND_MAX = 1000;
+const PROMPT_MAX = 300;
 
 export function summarizeReview(events: readonly AgentEvent[]): ReviewSummary {
   // 도구 결과: toolId → 오류 여부. 같은 id의 마지막 결과가 유효하다.
@@ -23,13 +24,21 @@ export function summarizeReview(events: readonly AgentEvent[]): ReviewSummary {
   const bash: { text: string; seq: number; err: boolean }[] = []; // 결과가 온 명령만, 호출 순서대로
   let todos: { text: string; seq: number }[] = [];
   let lastTurn: "ok" | "interrupted" | "failed" | undefined;
+  let lastPrompt: { text: string; seq: number } | undefined;
+  let turnError: { text: string; seq: number } | undefined;
   for (const ev of events) {
+    if (ev.type === "user_text") {
+      lastPrompt = { text: ev.text.slice(0, PROMPT_MAX), seq: ev.seq };
+      continue;
+    }
     if (ev.type === "plan_update") {
       todos = ev.items.filter((i) => i.status !== "completed").map((i) => ({ text: i.text, seq: ev.seq }));
       continue;
     }
     if (ev.type === "turn_completed") {
       lastTurn = ev.status;
+      if (ev.status === "failed" && ev.error) turnError = { text: ev.error.slice(0, COMMAND_MAX), seq: ev.seq };
+      else turnError = undefined;
       continue;
     }
     if (ev.type !== "tool_call") continue;
@@ -67,5 +76,7 @@ export function summarizeReview(events: readonly AgentEvent[]): ReviewSummary {
     otherFailures: list(other),
     ...(lastTurn === "failed" || lastTurn === "interrupted" ? { turnFailed: lastTurn } : {}),
     openTodos: todos,
+    ...(lastPrompt ? { lastPrompt } : {}),
+    ...(turnError ? { turnError } : {}),
   };
 }

@@ -9,6 +9,7 @@ import { api } from '../../lib/api'
 import { relTime } from '../../lib/format'
 import { useT } from '../../lib/i18n'
 import { displayPath } from '../../lib/review'
+import { actions } from '../../lib/store'
 import { Button, Collapse, Skeleton } from '../ui'
 import { Group, RowLine } from './Bits'
 import { ReviewFile } from './ReviewFile'
@@ -19,12 +20,13 @@ const itemStyle = {
 } as const
 const wrapText = { minWidth: 0, flex: 1, overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' } as const
 
-function Section({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+function Section({ title, count, hint, children }: { title: string; count?: number; hint?: string; children: ReactNode }) {
   return (
     <section style={{ marginTop: 20 }}>
       <h3 style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: C.label3 }}>
-        {title} <span className="tabular-nums">{count}</span>
+        {title} {count !== undefined && <span className="tabular-nums">{count}</span>}
       </h3>
+      {hint && <div style={{ fontSize: 13, color: C.label3, margin: '0 0 8px' }}>{hint}</div>}
       <Group>{children}</Group>
     </section>
   )
@@ -44,6 +46,7 @@ export function ReviewDetail({ row, narrow, busy, onOpen, onDone }: {
   const [retry, setRetry] = useState(0)
   const [unrecordedOpen, setUnrecordedOpen] = useState(false)
   const [otherOpen, setOtherOpen] = useState(false)
+  const [leftoversOpen, setLeftoversOpen] = useState(false)
 
   // 같은 세션의 새로고침은 화면을 비우지 않는다(스크롤과 펼침을 지킨다). 다른 세션으로 바뀔 때만 비운다.
   useEffect(() => {
@@ -61,7 +64,7 @@ export function ReviewDetail({ row, narrow, busy, onOpen, onDone }: {
       .finally(() => alive && setGitLoading(false))
     return () => { alive = false }
   }, [row.id, row.lastSeq, retry])
-  useEffect(() => { setUnrecordedOpen(false); setOtherOpen(false) }, [row.id])
+  useEffect(() => { setUnrecordedOpen(false); setOtherOpen(false); setLeftoversOpen(false) }, [row.id])
 
   const d = detail && detail.id === row.id ? detail : null
   const gitOk = d?.git === 'ok'
@@ -125,6 +128,57 @@ export function ReviewDetail({ row, narrow, busy, onOpen, onDone }: {
               </div>
             ))}
           </Section>
+        )}
+
+        {d && d.outsideFiles.length > 0 && (
+          <Section title={t('brain.review.sectionOutside')} hint={t('brain.review.outsideHint')}>
+            {d.outsideFiles.map((p, i) => (
+              <div key={p}>
+                <RowLine index={i} />
+                <button type="button" className="press" onClick={() => onOpen(d.changedFiles.find((f) => f.path === p)?.seq)} style={itemStyle}>
+                  <span style={{ ...wrapText, fontFamily: FONT.mono, fontVariantLigatures: 'none', fontSize: 13, lineHeight: 1.45 }}>{p}</span>
+                </button>
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {d && gitOk && d.leftovers.length > 0 && (
+          <section style={{ marginTop: 20 }}>
+            <button
+              type="button"
+              className="press"
+              aria-expanded={leftoversOpen}
+              aria-controls="review-leftovers"
+              onClick={() => setLeftoversOpen((v) => !v)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 44, padding: 0, border: 'none', background: 'transparent', color: C.label2, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            >
+              {leftoversOpen ? <ChevronDown size={16} aria-hidden /> : <ChevronRight size={16} aria-hidden />}
+              {t('brain.review.leftovers', { n: d.leftovers.length })}
+            </button>
+            <Collapse open={leftoversOpen} id="review-leftovers">
+              <div style={{ fontSize: 13, color: C.label3, margin: '0 0 8px' }}>{t('brain.review.leftoversHint')}</div>
+              {d.leftoversIncomplete && <div style={{ fontSize: 13, color: C.label2, margin: '0 0 8px' }}>{t('brain.review.leftoversIncomplete')}</div>}
+              {d.leftovers.map((l) => (
+                <div key={`${l.from}:${l.name}`} style={{ marginBottom: 10 }}>
+                  <div style={{ margin: '0 0 6px', fontFamily: FONT.mono, fontVariantLigatures: 'none', fontSize: 13, fontWeight: 600, color: C.label, overflowWrap: 'anywhere' }}>{l.name}</div>
+                  <Group>
+                    {l.hits.map((h, i) => (
+                      <div key={`${h.path}:${h.line}`}>
+                        <RowLine index={i} />
+                        <button type="button" className="press" onClick={() => actions.openFileViewer(row.id, h.path)} style={itemStyle}>
+                          <span style={{ ...wrapText, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ fontFamily: FONT.mono, fontVariantLigatures: 'none', fontSize: 12.5, color: C.label3 }}>{h.path}:{h.line}</span>
+                            <span style={{ fontFamily: FONT.mono, fontVariantLigatures: 'none', fontSize: 13, lineHeight: 1.45 }}>{h.text}</span>
+                          </span>
+                        </button>
+                      </div>
+                    ))}
+                  </Group>
+                </div>
+              ))}
+            </Collapse>
+          </section>
         )}
 
         {d && d.changedFiles.length > 0 && (

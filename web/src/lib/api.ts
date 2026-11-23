@@ -6,6 +6,7 @@ import type {
   DocAttachment,
   ModelInfo,
   PermissionPolicy,
+  PermissionRequest,
   ProvidersResponse,
   AccountUsageResponse,
   ProviderAvailabilityResponse,
@@ -19,7 +20,7 @@ import type {
   FsPlaces,
 } from './types'
 import type { DeletedSessionRow, SearchHit } from './brain'
-import type { ReviewDetailResponse, ReviewFileDiffResponse, ReviewListResponse, ReviewMarkResponse } from '@shared/brain'
+import type { FileTraceResponse, ProjectRecapResponse, ReviewDetailResponse, ReviewFileDiffResponse, ReviewListResponse, ReviewMarkResponse } from '@shared/brain'
 import type { WorkspaceFileResponse, WorkspaceFilesResponse, PermissionMode, PermissionModesResponse, AutoResumePlan, AutoResumeSettings, HandoffInfo, HandoffRequestBody, BackupItem, BackupListResponse, AuthDevicesResponse, ChangePasswordResponse, EventsPageResponse, ServerInfoResponse, ServerLogLevel, RemoteAccessResponse, ServerLogResponse, UpdateStatusResponse } from '@shared/http'
 import type { ErrorGroupDetailResponse, ErrorGroupListResponse, ErrorLogPeriod, ErrorLogSource } from '@shared/errors'
 import { authHeaders } from './clientAuth'
@@ -331,6 +332,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ permissionId, decision }),
     }),
+  getPendingPermissions: (id: string) => req<{ pending: PermissionRequest[] }>(`/api/sessions/${id}/permissions`),
 
   // answers[i] = i번째 질문에서 고른 **선택지 이름**들, custom[i] = 그 질문에 직접 적은 문장(없으면 null).
   //   서버가 answers를 제시된 선택지와 대조하므로 자유 입력을 여기 섞어 보내면 400이 된다(8d-3 ⑥ⓒ).
@@ -387,6 +389,11 @@ export const api = {
   reviewList: () => req<ReviewListResponse>('/api/review'),
   /** git=false면 서버가 git 상태를 건너뛴다(기록만 먼저 그릴 때). */
   reviewDetail: (id: string, git: boolean) => req<ReviewDetailResponse>(`/api/review/${encodeURIComponent(id)}${git ? '' : '?git=0'}`),
+  /** 새 세션 빈 화면용: 같은 프로젝트 폴더의 최근 세션 요약. 옛 서버는 404를 준다. */
+  reviewRecap: (project: string) => req<ProjectRecapResponse>(`/api/review/recap?project=${encodeURIComponent(project)}`),
+  /** 이 파일(세션 작업 폴더 기준 경로)을 고친 같은 프로젝트의 세션들. 첫 조회가 8초까지 걸릴 수 있다. */
+  reviewTrace: (id: string, path: string) =>
+    req<FileTraceResponse>(`/api/review/trace?session=${encodeURIComponent(id)}&path=${encodeURIComponent(path)}`),
   reviewFileDiff: (id: string, path: string) =>
     req<ReviewFileDiffResponse>(`/api/review/${encodeURIComponent(id)}/diff?path=${encodeURIComponent(path)}`),
   reviewDone: (id: string, seq: number) =>

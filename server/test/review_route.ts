@@ -18,7 +18,7 @@ const { sessionManager } = await import("../sessions/SessionManager");
 await (await import("./support/tempDb")).useTempDiary("review_route"); // 임시 SQLite 일기
 const store = await import("../sessions/persistence");
 const express = (await import("express")).default;
-const { reviewRouter } = await import("../routes/review");
+const { reviewRouter, recapState } = await import("../routes/review");
 const { clampString } = await import("../sessions/persistFilter");
 
 let pass = 0;
@@ -304,6 +304,91 @@ if (ci) {
   const rc2 = await dq(sCase, path.join(ciDir, "ci.ts"));
   eq("대소문자가 다른 작업 폴더 경로도 git 대체가 된다", [rc2.json.source, rc2.json.edits[0]?.hunks?.length > 0], ["git", true]);
 } else console.log("  (대소문자를 구분하는 파일시스템 — 대소문자 시험 생략)");
+
+console.log("\n=== 상세: 범위 밖 파일·지운 이름이 남은 곳 ===");
+const repoL = path.join(ROOT, "repoL");
+fs.mkdirSync(path.join(repoL, "src"), { recursive: true });
+git(["init", "-q"], repoL);
+const lib = path.join(repoL, "src", "lib.ts");
+fs.writeFileSync(lib, "export function oldHelper() {}\n");
+fs.writeFileSync(path.join(repoL, "src", "use.ts"), "oldHelper();\n");
+fs.writeFileSync(path.join(repoL, "legacyMod.ts"), "x\n");
+fs.writeFileSync(path.join(repoL, "src", "other.ts"), "import './legacyMod';\n");
+git(["add", "."], repoL);
+git(["commit", "-q", "-m", "init"], repoL);
+fs.writeFileSync(lib, "// removed\n"); // 세션이 정의를 지운 결과
+git(["rm", "-q", "legacyMod.ts"], repoL);
+const OUTSIDE = "/opt/aether-test-outside/x.ts"; // 작업 폴더와 임시 폴더 밖
+const SCRATCH = path.join(os.tmpdir(), "aether-scratch.txt"); // 임시 폴더는 뺀다
+const removeDef = "export function oldHelper() {}";
+const tail = (name: string, at: number, events: object[], provider: string) => seed({ cwd: repoL, provider, name, at, events: [{ kind: "user_msg", text: `${name} 지시` }, ...events, done] });
+const codexRemove = (id: string) => [
+  codexItem("item/started", { type: "fileChange", id, status: "inProgress", changes: [{ path: lib, kind: { type: "update", move_path: null }, diff: `@@ -1 +1 @@\n-${removeDef}\n+// removed\n` }] }),
+  codexItem("item/completed", { type: "fileChange", id, status: "completed", changes: [{ path: lib, kind: { type: "update", move_path: null }, diff: `@@ -1 +1 @@\n-${removeDef}\n+// removed\n` }] }),
+];
+const tClaude = tail("제거 클로드", now - 400, [
+  claudeCall("r1", "Edit", { file_path: lib, old_string: removeDef, new_string: "// removed" }), claudeRes("r1"),
+  claudeCall("r2", "Bash", { command: "git rm legacyMod.ts" }), claudeRes("r2"),
+  ...editOk("r3", OUTSIDE), ...editOk("r4", SCRATCH),
+], "claude");
+const tCodex = tail("제거 코덱스", now - 390, codexRemove("k1"), "codex");
+const tOllama = tail("제거 올라마", now - 380, codexRemove("k2"), "ollama");
+const tGrok = tail("제거 그록", now - 370, [
+  grokUpd({ sessionUpdate: "tool_call", toolCallId: "g1", title: "search_replace", kind: "edit", rawInput: { file_path: lib, old_string: removeDef, new_string: "// removed" } }),
+  grokUpd({ sessionUpdate: "tool_call_update", toolCallId: "g1", status: "completed", content: { type: "text", text: "o" } }),
+], "grok");
+sessionManager.restoreFromDisk();
+const dl = await call("GET", `/api/review/${tClaude}`);
+eq("범위 밖 파일은 폴더 밖이고 임시 폴더 밖인 것만", dl.json.outsideFiles, [OUTSIDE]);
+const leftNames = (j: any) => (j.leftovers as any[]).map((l) => [l.name, l.from, l.hits.map((h: any) => h.path)]);
+eq("Claude: 지운 정의와 git rm한 파일 이름이 남은 곳", leftNames(dl.json), [["legacyMod", "file", ["src/other.ts"]], ["oldHelper", "definition", ["src/use.ts"]]]);
+for (const [label, id] of [["Codex", tCodex], ["Ollama(provider 표시)", tOllama], ["Grok", tGrok]] as const) {
+  eq(`${label}: 지운 정의가 남은 곳`, leftNames((await call("GET", `/api/review/${id}`)).json), [["oldHelper", "definition", ["src/use.ts"]]]);
+}
+eq("남은 곳에 줄 번호와 글이 있다", dl.json.leftovers[1].hits[0], { path: "src/use.ts", line: 1, text: "oldHelper();" });
+eq("git 저장소가 아니면 leftovers는 빈 목록이고 outsideFiles는 그대로", [dp.json.git, dp.json.leftovers, dp.json.outsideFiles], ["unavailable", [], []]);
+eq("?git=0이어도 outsideFiles가 있다", (await call("GET", `/api/review/${tClaude}?git=0`)).json.outsideFiles, [OUTSIDE]);
+
+console.log("\n=== 파일에서 고친 세션 찾기(/trace) ===");
+const tOther = seed({ cwd: plain, provider: "claude", name: "다른 프로젝트", at: now - 360, events: [{ kind: "user_msg", text: "다른 곳" }, ...editOk("o1", lib), done] });
+const tFailed = tail("실패한 수정", now - 350, [claudeCall("f1", "Edit", { file_path: lib, old_string: "a", new_string: "b" }), claudeRes("f1", true)], "claude");
+const tHidden = tail("숨긴 구간", now - 340, editOk("h1", lib), "claude");
+const hmeta = path.join(DATA, tHidden, "meta.json");
+fs.writeFileSync(hmeta, JSON.stringify({ ...JSON.parse(fs.readFileSync(hmeta, "utf8")), hiddenRanges: [{ after: 0, until: 5 }] }));
+sessionManager.restoreFromDisk();
+const tr = await call("GET", `/api/review/trace?session=${tClaude}&path=${encodeURIComponent("src/lib.ts")}`);
+eq("네 provider의 세션이 모두 나오고 다른 프로젝트·실패·숨긴 구간은 빠진다", [...(tr.json.entries as any[]).map((e) => e.sessionId)].sort(), [tClaude, tCodex, tOllama, tGrok].sort());
+eq("최신이 위", (tr.json.entries as any[]).map((e) => e.at), [...(tr.json.entries as any[]).map((e) => e.at)].sort((a, b) => b - a));
+const entryC = (tr.json.entries as any[]).find((e) => e.sessionId === tClaude);
+eq("그때의 사람 지시와 명령", [entryC.prompt.text, entryC.commands.map((c: any) => c.text), entryC.title], ["제거 클로드 지시", ["git rm legacyMod.ts"], "제거 클로드"]);
+eq("partial이 아니다", tr.json.partial, false);
+check(!JSON.stringify(tr.json).includes(ROOT), "응답에 서버 절대 경로가 없다");
+eq("폴더 밖 경로는 400", (await call("GET", `/api/review/trace?session=${tClaude}&path=${encodeURIComponent("../../x.ts")}`)).status, 400);
+eq("비밀 파일은 빈 결과", (await call("GET", `/api/review/trace?session=${tClaude}&path=.env`)).json.entries, []);
+eq("없는 세션은 404", (await call("GET", `/api/review/trace?session=${randomUUID()}&path=a`)).status, 404);
+eq("path가 없으면 400", (await call("GET", `/api/review/trace?session=${tClaude}`)).status, 400);
+
+console.log("\n=== 폴더 재진입 요약(/recap) ===");
+const repoR = path.join(ROOT, "repoR");
+fs.mkdirSync(repoR);
+const rDone = seed({ cwd: repoR, provider: "claude", name: "끝남", at: now - 300, events: [{ kind: "user_msg", text: "마무리" }, ...editOk("a1", path.join(repoR, "a.ts")), ...editOk("a2", path.join(repoR, "b.ts")), done] });
+const rFail = seed({ cwd: repoR, provider: "codex", name: "실패", at: now - 200, events: [{ kind: "user_msg", text: "실행" }, { kind: "codex", msg: { method: "turn/completed", params: { turn: { status: "failed", error: { message: "boom" } } } } }] });
+const rStop = seed({ cwd: repoR, provider: "ollama", name: "중단", at: now - 100, events: [{ kind: "user_msg", text: "하던 일" }, { kind: "codex", msg: { method: "turn/completed", params: { turn: { status: "interrupted" } } } }] });
+const rNoPrompt = seed({ cwd: repoR, provider: "claude", name: "지시 없음", at: now - 50, events: [...editOk("n1", path.join(repoR, "n.ts")), done] });
+const rArchived = seed({ cwd: repoR, provider: "claude", name: "보관", at: now - 40, archivedAt: now, events: [{ kind: "user_msg", text: "보관됨" }, done] });
+sessionManager.restoreFromDisk();
+const rc2 = await call("GET", `/api/review/recap?project=${encodeURIComponent(repoR + "/")}`);
+const rs = rc2.json.sessions as any[];
+eq("지시가 없는 세션과 보관한 세션은 빠지고 최신순", rs.map((x) => x.id), [rStop, rFail, rDone]);
+eq("끝난 상태: 중단·실패·끝남", rs.map((x) => x.state), ["interrupted", "failed", "done"]);
+eq("마지막 지시", rs.map((x) => x.lastPrompt.text), ["하던 일", "실행", "마무리"]);
+eq("마지막 오류는 턴 오류", rs[1].lastError.text, "boom");
+eq("최근에 고친 파일", rs[2].recentFiles.map((f: any) => path.basename(f.path)), ["a.ts", "b.ts"]);
+const fakeItem = (attention: string) => ({ attention }) as never;
+const none = { changedFiles: [], failedCommands: [], otherFailures: [], openTodos: [] };
+eq("진행 중·기다림은 attention에서", [recapState(fakeItem("running"), none), recapState(fakeItem("background"), none), recapState(fakeItem("waiting"), none)], ["running", "running", "waiting"]);
+eq("project가 없으면 400", (await call("GET", "/api/review/recap")).status, 400);
+eq("프로젝트에 세션이 없으면 빈 목록", (await call("GET", `/api/review/recap?project=${encodeURIComponent(path.join(ROOT, "nothing"))}`)).json.sessions, []);
 
 console.log("\n=== 검토 완료와 되돌리기 ===");
 const last = d.json.lastSeq as number;

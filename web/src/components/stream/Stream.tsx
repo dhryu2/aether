@@ -27,6 +27,8 @@ import {
   useStickyBottom,
 } from './index'
 import { EmptyHero } from '../EmptyHero'
+import { ProjectRecap } from '../ProjectRecap'
+import { projectKey } from '../../lib/sessionGroups'
 import { TodoLeftover } from './TodoLeftover'
 import { useChamdingPresence } from './useChamdingPresence'
 
@@ -36,6 +38,7 @@ export function Stream({ sessionId, cardsOnly = false }: { sessionId: string; ca
   const ref = useRef<HTMLDivElement>(null)
 
   const id = sessionId
+  const thisSession = s.sessions.find((x) => x.id === id)
   const rawItems = s.convos[id] ?? []
   const pendingSeq = oldestPendingCardSeq(rawItems)
   const items = cardsOnly
@@ -180,7 +183,10 @@ export function Stream({ sessionId, cardsOnly = false }: { sessionId: string; ca
             <OlderLoading anchorRef={paging.olderSentinelRef} />
           </div>
         ) : (
-          <EmptyHero name={sessionWorkTitle(s.sessions.find((x) => x.id === id) ?? { displayName: '' }, t('stream.emptyHero.newName'))} />
+          <EmptyHero
+            name={sessionWorkTitle(thisSession ?? { displayName: '' }, t('stream.emptyHero.newName'))}
+            below={thisSession ? <ProjectRecap sessionId={id} project={projectKey(thisSession)} /> : undefined}
+          />
         )}
       </div>
       {!showSkeleton && hasConvo && !atBottom && <ScrollToBottomButton narrow={s.isNarrow} onClick={scrollToBottom} />}

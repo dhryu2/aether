@@ -175,7 +175,7 @@ export function folderUncommittedChanges(cwd: string): string[] | null {
 }
 
 /** 작업 검토함이 쓰는 폴더의 저장소 상태. dirty는 커밋 안 된 변경의 절대 경로(새 폴더는 끝에 `/`), ignored는 files 중 무시된 파일(확인 못 하면 null). */
-export type FolderReviewState = { root: string; dirty: string[]; ignored: Set<string> | null };
+export type FolderReviewState = { root: string; dirty: string[]; ignored: Set<string> | null; /** 지워졌거나 이름이 바뀐 파일의 옛 절대 경로. */ deleted: string[] };
 
 /**
  * 폴더의 커밋 안 된 변경과 files의 무시 여부를 읽는다. 저장소가 아니거나 확인에 실패하면 null이다.
@@ -191,21 +191,75 @@ export async function folderReviewStateAsync(cwd: string, files: readonly string
     const status = (await out(["status", "--porcelain=v1", "-z", "--ignore-submodules=dirty"])).stdout.split("\0");
     failures.clear(`status:${cwd}`);
     const dirty: string[] = [];
+    const deleted: string[] = [];
     for (let i = 0; i < status.length; i++) {
       const entry = status[i];
       if (entry.length < 4) continue;
-      dirty.push(path.join(root, entry.slice(3))); // join은 끝의 /를 보존한다
+      const here = path.join(root, entry.slice(3)); // join은 끝의 /를 보존한다
+      dirty.push(here);
+      if (entry[0] === "D" || entry[1] === "D") deleted.push(here);
       if (entry[0] === "R" || entry[0] === "C" || entry[1] === "R" || entry[1] === "C") {
         i += 1; // 이름 바뀜·복사는 다음 칸이 옛 경로다
-        if (status[i]) dirty.push(path.join(root, status[i]));
+        if (status[i]) {
+          const old = path.join(root, status[i]);
+          dirty.push(old);
+          if (entry[0] === "R" || entry[1] === "R") deleted.push(old);
+        }
       }
     }
     const inside = files.filter((f) => f.startsWith(root + path.sep));
-    return { root, dirty, ignored: inside.length ? await ignoredAmong(cwd, env, inside) : new Set() };
+    return { root, dirty, deleted, ignored: inside.length ? await ignoredAmong(cwd, env, inside) : new Set() };
   } catch (error) {
     failures.report(error, { component: "session", operation: "session.workspace.inspect", severity: "warning" }, `status:${cwd}`);
     return null;
   }
+}
+
+export type FolderGrepResult = { hits: Map<string, { path: string; line: number; text: string }[]>; incomplete: boolean };
+
+const GREP_MAX_BYTES = 2 * 1024 * 1024;
+const GREP_PER_NAME = 5;
+const GREP_MAX_NAMES = 20;
+const GREP_LINE_MAX = 200;
+
+/**
+ * 폴더에서 낱말(고정 글자, 낱말 경계)이 나오는 줄을 찾는다. 추적 파일과 추적 안 된 파일을 보고 .gitignore 대상은 보지 않는다.
+ * 이름마다 GREP_PER_NAME곳, 이름은 GREP_MAX_NAMES개까지만 남긴다. 시간(10초)·출력(2MB)이 넘으면 그때까지 받은 것만 쓰고 incomplete.
+ * isSecret이 참인 경로는 뺀다. git 저장소가 아니거나 git 실행이 실패하면 null이다. 낱말은 인자 배열로 넘겨 셸을 거치지 않는다.
+ */
+export async function folderGrepAsync(cwd: string, words: readonly string[], isSecret: (rel: string) => boolean): Promise<FolderGrepResult | null> {
+  const names = [...new Set(words)].slice(0, GREP_MAX_NAMES);
+  if (!names.length || !(await isGitRepoAsync(cwd))) return null;
+  let stdout = "";
+  let incomplete = false;
+  try {
+    const env = await gitEnvAsync(cwd);
+    const args = ["grep", "--null", "-n", "-I", "-w", "-F", "--untracked", "--no-color", ...names.flatMap((w) => ["-e", w])];
+    stdout = (await execFileP("git", args, { cwd, encoding: "utf8", timeout: 10_000, env, maxBuffer: GREP_MAX_BYTES })).stdout;
+  } catch (error) {
+    const e = error as { code?: unknown; killed?: boolean; stdout?: string };
+    if (e.code === 1 && !e.stdout) return { hits: new Map(), incomplete: false }; // 일치 없음
+    if (e.code !== "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" && !e.killed) {
+      failures.report(error, { component: "session", operation: "session.workspace.grep", severity: "warning" }, `grep:${cwd}`);
+      return null;
+    }
+    incomplete = true;
+    stdout = e.stdout ?? "";
+  }
+  const hits = new Map<string, { path: string; line: number; text: string }[]>();
+  const re = new Map(names.map((n) => [n, new RegExp(`(^|[^\\w])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\w])`)]));
+  for (const row of stdout.split("\n")) {
+    const [rel, line, ...rest] = row.split("\0");
+    if (!rel || !line || isSecret(rel)) continue;
+    const text = rest.join("\0");
+    for (const [n, r] of re) {
+      const list = hits.get(n) ?? [];
+      if (list.length >= GREP_PER_NAME || !r.test(text)) continue;
+      list.push({ path: rel, line: Number(line), text: text.trim().slice(0, GREP_LINE_MAX) });
+      hits.set(n, list);
+    }
+  }
+  return { hits, incomplete };
 }
 
 /**

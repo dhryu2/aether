@@ -385,4 +385,9 @@ export const session: Dict = {
   'fileViewer.failed': { ko: '읽지 못했어요', en: "Couldn't read the file" },
   'fileViewer.retry': { ko: '다시 시도', en: 'Try Again' },
   'fileViewer.back': { ko: '파일 목록으로', en: 'Back to files' },
+  'fileViewer.trace': { ko: '이 파일을 고친 세션', en: 'Sessions that edited this file' },
+  'fileViewer.traceScanning': { ko: '기록을 훑는 중이에요', en: 'Scanning the record' },
+  'fileViewer.traceEmpty': { ko: '이 파일을 고친 기록이 없어요. 셸 명령으로 고친 것은 찾지 못해요', en: "No recorded edits. Edits made by shell commands aren't found" },
+  'fileViewer.tracePartial': { ko: '기록이 많아 일부만 보여요', en: 'Showing part of the record' },
+  'fileViewer.backToFile': { ko: '파일로 돌아가기', en: 'Back to the file' },
 }

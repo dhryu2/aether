@@ -44,6 +44,10 @@ export type ReviewSummary = {
   turnFailed?: "failed" | "interrupted";
   /** 마지막 할 일 목록의 끝나지 않은 항목. */
   openTodos: { text: string; seq: number }[];
+  /** 범위 안 마지막 사람 지시(300자로 자름). */
+  lastPrompt?: { text: string; seq: number };
+  /** 마지막 턴이 실패했을 때의 오류 글. */
+  turnError?: { text: string; seq: number };
 };
 
 /** 검토 대상 세션의 공통 머리 정보. */
@@ -83,6 +87,21 @@ export type ReviewDetailResponse = ReviewSessionHead & ReviewSummary & {
   fileStates: ("uncommitted" | "clean" | "unknown")[];
   /** 그 폴더의 커밋 안 된 변경 중 이 세션 기록에 없는 것(최대 200개). */
   unrecorded: string[];
+  /** 세션 작업 폴더 밖에서 바뀐 파일(시스템 임시 폴더 제외). git 유무와 상관없이 채운다. */
+  outsideFiles: string[];
+  /** 지운 파일·정의의 이름이 저장소에 아직 남은 곳. git을 읽었을 때만 채운다. */
+  leftovers: ReviewLeftover[];
+  /** 찾는 데 시간이 걸려 일부만 찾았다. */
+  leftoversIncomplete?: true;
+};
+
+/** 지운 이름 하나와 그 이름이 아직 쓰이는 곳. from은 지운 파일 이름인지 지운 정의 이름인지. */
+export type ReviewLeftover = {
+  name: string;
+  from: "file" | "definition";
+  /** 정의를 지운 사건의 순번(파일 삭제는 없다). */
+  seq?: number;
+  hits: { path: string; line: number; text: string }[];
 };
 
 /** 바뀐 파일 하나의 변경 내용. record는 세션 기록에서, git은 기록에 내용이 없어 커밋 안 된 변경에서 온다. none이면 보여 줄 내용이 없다(edits에 잘린 조각만 남을 수 있다). */
@@ -95,3 +114,31 @@ export type ReviewFileDiffResponse = {
 
 /** 검토 완료·되돌리기 응답. previous는 되돌릴 때 쓸 이전 위치(없으면 처음 처리한 것). 되돌릴 때 본문의 expected는 그 완료가 저장한 reviewedSeq이고, 지금 값과 다르면 409다. */
 export type ReviewMarkResponse = { reviewedSeq: number | null; previous: number | null };
+
+/** 파일을 고친 세션 하나. 그 파일을 고친 턴마다의 사람 지시와 실행 명령이 붙는다. */
+export type FileTraceEntry = {
+  sessionId: string;
+  title: string;
+  at: number;
+  seq: number;
+  prompt?: { text: string; seq: number };
+  commands: { text: string; seq: number }[];
+};
+
+/** 최신이 위. partial이면 시간 제한으로 일부 세션만 훑었다. */
+export type FileTraceResponse = { path: string; entries: FileTraceEntry[]; partial: boolean };
+
+/** 폴더 재진입 요약의 세션 하나. */
+export type ProjectRecapSession = {
+  id: string;
+  title: string;
+  lastActivityAt: number;
+  lastSeq: number;
+  state: "running" | "waiting" | "failed" | "interrupted" | "done";
+  lastPrompt?: { text: string; seq: number };
+  lastError?: { text: string; seq: number };
+  recentFiles: { path: string; seq: number }[];
+  openTodos: { text: string; seq: number }[];
+};
+
+export type ProjectRecapResponse = { sessions: ProjectRecapSession[] };

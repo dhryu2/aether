@@ -82,6 +82,16 @@ Aether does not include any AI tool. Install and sign in to the ones you want to
 
 ## <img src="web/src/assets/chamding-idle.webp" alt="" height="30" align="top"> Getting started
 
+### Install the app
+
+1. Download the Mac `.dmg` from <https://aether.dhryu.dev> and open it.
+2. Drag Aether into your Applications folder.
+3. The first time you open it, macOS may warn that the app is not signed. Open System Settings > Privacy & Security and click "Open Anyway".
+
+Supported: macOS (Apple Silicon) only. Windows is in progress.
+
+### Run from source
+
 Node.js 24 is required. From the repository root, run it from source:
 
 ```bash
@@ -102,7 +112,11 @@ npm --prefix server test
 ## Access and security
 
 - **By default:** Aether is reachable only from the computer it is installed on, and sign-in is off.
-- **If you forget your password:** On the installed computer, run `bin/Reset Aether Password.command` (Mac) or `bin\reset-password.cmd` (Windows) in the program folder.
+- **If you forget your password:** On the installed computer, run the command below in a terminal and enter the new password twice. You do not need to stop the server first. Changing the password signs out every device, so sign in again with the new one.
+
+  ```bash
+  /Applications/Aether.app/Contents/Resources/core/node/bin/node /Applications/Aether.app/Contents/Resources/core/server/index.mjs --reset-password
+  ```
 - **From other devices:** Do not expose it directly to the internet. Keep it inside Tailscale, as Use on your phone does. If you run from source, turn on authentication with `AETHER_AUTH_MODE` in `server/.env` first. See [`server/.env.example`](server/.env.example) for the options.
 - **Be careful:** AI agents can edit files and run commands on this computer. Check your approval settings before you use it.
 

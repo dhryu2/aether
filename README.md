@@ -82,6 +82,16 @@ Aether에는 AI 도구가 포함되어 있지 않습니다. 아래 중 쓸 도�
 
 ## <img src="web/src/assets/chamding-idle.webp" alt="" height="30" align="top"> 시작하기
 
+### 앱 설치
+
+1. <https://aether.dhryu.dev>에서 Mac용 `.dmg` 파일을 다운로드해 엽니다.
+2. Aether를 응용 프로그램 폴더로 끌어 넣습니다.
+3. 처음 열 때 서명되지 않은 앱이라는 경고가 뜨면 시스템 설정 > 개인정보 보호 및 보안에서 「그래도 열기」를 누릅니다.
+
+지원: macOS(Apple Silicon)만 지원합니다. 윈도우는 준비 중입니다.
+
+### 소스에서 실행
+
 Node.js 24가 필요합니다. 소스에서 이렇게 실행합니다.
 
 ```bash
@@ -102,7 +112,11 @@ npm --prefix server test
 ## 접속 범위와 보안
 
 - **기본값:** 설치한 컴퓨터에서만 접속되고, 로그인 절차는 꺼져 있습니다.
-- **비밀번호를 잊었을 때:** 설치한 컴퓨터에서 프로그램 폴더의 `bin/Reset Aether Password.command`(맥) 또는 `bin\reset-password.cmd`(윈도우)를 실행하세요.
+- **비밀번호를 잊었을 때:** 설치한 컴퓨터의 터미널에서 아래 명령을 실행하고 새 비밀번호를 두 번 입력하세요. 서버를 먼저 멈출 필요는 없습니다. 비밀번호를 바꾸면 모든 기기의 로그인이 풀리니 새 비밀번호로 다시 로그인하세요.
+
+  ```bash
+  /Applications/Aether.app/Contents/Resources/core/node/bin/node /Applications/Aether.app/Contents/Resources/core/server/index.mjs --reset-password
+  ```
 - **다른 기기에서 쓸 때:** 인터넷에 직접 열지 말고 「폰에서 쓰기」처럼 Tailscale 안에서만 여세요. 소스에서 직접 실행한다면 `server/.env`의 `AETHER_AUTH_MODE`로 인증을 먼저 켜세요. 인증 설정은 [`server/.env.example`](server/.env.example)을 보세요.
 - **주의:** AI 에이전트는 이 컴퓨터에서 파일을 고치고 명령을 실행할 수 있습니다. 승인 설정을 확인하고 쓰세요.
 

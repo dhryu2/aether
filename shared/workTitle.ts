@@ -103,8 +103,9 @@ export function deriveWorkTitle(prompt: string): string | null {
     .replace(/https?:\/\/\S+/gi, " ")
     .replace(/[`*_~#>[\]{}()]/g, " ")
     .replace(/^(?:issue|task|bug|feature|pr)\s*(?:#?\d+)?\s*[:-]\s*/i, "")
-    .split(/[.!?;\n\r\u2028\u2029]/u)[0]
-    ?.trim()
+    .split(/[.!?;\n\r\u2028\u2029]/u)
+    .map((part) => part.trim())
+    .find(Boolean) // 코드 블록으로 시작하면 첫 조각이 비므로 내용 있는 첫 조각을 쓴다
 
   if (!firstClause) return null
 

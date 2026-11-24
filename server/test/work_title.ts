@@ -18,6 +18,7 @@ check(deriveWorkTitle("좀 도와줘 배포가 또 실패했어") === "배포가
 check(deriveWorkTitle("/compact") === null, "내용 없는 슬래시 명령은 제목이 아니다");
 check(deriveWorkTitle("/security-audit 이 저장소를 감사해줘.\n\n- 조건") === "이 저장소를 감사해줘", "슬래시 명령 단어를 떼고 남은 말로 뽑는다");
 check(deriveWorkTitle("/review\n로그인 코드를 봐줘") === "로그인 코드를 봐줘", "명령 뒤 줄바꿈도 공백으로 본다");
+check(deriveWorkTitle("```\n로그 내용\n```\n왜 죽었어?") === "로그 내용", "코드 블록으로 시작해도 내용 있는 첫 줄로 뽑는다");
 check(deriveWorkTitle("   ") === null, "빈 말은 제목이 아니다");
 check(deriveWorkTitle("https://example.com/path fix this") === "Fix this", "URL을 제목에 넣지 않는다");
 

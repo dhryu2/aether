@@ -171,7 +171,8 @@ export function notifyPush(payload: BrowserPushPayload): PushSendResult {
   if (!ensureVapid()) return { attempted: 0, reason: "no-vapid" };
   const data = JSON.stringify(payload);
   for (const sub of [...list]) {
-    webpush.sendNotification(sub, data).then(() => {
+    // 기기가 꺼져 있던 동안 쌓인 알림이 켜질 때 한꺼번에 쏟아지지 않게, 1시간 지나면 푸시 서비스가 버리게 한다(기본은 4주).
+    webpush.sendNotification(sub, data, { TTL: 3600 }).then(() => {
       deliveryFailures.clear(sub.endpoint);
     }).catch((err: { statusCode?: number; code?: string }) => {
       // 영구 실패(만료·삭제·거부·잘못된 요청)면 정리. 일시 5xx/네트워크는 보존.

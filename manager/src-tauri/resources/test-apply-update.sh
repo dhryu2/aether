@@ -46,6 +46,13 @@ sleep 1
 check "실패: 복구한 앱이 응답" 'curl -s "http://127.0.0.1:$PORT/api/health" | grep -q "\"v\":\"new\""'
 check "실패: 로그 끝" '[ "$(last | cut -d" " -f3-)" = "업데이트 실패: 이전 앱으로 되돌림" ]'
 check "실패: 락 폴더 없음" '[ ! -e "$AETHER_APP_BASE/update.lock" ]'
+check "실패: 버전 값이 없으면 rolled-back을 만들지 않는다" '[ ! -e "$AETHER_APP_BASE/updates/rolled-back" ]'
+
+# 2-1) 서버가 건 업데이트(버전 값 있음)가 실패하면 rolled-back에 그 버전을 적는다
+mkapp "$AETHER_APP_BASE/update/Aether.app" dead
+AETHER_UPDATE_VERSION=9.9.9 bash "$HERE/apply-update.sh"
+check "실패(버전 있음): rolled-back에 버전 기록" '[ "$(cat "$AETHER_APP_BASE/updates/rolled-back" 2>/dev/null)" = 9.9.9 ]'
+sleep 1
 
 # 3) --detach: 즉시 반환하고 뒤에서 끝까지 간다. 앱이 안 떠 있어도 된다.
 pkill -f "$T/Aether.app/" ; sleep 1

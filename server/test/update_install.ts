@@ -1,14 +1,13 @@
 /**
- * 앱 안 업데이트: 서명·지문 검사, 진행 상태, 취소, 넘기기와 실패, 되돌림 표시, 맥 설치 스크립트의 되돌리기.
- * 가짜 사이트와 임시 폴더만 쓴다. 실제 설치, launchctl, 모델 호출은 없다.
+ * 앱 안 업데이트: 서명·지문 검사, 진행 상태, 취소, 넘기기와 실패, 되돌림 표시, 맥 dmg 넘기기.
+ * 가짜 사이트와 임시 폴더만 쓴다. 실제 설치, 모델 호출은 없다.
  */
 import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { createUpdateInstaller, targetFor, verifySignature, type UpdateInstallerOptions } from "../update/install";
+import { createUpdateInstaller, handoffMac, targetFor, verifySignature, type UpdateInstallerOptions } from "../update/install";
 
 let pass = 0;
 let fail = 0;
@@ -193,52 +192,57 @@ await failedWith({ size: payload.length + 1 }, "verify", "선언보다 작으면
   check(fs.existsSync(path.join(m.updatesDir, "rolled-back")) && fs.existsSync(path.join(m.updatesDir, "update.log")), "되돌림 표시와 설치 기록은 남긴다");
 }
 
-// 8. 맥 설치 스크립트: 가짜 launchctl, installer와 임시 폴더만 쓴다.
+// 맥 대상은 dmg이고, 넘기기가 null이면 서버는 스스로 끝내지 않는다(교체 스크립트가 앱을 끈다).
+{
+  const t = targetFor("darwin", "arm64")!;
+  check(t.staged === "Aether-update.dmg" && t.pattern.test("Aether-1.2.3-mac-arm64.dmg") && !t.pattern.test("Aether-1.2.3-mac-arm64.pkg"), "맥 대상은 dmg만 받는다", t);
+  const m = make(site(), { handoff: async () => null });
+  m.inst.start("0.0.3");
+  await settled(m.inst);
+  await new Promise((r) => setTimeout(r, 900));
+  check(m.exits.length === 0 && m.inst.status().install.phase === "installing", "넘기기가 null이면 서버가 스스로 끝내지 않는다", m.exits);
+  const stuck = make(site(), { handoff: async () => null, handoffWaitMs: 50 });
+  stuck.inst.start("0.0.3");
+  await settled(stuck.inst);
+  await new Promise((r) => setTimeout(r, 1200));
+  const st = stuck.inst.status().install;
+  check(st.phase === "failed" && st.reason === "handoff", "넘긴 뒤에도 서버가 살아 있으면 실패로 돌린다", st);
+}
+
+// 8. 맥 dmg 넘기기: 임시 폴더, 임시 서명, 가짜 apply-update.sh만 쓴다.
 if (process.platform === "darwin") {
-  const script = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "deploy", "installer", "mac", "aether-update.sh");
-  const scenario = (name: string, installerBody: string, prepare?: (ctx: { app: string; fake: string }) => void) => {
+  const mounts = () => spawnSync("hdiutil", ["info"], { encoding: "utf8" }).stdout;
+  const scenario = (name: string, breakSignature: boolean) => {
     const dir = path.join(tmp, name);
-    const home = path.join(dir, "home");
-    const app = path.join(home, "Applications", "Aether");
-    const updates = path.join(dir, "updates");
-    const fake = path.join(dir, "fake");
-    const log = path.join(dir, "calls.log");
-    for (const d of ["bin", "node", "server", "web"]) { fs.mkdirSync(path.join(app, d), { recursive: true }); fs.writeFileSync(path.join(app, d, "old"), "old"); }
-    fs.mkdirSync(updates, { recursive: true });
-    fs.mkdirSync(fake);
-    fs.writeFileSync(path.join(fake, "launchctl"), `#!/bin/bash\necho "$*" >> "${log}"\n[ "$1" = print ] && exit 1\nexit 0\n`, { mode: 0o755 });
-    fs.writeFileSync(path.join(fake, "installer"), `#!/bin/bash\nAPP="${app}"; UPDATES="${updates}"\n${installerBody}\n`, { mode: 0o755 });
-    prepare?.({ app, fake });
-    const r = spawnSync("bash", [script, app, updates, "0.0.3"], { env: { PATH: `${fake}:/usr/bin:/bin`, HOME: home, AETHER_UPDATE_WAIT: "2" }, encoding: "utf8" });
-    return { app, updates, status: r.status, calls: fs.existsSync(log) ? fs.readFileSync(log, "utf8") : "" };
+    const conf = path.join(dir, "conf");
+    const core = path.join(dir, "res", "core");
+    const src = path.join(dir, "src");
+    const app = path.join(src, "Aether.app");
+    fs.mkdirSync(path.join(app, "Contents", "MacOS"), { recursive: true });
+    fs.mkdirSync(core, { recursive: true });
+    fs.writeFileSync(path.join(app, "Contents", "Info.plist"), `<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Aether</string><key>CFBundleIdentifier</key><string>test.aether.fake</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>`);
+    fs.writeFileSync(path.join(app, "Contents", "MacOS", "Aether"), "#!/bin/bash\n", { mode: 0o755 });
+    spawnSync("codesign", ["--force", "--sign", "-", app]);
+    if (breakSignature) fs.appendFileSync(path.join(app, "Contents", "MacOS", "Aether"), "# 변조\n");
+    const dmg = path.join(dir, "Aether-update.dmg");
+    spawnSync("hdiutil", ["create", "-volname", "Aether", "-srcfolder", src, "-format", "UDZO", "-ov", dmg]);
+    const record = path.join(dir, "record.txt");
+    fs.writeFileSync(path.join(dir, "res", "apply-update.sh"), `#!/bin/bash\necho "$1|$AETHER_APP_BASE|$AETHER_UPDATE_VERSION|$(ls "$AETHER_APP_BASE/update")" > "${record}"\n`, { mode: 0o755 });
+    return { dmg, conf, core, record };
   };
-  const newFiles = `for d in bin node server web; do mkdir -p "$APP/$d"; echo new > "$APP/$d/new"; done`;
-  const isOld = (app: string) => ["bin", "node", "server", "web"].every((d) => fs.existsSync(path.join(app, d, "old")) && !fs.existsSync(path.join(app, d, "new")));
+  const before = mounts();
 
-  const ok = scenario("mac-ok", `${newFiles}\ntouch "$UPDATES/ok-0.0.3"`);
-  check(ok.status === 0 && fs.existsSync(path.join(ok.app, "server", "new")) && !fs.existsSync(path.join(ok.app, "server", "old")), "맥: 정상이면 새 파일만 남는다", ok);
-  check(!fs.existsSync(path.join(ok.app, ".old")) && !fs.existsSync(path.join(ok.updates, "rolled-back")) && !fs.existsSync(path.join(ok.updates, "ok-0.0.3")), "맥: 정상이면 이전 파일과 표시를 치운다");
+  const ok = scenario("mac-ok", false);
+  await handoffMac(ok.dmg, "0.0.9", ok.conf, ok.core);
+  check(fs.existsSync(path.join(ok.conf, "update", "Aether.app", "Contents", "MacOS", "Aether")), "맥: 대기 폴더에 새 앱이 복사된다");
+  check(fs.existsSync(ok.record) && fs.readFileSync(ok.record, "utf8").trim() === `--detach|${ok.conf}|0.0.9|Aether.app`, "맥: 교체 스크립트에 인자·설정 폴더·버전을 넘긴다", fs.existsSync(ok.record) && fs.readFileSync(ok.record, "utf8"));
+  check(mounts() === before, "맥: dmg 마운트가 남지 않는다");
 
-  const refused = scenario("mac-refused", "exit 1");
-  check(isOld(refused.app) && fs.readFileSync(path.join(refused.updates, "rolled-back"), "utf8") === "0.0.3", "맥: 설치 명령이 실패하면 되돌리고 표시한다", refused);
-  check(refused.calls.includes("bootstrap"), "맥: 되돌린 뒤 이전 버전을 다시 띄운다", refused.calls);
-
-  const sick = scenario("mac-sick", newFiles);
-  check(isOld(sick.app) && !fs.existsSync(path.join(sick.app, ".old")) && fs.readFileSync(path.join(sick.updates, "rolled-back"), "utf8") === "0.0.3", "맥: 새 서버가 뜨지 않으면 되돌린다", sick);
-
-  // 되돌리다 mv가 실패하면 이전 파일을 잃지 않게 .old를 남긴다.
-  const stuck = scenario("mac-stuck", "exit 1", ({ app, fake }) => {
-    fs.writeFileSync(path.join(fake, "mv"), `#!/bin/bash\n[ "$2" = "${app}/server" ] && exit 1\nexec /bin/mv "$@"\n`, { mode: 0o755 });
-  });
-  check(fs.existsSync(path.join(stuck.app, ".old", "server", "old")) && fs.readFileSync(path.join(stuck.updates, "rolled-back"), "utf8") === "0.0.3", "맥: 되돌리지 못한 폴더는 .old에 남는다", stuck);
-
-  // 지난 .old를 지우지 못하면 아무것도 옮기지 않고 그대로 다시 띄운다.
-  const leftover = scenario("mac-leftover", `echo called > "$UPDATES/installer-called"`, ({ app, fake }) => {
-    fs.mkdirSync(path.join(app, ".old", "bin"), { recursive: true });
-    fs.writeFileSync(path.join(fake, "rm"), `#!/bin/bash\n[ "$2" = "${app}/.old" ] && exit 1\nexec /bin/rm "$@"\n`, { mode: 0o755 });
-  });
-  check(isOld(leftover.app) && !fs.existsSync(path.join(leftover.updates, "installer-called")) && fs.existsSync(path.join(leftover.updates, "rolled-back")), "맥: 지난 .old가 남아 있으면 설치하지 않고 되돌림으로 끝낸다", leftover);
-  check(leftover.calls.includes("bootstrap"), "맥: 그 경우에도 이전 버전을 다시 띄운다", leftover.calls);
+  const bad = scenario("mac-bad", true);
+  let err = false;
+  await handoffMac(bad.dmg, "0.0.9", bad.conf, bad.core).catch(() => { err = true; });
+  check(err && !fs.existsSync(bad.record) && !fs.existsSync(path.join(bad.conf, "update", "Aether.app")), "맥: 서명이 망가진 앱이면 교체 스크립트를 부르지 않고 실패한다");
+  check(mounts() === before, "맥: 실패해도 마운트가 남지 않는다");
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });

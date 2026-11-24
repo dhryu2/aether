@@ -1,12 +1,13 @@
 /**
- * 앱 안 업데이트. 서명된 version.json으로 설치 파일을 받아 검사한 뒤, 자동 실행 장치에 설치를 넘기고 서버를 끝낸다.
- * 설치 중에는 서버가 없으므로 설치와 되돌리기는 설치 프로그램(aether.nsi, aether-update.sh)이 맡는다.
+ * 앱 안 업데이트. 서명된 version.json으로 설치 파일을 받아 검사한 뒤, 설치를 넘기고 서버를 끝낸다.
+ * 윈도우는 설치 프로그램(aether.nsi)이, 맥은 앱 안의 apply-update.sh가 설치와 되돌리기를 맡는다.
  * 약속: updates 폴더의 ok-<버전>은 새 서버가 떴다는 표시, rolled-back은 되돌렸다는 표시(내용은 실패한 버전)다.
- * 자동 실행 장치 아래의 설치본에서만 켜진다. 개발 실행과 개인 운영 서버에서는 꺼져 있다.
+ * 자동 실행 장치 아래의 설치본에서만 켜진다. 업데이트 주소가 없으면 꺼진다.
  */
 import { execFile } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import pkg from "../package.json" with { type: "json" };
@@ -24,6 +25,7 @@ const MAX_FILE_BYTES = 1024 * 1024 * 1024;
 const STALL_MS = 30_000;
 const EXIT_DELAY_MS = 800;
 const CLEANUP_DELAY_MS = 2 * 60_000;
+const HANDOFF_WAIT_MS = 5 * 60_000; // 맥: 넘겨받은 쪽이 앱을 끄지 못하고 끝났을 때 installing에 영원히 머물지 않게 한다
 const ROLLED_BACK = "rolled-back";
 const UPDATE_LOG = "update.log"; // 되돌린 뒤 원인을 볼 수 있게 남긴다
 
@@ -32,7 +34,7 @@ type Target = { os: "win" | "mac"; arch: "x64" | "arm64"; staged: string; patter
 /** 이 컴퓨터에 맞는 설치 파일 종류. 배포하지 않는 조합이면 null이다. */
 export function targetFor(platform: NodeJS.Platform, arch: string): Target | null {
   if (platform === "win32" && arch === "x64") return { os: "win", arch: "x64", staged: "Aether-update.exe", pattern: /^Aether-(\d+\.\d+\.\d+)-win-x64\.exe$/ };
-  if (platform === "darwin" && arch === "arm64") return { os: "mac", arch: "arm64", staged: "Aether-update.pkg", pattern: /^Aether-(\d+\.\d+\.\d+)-mac-arm64\.pkg$/ };
+  if (platform === "darwin" && arch === "arm64") return { os: "mac", arch: "arm64", staged: "Aether-update.dmg", pattern: /^Aether-(\d+\.\d+\.\d+)-mac-arm64\.dmg$/ };
   return null;
 }
 
@@ -58,9 +60,10 @@ export interface UpdateInstallerOptions {
   fetchFn?: typeof fetch;
   /** 설치 직전 DB 백업. 실패하면 설치하지 않는다. */
   beforeHandoff: () => Promise<void>;
-  /** 설치 프로그램에 넘기고 서버가 끝낼 종료 코드를 돌려준다. */
-  handoff: (stagedFile: string, version: string) => Promise<number>;
+  /** 설치 프로그램에 넘기고 서버가 끝낼 종료 코드를 돌려준다. null이면 넘겨받은 쪽이 앱을 끄므로 서버는 스스로 끝내지 않는다. */
+  handoff: (stagedFile: string, version: string) => Promise<number | null>;
   stallMs?: number;
+  handoffWaitMs?: number;
   cleanupDelayMs?: number;
   warn?: (msg: string) => void;
 }
@@ -157,7 +160,13 @@ export function createUpdateInstaller(opts: UpdateInstallerOptions) {
         warn(`[aether update] 설치를 시작하지 못했습니다: ${e instanceof Error ? e.message : String(e)}`);
         throw new InstallError("handoff");
       });
-      setTimeout(() => exitFn(code), EXIT_DELAY_MS); // 화면이 설치 단계를 한 번은 볼 수 있게 조금 뒤에 끝낸다
+      if (code !== null) setTimeout(() => exitFn(code), EXIT_DELAY_MS);
+      else {
+        // 교체 스크립트가 앱을 옮기기 전에 끝나면 서버가 그대로 살아 있다. 그때는 실패로 돌린다.
+        setTimeout(() => {
+          if (state.phase === "installing") state = { phase: "failed", version, reason: "handoff" };
+        }, opts.handoffWaitMs ?? HANDOFF_WAIT_MS).unref();
+      } // 화면이 설치 단계를 한 번은 볼 수 있게 조금 뒤에 끝낸다
     } catch (e) {
       abort = undefined;
       const reason = classify(e, ctrl.signal.aborted);
@@ -204,7 +213,7 @@ export function createUpdateInstaller(opts: UpdateInstallerOptions) {
 
   /** 서버가 요청을 받을 수 있게 된 뒤 부른다. 설치 프로그램이 이 표시를 기다리고, 받은 파일은 조금 뒤 치운다. */
   function markHealthy(): void {
-    // 같은 계정의 개인 운영 서버와 개발 실행이 설치본의 표시를 쓰거나 파일을 치우면 안 된다.
+    // 같은 계정의 다른 서버와 개발 실행이 설치본의 표시를 쓰거나 파일을 치우면 안 된다.
     if (!opts.supervised || !fs.existsSync(opts.updatesDir)) return;
     try {
       fs.writeFileSync(path.join(opts.updatesDir, `ok-${opts.current}`), "");
@@ -229,33 +238,31 @@ export function createUpdateInstaller(opts: UpdateInstallerOptions) {
 
 const execFileAsync = promisify(execFile);
 
-const xmlEscape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-
 /**
- * 맥: 서비스를 내리면 launchd가 같은 프로세스 그룹을 끄므로 별도 일회용 launchd 작업으로 설치한다.
- * 스크립트는 프로그램 폴더가 교체되는 동안에도 읽을 수 있게 updates로 복사해 쓴다.
+ * 맥: dmg 안의 새 앱을 대기 폴더(<설정 폴더>/update/Aether.app)로 꺼내 서명을 검사한 뒤, 앱 안의 교체 스크립트에 넘긴다.
+ * 교체 스크립트는 스스로 세션에서 떨어져 앱을 끄고 바꾸고 다시 연다. 실패하면 이전 앱으로 되돌리고 rolled-back에 버전을 적는다.
  */
-async function handoffMac(version: string, updatesDir: string, programDir: string): Promise<number> {
-  const label = "com.aether.updater";
-  const script = path.join(updatesDir, "aether-update.sh");
-  fs.copyFileSync(path.join(programDir, "bin", "aether-update.sh"), script);
-  const plist = path.join(updatesDir, `${label}.plist`);
-  const args = ["/bin/bash", script, programDir, updatesDir, version].map((a) => `<string>${xmlEscape(a)}</string>`).join("");
-  const log = xmlEscape(path.join(updatesDir, UPDATE_LOG));
-  fs.writeFileSync(plist, `<?xml version="1.0" encoding="UTF-8"?>
-<plist version="1.0"><dict>
-<key>Label</key><string>${label}</string>
-<key>ProgramArguments</key><array>${args}</array>
-<key>RunAtLoad</key><true/>
-<key>EnvironmentVariables</key><dict><key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
-<key>StandardOutPath</key><string>${log}</string>
-<key>StandardErrorPath</key><string>${log}</string>
-</dict></plist>
-`);
-  const domain = `gui/${process.getuid!()}`;
-  await execFileAsync("launchctl", ["bootout", `${domain}/${label}`]).catch(() => undefined); // 지난번 작업이 남아 있으면 치운다
-  await execFileAsync("launchctl", ["bootstrap", domain, plist]);
-  return 0; // 코드 0은 LaunchAgent가 다시 띄우지 않는다
+export async function handoffMac(dmg: string, version: string, configDir: string, programDir: string): Promise<void> {
+  const staged = path.join(configDir, "update", "Aether.app");
+  const mnt = fs.mkdtempSync(path.join(os.tmpdir(), "aether-dmg-"));
+  fs.rmSync(staged, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(staged), { recursive: true });
+  try {
+    try {
+      await execFileAsync("hdiutil", ["attach", dmg, "-nobrowse", "-readonly", "-noautoopen", "-mountpoint", mnt]);
+      await execFileAsync("ditto", [path.join(mnt, "Aether.app"), staged]);
+    } finally {
+      await execFileAsync("hdiutil", ["detach", mnt, "-force"]).catch(() => undefined);
+      try { fs.rmdirSync(mnt); } catch { /* 붙어 있던 볼륨이 아직 남았으면 비어 있지 않을 수 있다. 임시 폴더라 둬도 된다. */ }
+    }
+    await execFileAsync("codesign", ["--verify", "--deep", "--strict", staged]);
+  } catch (e) {
+    fs.rmSync(staged, { recursive: true, force: true });
+    throw e;
+  }
+  await execFileAsync("/bin/bash", [path.join(programDir, "..", "apply-update.sh"), "--detach"], {
+    env: { ...process.env, AETHER_APP_BASE: configDir, AETHER_UPDATE_VERSION: version },
+  });
 }
 
 const updatesDir = path.join(appPaths().configDir, "updates");
@@ -275,5 +282,9 @@ export const updateInstaller = createUpdateInstaller({
   beforeHandoff: async () => {
     await createBackup(database(), { dir: config.backupDir, kind: "manual", keep: config.backupKeep, protectId: restoreStatus(config.dbPath).pending?.id });
   },
-  handoff: async (_staged, version) => (process.platform === "darwin" ? handoffMac(version, updatesDir, programDir!) : EXIT_CODE_INSTALL),
+  handoff: async (staged, version) => {
+    if (process.platform !== "darwin") return EXIT_CODE_INSTALL;
+    await handoffMac(staged, version, appPaths().configDir, programDir!);
+    return null;
+  },
 });

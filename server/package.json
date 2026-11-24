@@ -1,7 +1,7 @@
 {
   "name": "aether-server",
   "version": "0.0.0",
-  "aetherReleaseVersion": "0.0.7",
+  "aetherReleaseVersion": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {

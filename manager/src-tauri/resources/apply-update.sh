@@ -3,6 +3,7 @@
 # 새 앱이 응답하지 않으면 이전 앱으로 되돌린다. 진행은 <설정 폴더>/update.log에 남긴다.
 # 사용: apply-update.sh [--detach]   --detach는 새 세션에서 따로 돌려 바로 반환한다(호출한 프로세스가 앱 종료와 함께 죽어도 끝까지 간다).
 # 환경(시험용 재정의): AETHER_APP_BASE, AETHER_UPDATE_APP, AETHER_UPDATE_PORT, AETHER_UPDATE_BACKUP,
+#   AETHER_UPDATE_VERSION(서버가 건 업데이트의 버전, 되돌릴 때 rolled-back에 적는다),
 #   AETHER_UPDATE_SKIP_VERIFY=1(서명 검사 생략), AETHER_UPDATE_OPEN(앱을 여는 명령), AETHER_UPDATE_HEALTH_WAIT(초, 기본 60)
 CONF="${AETHER_APP_BASE:-$HOME/Library/Application Support/Aether}"
 APP="${AETHER_UPDATE_APP:-/Applications/Aether.app}"
@@ -39,6 +40,8 @@ healthy() { curl -s -m 2 "http://127.0.0.1:$PORT/api/health" | grep -q '"ok":tru
 fail() {
   if [ -n "$MOVED" ]; then
     log "새 앱이 정상으로 뜨지 않아 이전 앱으로 되돌립니다: $1"
+    # 서버가 건 업데이트면 실패한 버전을 남겨 웹이 되돌림을 알리게 한다(메뉴에서 적용한 경우는 버전이 없어 남기지 않는다).
+    [ -n "${AETHER_UPDATE_VERSION:-}" ] && { mkdir -p "$CONF/updates"; printf '%s' "$AETHER_UPDATE_VERSION" >"$CONF/updates/rolled-back"; }
     quit_app
     rm -rf "$APP"
     if mv "$BACKUP" "$APP"; then

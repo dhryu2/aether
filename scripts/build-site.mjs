@@ -1,6 +1,9 @@
 #!/usr/bin/env node
-// 다운로드 사이트 생성: build/installers의 설치 파일 + server/package.json 버전 + deploy/site/notes/<버전>.md
-// → build/site/{index.html, icon.png, 글꼴, version.json, 설치 파일}. 빌드 도구 없이 정적 파일만 만든다. 네트워크 전송은 하지 않는다.
+// 다운로드 사이트 생성: build/installers의 맥 dmg + server/package.json 버전 + deploy/site/notes/<버전>.md
+// → build/site/{index.html, icon.png, 첫 화면 그림, 글꼴, version.json, dmg}. 빌드 도구 없이 정적 파일만 만든다. 네트워크 전송은 하지 않는다.
+// 공개 빌드 순서: AETHER_BUILD_MAC_APP_ONLY=1 AETHER_UPDATE_URL=<배포 주소> scripts/build-installers.sh
+//   → AETHER_SIGN_IDENTITY=<인증서 이름> scripts/build-manager-app.sh → scripts/build-mac-dmg.sh
+//   → AETHER_UPDATE_SIGNING_KEY=<개인키> node scripts/build-site.mjs
 // 사용: node scripts/build-site.mjs [--released-at <ISO 시각>]
 // 시험용 재정의: --installers --out --notes-dir --pkg --template --icon (기본값은 저장소 경로)
 import crypto from "node:crypto";
@@ -21,6 +24,7 @@ const icon = path.resolve(arg("icon") ?? path.join(REPO, "web/public/icon-512.pn
 const font = path.join(REPO, "web/node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2");
 const mono = path.join(REPO, "web/node_modules/@fontsource/geist-mono/files/geist-mono-latin-400-normal.woff2");
 
+const heroDir = path.join(REPO, "deploy/readme");
 const NOTES_MAX = 4000;
 function fail(msg) { console.error(`사이트 빌드 실패: ${msg}`); process.exit(1); }
 
@@ -30,17 +34,15 @@ const releasedRaw = new Date(arg("released-at") ?? Date.now());
 if (Number.isNaN(releasedRaw.getTime())) fail(`--released-at이 시각이 아닙니다: ${arg("released-at")}`);
 const releasedAt = releasedRaw.toISOString(); // 서버 스키마(문자열 40자 이하)와 형식을 맞춘다
 
-// 만들 설치 파일은 build-installers.sh가 만드는 두 개로 고정이다. 하나라도 없으면 멈춘다.
-const targets = [
-  { os: "win", arch: "x64", name: `Aether-${version}-win-x64.exe` },
-  { os: "mac", arch: "arm64", name: `Aether-${version}-mac-arm64.pkg` },
-];
+// 배포하는 파일은 build-mac-dmg.sh가 만드는 맥 dmg 하나다. 없으면 멈춘다.
+const targets = [{ os: "mac", arch: "arm64", name: `Aether-${version}-mac-arm64.dmg` }];
+const heroes = ["ko", "en"].flatMap((l) => ["light", "dark"].map((m) => `hero-${l}-${m}.png`));
 const notesFile = path.join(notesDir, `${version}.md`);
 if (!fs.existsSync(notesFile)) fail(`이번 버전 내용 파일이 없습니다: ${notesFile}`);
 for (const t of targets) {
   if (!fs.statSync(path.join(installers, t.name), { throwIfNoEntry: false })?.isFile()) fail(`설치 파일이 없습니다: ${path.join(installers, t.name)}`);
 }
-for (const f of [template, icon, font, mono, path.join(termsDir, `${TERMS_VERSION}.html`)]) if (!fs.existsSync(f)) fail(`재료 파일이 없습니다: ${f}`);
+for (const f of [template, icon, font, mono, path.join(termsDir, `${TERMS_VERSION}.html`), ...heroes.map((h) => path.join(heroDir, h))]) if (!fs.existsSync(f)) fail(`재료 파일이 없습니다: ${f}`);
 
 function sha256(file) {
   const h = crypto.createHash("sha256");
@@ -70,6 +72,7 @@ fs.mkdirSync(out, { recursive: true });
 for (const t of targets) fs.copyFileSync(path.join(installers, t.name), path.join(out, t.name));
 fs.cpSync(termsDir, path.join(out, "terms"), { recursive: true });
 fs.copyFileSync(icon, path.join(out, "icon.png"));
+for (const h of heroes) fs.copyFileSync(path.join(heroDir, h), path.join(out, h));
 fs.copyFileSync(font, path.join(out, path.basename(font))); // shortcut: 2MB 전체 글꼴을 그대로 쓴다, 페이지 첫 표시가 느리다는 보고가 있으면 쓰는 글자만 추리기
 fs.copyFileSync(mono, path.join(out, path.basename(mono)));
 // 두 글꼴은 SIL OFL 1.1이라 글꼴을 배포할 때 라이선스 원문을 함께 둔다.

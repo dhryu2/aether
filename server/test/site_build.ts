@@ -23,9 +23,8 @@ const inst = path.join(tmp, "inst"); fs.mkdirSync(inst);
 const notes = path.join(tmp, "notes"); fs.mkdirSync(notes);
 const pkg = path.join(tmp, "package.json"); fs.writeFileSync(pkg, JSON.stringify({ version: "0.0.0", aetherReleaseVersion: "1.2.3" }));
 fs.writeFileSync(path.join(notes, "1.2.3.md"), "- 첫째 </script><b>\n둘째 줄\n");
-const WIN = "Aether-1.2.3-win-x64.exe", MAC = "Aether-1.2.3-mac-arm64.pkg";
-const winBytes = crypto.randomBytes(12345), macBytes = crypto.randomBytes(67890);
-fs.writeFileSync(path.join(inst, WIN), winBytes);
+const MAC = "Aether-1.2.3-mac-arm64.dmg";
+const macBytes = crypto.randomBytes(67890);
 fs.writeFileSync(path.join(inst, MAC), macBytes);
 const sha = (b: Buffer) => crypto.createHash("sha256").update(b).digest("hex");
 
@@ -37,23 +36,25 @@ check(r.status === 0, "정상 빌드 성공", r.stderr);
 const vj = JSON.parse(fs.readFileSync(path.join(out, "version.json"), "utf8"));
 check(vj.version === "1.2.3" && vj.releasedAt === "2026-11-02T01:02:03.000Z", "버전과 공개 시각");
 check(Object.keys(vj).sort().join() === "files,notes,releasedAt,version", "version.json 최상위 키");
-const fw = vj.files.find((f: { os: string }) => f.os === "win"), fm = vj.files.find((f: { os: string }) => f.os === "mac");
-check(fw.arch === "x64" && fw.name === WIN && fw.size === winBytes.length && fw.sha256 === sha(winBytes), "윈도우 파일 크기·해시", fw);
+const fm = vj.files[0];
+check(vj.files.length === 1 && fm.os === "mac", "배포 파일은 맥 dmg 하나뿐", vj.files);
 check(fm.arch === "arm64" && fm.name === MAC && fm.size === macBytes.length && fm.sha256 === sha(macBytes), "맥 파일 크기·해시", fm);
-check(Object.keys(fw).sort().join() === "arch,name,os,sha256,size", "files 항목 키");
+check(Object.keys(fm).sort().join() === "arch,name,os,sha256,size", "files 항목 키");
 check(vj.notes.startsWith("- 첫째"), "notes는 notes 파일 내용");
-check(sha(fs.readFileSync(path.join(out, WIN))) === fw.sha256 && sha(fs.readFileSync(path.join(out, MAC))) === fm.sha256, "복사된 설치 파일이 원본과 같다");
+check(sha(fs.readFileSync(path.join(out, MAC))) === fm.sha256, "복사된 설치 파일이 원본과 같다");
 check(fs.existsSync(path.join(out, "icon.png")), "마스코트 이미지 복사");
+check(["ko", "en"].every((l) => ["light", "dark"].every((m) => fs.existsSync(path.join(out, `hero-${l}-${m}.png`)))), "첫 화면 그림 4장 복사");
 const html = fs.readFileSync(path.join(out, "index.html"), "utf8");
+check(!html.includes("Windows") && html.includes("hero-ko-dark.png"), "윈도우 안내 없음, 첫 화면 그림이 들어 있다");
 check(!html.includes("__VERSION_JSON__") && !html.includes("__NOSCRIPT_FILES__"), "템플릿 자리 치환됨");
 check((html.match(/<\/script>/g) ?? []).length === 2, "notes의 </script>가 스크립트를 끊지 못한다(이스케이프)");
 const inline = /<script id="data" type="application\/json">([\s\S]*?)<\/script>/.exec(html)![1];
-check(JSON.parse(inline).files.length === 2 && JSON.parse(inline).notes.includes("</script>"), "인라인 JSON이 version.json과 같다");
-check(html.includes(`href="${WIN}"`), "스크립트 없이도 받을 수 있는 링크(noscript)");
+check(JSON.parse(inline).files.length === 1 && JSON.parse(inline).notes.includes("</script>"), "인라인 JSON이 version.json과 같다");
+check(html.includes(`href="${MAC}"`), "스크립트 없이도 받을 수 있는 링크(noscript)");
 check(!/src="https?:|<link[^>]+href="https?:|@import|url\(\s*["']?https?:/.test(html), "외부 자원 참조 없음");
 check(/<title>Aether — /.test(html) && !/document\.title=[^;]*version/.test(html), "탭 제목에 버전을 넣지 않는다");
 check(html.includes('href="https://github.com/dhryu2/aether"') && html.includes('href="#features"'), "GitHub 링크와 페이지 안 링크");
-check(fs.readdirSync(out).sort().join() === [MAC, WIN, "PretendardVariable.woff2", "Pretendard-LICENSE.txt", "geist-mono-latin-400-normal.woff2", "GeistMono-LICENSE.txt", "icon.png", "index.html", "terms", "version.json"].sort().join(), "출력은 정해진 10개 항목뿐", fs.readdirSync(out));
+check(fs.readdirSync(out).sort().join() === [MAC, ...["ko", "en"].flatMap((l) => ["light", "dark"].map((m) => `hero-${l}-${m}.png`)), "PretendardVariable.woff2", "Pretendard-LICENSE.txt", "geist-mono-latin-400-normal.woff2", "GeistMono-LICENSE.txt", "icon.png", "index.html", "terms", "version.json"].sort().join(), "출력은 정해진 14개 항목뿐", fs.readdirSync(out));
 
 const termsPage = fs.readFileSync(path.join(out, "terms", `${TERMS_VERSION}.html`), "utf8");
 check(html.includes(`href="terms/${TERMS_VERSION}.html"`), "footer가 지금 판의 사용 조건을 가리킨다");
@@ -68,11 +69,11 @@ fs.writeFileSync(path.join(out, "stale.txt"), "x");
 check(run(out).status === 0 && !fs.existsSync(path.join(out, "stale.txt")), "재빌드는 이전 결과를 비운다");
 
 // 설치 파일이 없으면 실패하고 출력도 만들지 않는다
-fs.renameSync(path.join(inst, MAC), path.join(tmp, "hidden.pkg"));
+fs.renameSync(path.join(inst, MAC), path.join(tmp, "hidden.dmg"));
 const out2 = path.join(tmp, "site2");
 const miss = run(out2);
 check(miss.status === 1 && /설치 파일이 없습니다/.test(miss.stderr) && !fs.existsSync(out2), "설치 파일이 없으면 실패(출력 없음)", miss.stderr);
-fs.renameSync(path.join(tmp, "hidden.pkg"), path.join(inst, MAC));
+fs.renameSync(path.join(tmp, "hidden.dmg"), path.join(inst, MAC));
 fs.renameSync(path.join(notes, "1.2.3.md"), path.join(tmp, "n.md"));
 const noNotes = run(out2);
 check(noNotes.status === 1 && /내용 파일이 없습니다/.test(noNotes.stderr), "notes 파일이 없으면 실패", noNotes.stderr);
@@ -100,11 +101,11 @@ check(ck.status().latest === "1.2.3" && ck.status().available, "build-site의 ve
 
 // 설치 파일 폴더가 출력 폴더와 같거나 그 안이면 실패하고 원본을 지우지 않는다
 const same = spawnSync(process.execPath, [SCRIPT, "--installers", inst, "--out", inst, "--notes-dir", notes, "--pkg", pkg], { encoding: "utf8" });
-check(same.status === 1 && fs.existsSync(path.join(inst, WIN)), "출력 폴더가 설치 파일 폴더와 같으면 실패(원본 보존)", same.stderr);
+check(same.status === 1 && fs.existsSync(path.join(inst, MAC)), "출력 폴더가 설치 파일 폴더와 같으면 실패(원본 보존)", same.stderr);
 const outer = path.join(tmp, "outer"); fs.mkdirSync(path.join(outer, "inner"), { recursive: true }); fs.writeFileSync(path.join(outer, "version.json"), "{}");
-fs.copyFileSync(path.join(inst, WIN), path.join(outer, "inner", WIN)); fs.copyFileSync(path.join(inst, MAC), path.join(outer, "inner", MAC));
+fs.copyFileSync(path.join(inst, MAC), path.join(outer, "inner", MAC));
 const inside = spawnSync(process.execPath, [SCRIPT, "--installers", path.join(outer, "inner"), "--out", outer, "--notes-dir", notes, "--pkg", pkg], { encoding: "utf8" });
-check(inside.status === 1 && fs.existsSync(path.join(outer, "inner", WIN)), "설치 파일 폴더가 출력 폴더 안이면 실패(원본 보존)", inside.stderr);
+check(inside.status === 1 && fs.existsSync(path.join(outer, "inner", MAC)), "설치 파일 폴더가 출력 폴더 안이면 실패(원본 보존)", inside.stderr);
 
 // 사이트 결과물이 아닌 파일이 든 폴더는 지우지 않는다
 const other = path.join(tmp, "mine"); fs.mkdirSync(other); fs.writeFileSync(path.join(other, "keep.txt"), "소중");

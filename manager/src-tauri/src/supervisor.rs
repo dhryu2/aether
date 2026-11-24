@@ -149,7 +149,7 @@ impl Worker {
             .env("TMPDIR", &tmp)
             .env("AETHER_PARENT_WATCH", "1")
             .env("AETHER_ADMIN_TOKEN", &token)
-            .env_remove("AETHER_SUPERVISED")
+            .env("AETHER_SUPERVISED", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

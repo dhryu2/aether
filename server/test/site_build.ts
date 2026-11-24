@@ -45,7 +45,7 @@ check(sha(fs.readFileSync(path.join(out, MAC))) === fm.sha256, "복사된 설치
 check(fs.existsSync(path.join(out, "icon.png")), "마스코트 이미지 복사");
 check(["ko", "en"].every((l) => ["light", "dark"].every((m) => fs.existsSync(path.join(out, `hero-${l}-${m}.png`)))), "첫 화면 그림 4장 복사");
 const html = fs.readFileSync(path.join(out, "index.html"), "utf8");
-check(!html.includes("Windows") && html.includes("hero-ko-dark.png"), "윈도우 안내 없음, 첫 화면 그림이 들어 있다");
+check(!html.includes("Windows") && html.includes("hero-en-dark.png"), "윈도우 안내 없음, 첫 화면 그림이 들어 있다");
 check(!html.includes("__VERSION_JSON__") && !html.includes("__NOSCRIPT_FILES__"), "템플릿 자리 치환됨");
 check((html.match(/<\/script>/g) ?? []).length === 2, "notes의 </script>가 스크립트를 끊지 못한다(이스케이프)");
 const inline = /<script id="data" type="application\/json">([\s\S]*?)<\/script>/.exec(html)![1];

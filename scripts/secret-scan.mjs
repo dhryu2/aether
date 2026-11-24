@@ -42,9 +42,9 @@ const BAD_FILE = /(?:^|\/)(?:\.env(?:\.(?!example$)[^/]+)?|id_(?:rsa|dsa|ecdsa|e
 // 공개하지 않는 경로. 강제로 추가해도 막는다.
 const PRIVATE_PATH = /^(?:\.private(?:\/|$)|docs\/|CLAUDE\.md$|AGENTS\.md$|HANDOFF\.md$|SPEC\.md$|PRODUCT\.md$|PHASE0_RESULTS\.md$|mobile\/|server\/spikes\/|\.claude\/(?:agents|skills)(?:\/|$)|\.grok(?:\/|$)|\.graphifyignore$|deploy\/dev-postgres\/|deploy\/notify\.sh$|graphify-out\/)/;
 // 새 파일은 정한 자리에만 둔다. 문서와 루트 항목을 늘리려면 여기를 고쳐 이유를 남긴다.
-// README.en.md: 저장소 첫 화면에서 바로 찾도록 영어 README를 맨 위에 둔다(2026-11-03 사용자 결정).
-const ROOT_ENTRIES = new Set([".claude", ".githooks", ".gitignore", "BRAND.md", "LICENSE", "NOTICE", "README.md", "README.en.md", "deploy", "desktop", "e2e", "manager", "scripts", "server", "shared", "web"]);
-const PUBLIC_MD = /(?:^|\/)README\.md$|^README\.en\.md$|^BRAND\.md$|^deploy\/site\/notes\/[^/]+\.md$|^server\/codex\/protocol\//;
+// README.ko.md: 영어 README.md를 기본으로 두고 한국어판을 맨 위에 함께 둔다.
+const ROOT_ENTRIES = new Set([".claude", ".githooks", ".gitignore", "BRAND.md", "LICENSE", "NOTICE", "README.md", "README.ko.md", "deploy", "desktop", "e2e", "manager", "scripts", "server", "shared", "web"]);
+const PUBLIC_MD = /(?:^|\/)README\.md$|^README\.ko\.md$|^BRAND\.md$|^deploy\/site\/notes\/[^/]+\.md$|^server\/codex\/protocol\//;
 const NOREPLY = /@users\.noreply\.github\.com$/i;
 
 // .env의 비밀 항목 값과 개인 고유값은 그대로 찾는다. 짧은 값은 오탐이 많아 뺀다.

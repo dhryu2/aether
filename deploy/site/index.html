@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#ffffff">
-<meta name="description" content="내 컴퓨터에 설치해 채팅으로 AI 에이전트를 다루는 앱입니다.">
-<title>Aether — 채팅으로 다루는 AI 에이전트</title>
+<meta name="description" content="An app you install on your own computer to run AI agents from a chat.">
+<title>Aether — Run your AI agents from a chat</title>
 <link rel="icon" href="icon.png">
 <link rel="preload" href="PretendardVariable.woff2" as="font" type="font/woff2" crossorigin>
 <style>
@@ -138,18 +138,18 @@ footer{background:var(--tint);padding:0 0 28px}
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></symbol><symbol id="i-load" viewBox="0 0 24 24"><path d="M12 2v4M16.2 7.8l2.9-2.9M18 12h4M16.2 16.2l2.9 2.9M12 18v4M4.9 19.1l2.9-2.9M2 12h4M4.9 4.9l2.9 2.9"/></symbol></svg>
 <nav class="wrap top" aria-label="Aether">
   <a class="brand" href="#"><img src="icon.png" alt="" width="30" height="30">Aether</a>
-  <a href="#features" data-t="navFeatures">기능</a>
-  <a href="#install" data-t="navInstall">설치 방법</a>
+  <a href="#features" data-t="navFeatures">Features</a>
+  <a href="#install" data-t="navInstall">Install</a>
   <a href="https://github.com/dhryu2/aether">GitHub</a>
-  <a class="btn small dl" hidden data-t="navDl">다운로드</a>
+  <a class="btn small dl" hidden data-t="navDl">Download</a>
 </nav>
 
 <main>
 <div class="wrap">
   <div class="hero">
     <div>
-      <h1 data-t="h1">AI 에이전트를 터미널 대신 채팅으로</h1>
-      <p class="lead" data-t="lead">Aether는 내 컴퓨터에 설치해 쓰는 앱입니다. 채팅 화면에서 AI에게 작업을 맡기고, 승인 요청에도 바로 답할 수 있습니다. 계정은 필요 없습니다.</p>
+      <h1 data-t="h1">AI agents in a chat, not a terminal</h1>
+      <p class="lead" data-t="lead">Aether is an app you install on your own computer. Hand work to an AI in a chat window and answer its approval requests right there. No account needed.</p>
       <div class="cta" id="download">
         <a class="btn dl primary" hidden></a>
         <p class="meta" id="primary-meta" hidden></p>
@@ -162,59 +162,59 @@ footer{background:var(--tint);padding:0 0 28px}
   </div>
 
   <picture class="shot">
-    <source media="(prefers-color-scheme: dark)" srcset="hero-ko-dark.png">
-    <img src="hero-ko-light.png" width="1644" height="1044" data-t-label="windowLabel" alt="Aether 화면 예시. 왼쪽에 작업 목록이 있고, 오른쪽 대화에 파일 수정 승인 요청이 떠 있습니다.">
+    <source media="(prefers-color-scheme: dark)" srcset="hero-en-dark.png">
+    <img src="hero-en-light.png" width="1644" height="1044" data-t-label="windowLabel" alt="Example of the Aether screen. A list of work on the left, and a file edit approval request in the conversation on the right.">
   </picture>
 
   <section id="features">
-    <h2 data-t="featH">터미널을 지켜보지 않아도 AI가 뭘 하는지 보입니다</h2>
+    <h2 data-t="featH">See what the AI is doing without watching a terminal</h2>
     <div class="feats">
       <article class="feat">
-        <div><h3 data-t="f1h">터미널 대신 채팅 화면</h3><p data-t="f1p">AI가 읽은 파일과 실행한 명령이 카드로 표시됩니다. AI가 질문하거나 승인을 요청하면 그 자리에서 답하면 됩니다.</p></div>
-        <div class="demo ask" aria-hidden="true"><b data-t="f1q">테스트를 어디까지 실행할까요?</b><ul><li class="on"><span data-t="f1a">변경된 파일 관련 테스트만</span></li><li><span data-t="f1b">전체 테스트</span></li></ul></div>
+        <div><h3 data-t="f1h">A chat window, not a terminal</h3><p data-t="f1p">Files the AI read and commands it ran appear as cards. When it asks a question or needs approval, you answer right there.</p></div>
+        <div class="demo ask" aria-hidden="true"><b data-t="f1q">How much of the test suite should I run?</b><ul><li class="on"><span data-t="f1a">Only tests related to the changed files</span></li><li><span data-t="f1b">All tests</span></li></ul></div>
       </article>
       <article class="feat">
-        <div><h3 data-t="f2h">계정 없이 내 컴퓨터에서</h3><p data-t="f2p">회원가입이 필요 없고, 대화 기록은 내 컴퓨터에 저장됩니다. 설정 화면에서 백업과 복원도 할 수 있습니다.</p></div>
+        <div><h3 data-t="f2h">No account, on your own computer</h3><p data-t="f2p">There is nothing to sign up for, and conversations are stored on your computer. You can back them up and restore them in Settings.</p></div>
         <dl class="demo kv">
-          <dt data-t="f2k1">계정</dt><dd data-t="f2v1">없음</dd>
-          <dt data-t="f2k2">대화 기록</dt><dd data-t="f2v2">내 컴퓨터</dd>
-          <dt data-t="f2k3">데이터 전송</dt><dd data-t="f2v3">내가 선택한 AI 서비스로만</dd>
+          <dt data-t="f2k1">Account</dt><dd data-t="f2v1">None</dd>
+          <dt data-t="f2k2">Conversations</dt><dd data-t="f2v2">Your computer</dd>
+          <dt data-t="f2k3">Data sent</dt><dd data-t="f2v3">Only to the AI service you choose</dd>
         </dl>
       </article>
       <article class="feat">
-        <div><h3 data-t="f3h">얼마나 기다렸는지 목록에서</h3><p data-t="f3p">어떤 작업이 얼마나 오래 내 답을 기다리는지 목록에서 바로 확인할 수 있습니다.</p></div>
+        <div><h3 data-t="f3h">See how long work has waited</h3><p data-t="f3p">The list shows which work is waiting for you and for how long.</p></div>
         <div class="demo" aria-hidden="true">
-          <div class="row on"><b data-t="mS1">로그인 테스트 고치기</b><small class=wait><svg class="i"><use href="#i-hand"/></svg><span data-t="mS1s">승인 대기</span><em data-t="mAge">2분째</em></small><span class="model" data-t="mModel">모델 A</span></div>
-          <div class="row"><b data-t="mS2">결제 화면 다듬기</b><small><svg class="i"><use href="#i-load"/></svg><span data-t="mS2s">작업 중</span></small><span class="model" data-t="mModel">모델 A</span></div>
+          <div class="row on"><b data-t="mS1">Fix the login test</b><small class=wait><svg class="i"><use href="#i-hand"/></svg><span data-t="mS1s">Awaiting approval</span><em data-t="mAge">2 min</em></small><span class="model" data-t="mModel">Model A</span></div>
+          <div class="row"><b data-t="mS2">Polish the payment page</b><small><svg class="i"><use href="#i-load"/></svg><span data-t="mS2s">Working</span></small><span class="model" data-t="mModel">Model A</span></div>
         </div>
       </article>
       <article class="feat">
-        <div><h3 data-t="f4h">여러 AI를 한 화면에서</h3><p data-t="f4p">작업마다 사용할 AI를 고르고, 여러 작업을 나란히 열어 둘 수 있습니다.</p></div>
+        <div><h3 data-t="f4h">Several AIs, one window</h3><p data-t="f4p">Choose the AI for each piece of work, and keep several open side by side.</p></div>
         <div class="demo panes" aria-hidden="true">
-          <div><b data-t="f4a">AI 도구 A</b><small data-t="mS2">결제 화면 다듬기</small></div>
-          <div><b data-t="f4b">AI 도구 B</b><small data-t="mS3">문서 정리</small></div>
+          <div><b data-t="f4a">AI tool A</b><small data-t="mS2">Polish the payment page</small></div>
+          <div><b data-t="f4b">AI tool B</b><small data-t="mS3">Tidy the docs</small></div>
         </div>
       </article>
     </div>
-    <div class="phone"><b data-t="phH">폰에서도 쓰고 싶다면</b><span data-t="phP">기본 설정에서는 설치한 컴퓨터에서만 열립니다. 컴퓨터와 폰에 Tailscale을 설치해 같은 계정으로 로그인한 뒤, 설정의 「폰에서 쓰기」를 켜면 폰 브라우저에서도 같은 화면을 쓸 수 있습니다. 컴퓨터가 잠들면 폰에서 열리지 않습니다.</span></div>
+    <div class="phone"><b data-t="phH">Want to use it from your phone?</b><span data-t="phP">By default, Aether opens only on the computer it is installed on. Install Tailscale on the computer and your phone, sign in to the same account, then turn on Use on your phone in Settings to get the same screen in your phone browser. It will not open while the computer is asleep.</span></div>
   </section>
 
   <section id="install">
-    <h2 data-t="insH">설치는 세 단계면 끝납니다</h2>
+    <h2 data-t="insH">Three steps to install</h2>
     <ol class="steps">
-      <li><h3 data-t="s1h">앱을 응용 프로그램 폴더로</h3><p data-t="s1p">다운로드한 파일을 열고, Aether를 응용 프로그램 폴더로 끌어 넣습니다.</p></li>
-      <li><h3 data-t="s2h">보안 경고 넘어가기</h3>
-        <p data-t="s2p">Apple의 인증을 받지 않은 앱이라 처음 실행할 때 보안 경고가 나타납니다.</p>
-        <p><span data-t="s2m">열리지 않으면 「시스템 설정」의 「개인정보 보호 및 보안」에서 「그래도 열기」를 누릅니다.</span></p>
+      <li><h3 data-t="s1h">Move the app to Applications</h3><p data-t="s1p">Open the downloaded file and drag Aether into the Applications folder.</p></li>
+      <li><h3 data-t="s2h">Get past the security warning</h3>
+        <p data-t="s2p">The app is not notarized by Apple, so a security warning appears the first time.</p>
+        <p><span data-t="s2m">If it will not open, go to Privacy &amp; Security in System Settings and choose “Open Anyway”.</span></p>
       </li>
-      <li><h3 data-t="s3h">초기 설정</h3><p data-t="s3p">앱을 처음 열면 브라우저에 초기 설정 화면이 열립니다. 안내를 따라 마치면 바로 쓸 수 있습니다.</p></li>
+      <li><h3 data-t="s3h">Initial setup</h3><p data-t="s3p">When you first open the app, the setup page opens in your browser. Follow it and you are ready to go.</p></li>
     </ol>
     <div class="facts">
-      <div><h3 data-t="needH">사전 준비</h3><p data-t="need">Aether에는 AI 도구가 포함되어 있지 않습니다. 사용할 AI 도구를 먼저 설치하고 로그인해 두세요.</p></div>
-      <div><h3 data-t="updH">업데이트</h3><p data-t="upd">새 버전이 나오면 설정의 서버 정보에서 업데이트 버튼을 누르세요. 앱이 새 버전을 받아 스스로 교체하고 다시 열립니다. 대화와 설정은 그대로 유지되고, 교체하는 동안 실행 중인 세션은 멈춥니다.</p></div>
-      <div id="changes"><h3 data-t="notesH">이번 버전 변경 사항</h3><div id="notes"></div></div>
+      <div><h3 data-t="needH">Before you start</h3><p data-t="need">Aether does not include an AI tool. Install the one you want to use and sign in first.</p></div>
+      <div><h3 data-t="updH">Updates</h3><p data-t="upd">When a new version is out, press Update in Settings under Server info. The app downloads the new version, replaces itself, and reopens. Your conversations and settings are kept, and running sessions stop during the swap.</p></div>
+      <div id="changes"><h3 data-t="notesH">Changes in this version</h3><div id="notes"></div></div>
     </div>
-    <details id="sha-box" hidden><summary data-t="shaSum">SHA256 체크섬 보기</summary><div id="sha"></div></details>
+    <details id="sha-box" hidden><summary data-t="shaSum">Show SHA256 checksums</summary><div id="sha"></div></details>
   </section>
 </div>
 
@@ -222,7 +222,7 @@ footer{background:var(--tint);padding:0 0 28px}
   <div class="wrap">
     <img src="icon.png" alt="" width="128" height="128">
     <div>
-      <h2 data-t="endH">계정 없이 설치해서 바로 쓸 수 있습니다</h2>
+      <h2 data-t="endH">Install it and use it, no account needed</h2>
       <a class="btn dl primary" hidden></a>
       <p class="meta others" hidden></p>
     </div>
@@ -236,13 +236,13 @@ footer{background:var(--tint);padding:0 0 28px}
       <div class="plate-main">
         <div class="plate-brand">
           <a class="brand" href="#"><img src="icon.png" alt="" width="34" height="34">Aether</a>
-          <p data-t="tagline">채팅으로 다루는 AI 에이전트</p>
+          <p data-t="tagline">Run your AI agents from a chat</p>
         </div>
-        <nav aria-labelledby="fp"><h2 id="fp" data-t="fProduct">제품</h2><a href="#features" data-t="navFeatures">기능</a><a href="#install" data-t="navInstall">설치 방법</a><a href="#download" data-t="navDl">다운로드</a></nav>
-        <nav aria-labelledby="fr"><h2 id="fr" data-t="fRes">자료</h2><a href="#changes" data-t="fChanges">변경 사항</a><a href="https://github.com/dhryu2/aether/issues" data-t="fIssues">문제 신고</a></nav>
-        <nav aria-labelledby="fo"><h2 id="fo" data-t="fProject">프로젝트</h2><a href="https://github.com/dhryu2/aether">GitHub</a><a href="https://github.com/dhryu2/aether/blob/main/LICENSE" data-t="fLicense">라이선스</a><a href="terms/2026-11-02.html" data-t="fTerms">사용 조건</a></nav>
+        <nav aria-labelledby="fp"><h2 id="fp" data-t="fProduct">Product</h2><a href="#features" data-t="navFeatures">Features</a><a href="#install" data-t="navInstall">Install</a><a href="#download" data-t="navDl">Download</a></nav>
+        <nav aria-labelledby="fr"><h2 id="fr" data-t="fRes">Resources</h2><a href="#changes" data-t="fChanges">Changes</a><a href="https://github.com/dhryu2/aether/issues" data-t="fIssues">Report an issue</a></nav>
+        <nav aria-labelledby="fo"><h2 id="fo" data-t="fProject">Project</h2><a href="https://github.com/dhryu2/aether">GitHub</a><a href="https://github.com/dhryu2/aether/blob/main/LICENSE" data-t="fLicense">License</a><a href="terms/2026-11-02.html" data-t="fTerms">Terms of use</a></nav>
       </div>
-      <div class="plate-end"><span>© 2026 dhryu</span><span data-t="fOss">오픈소스, Apache 2.0 라이선스</span><code id="foot-ver" hidden></code></div>
+      <div class="plate-end"><span>© 2026 dhryu</span><span data-t="fOss">Open source, Apache 2.0 License</span><code id="foot-ver" hidden></code></div>
     </div>
   </div>
 </footer>
@@ -252,27 +252,9 @@ footer{background:var(--tint);padding:0 0 28px}
 (function(){
 var D=JSON.parse(document.getElementById('data').textContent);
 var ko=/^ko/i.test(navigator.language||'');
-// 한국어 글은 HTML에 그대로 있다. 한국어가 아닌 브라우저만 아래 영어로 바꾼다.
-var EN={
- 
- navFeatures:'Features',navInstall:'Install',navDl:'Download',tagline:'Run your AI agents from a chat',fProduct:'Product',fRes:'Resources',fChanges:'Changes',fIssues:'Report an issue',fTerms:'Terms of use',fProject:'Project',fLicense:'License',fOss:'Open source, Apache 2.0 License',
- h1:'AI agents in a chat, not a terminal',
- lead:'Aether is an app you install on your own computer. Hand work to an AI in a chat window and answer its approval requests right there. No account needed.',
- windowLabel:'Example of the Aether screen. A list of work on the left, and a file edit approval request in the conversation on the right.',
- mModel:'Model A',mS1:'Fix the login test',mS1s:'Awaiting approval',mAge:'2 min',mS2:'Polish the payment page',mS2s:'Working',mS3:'Tidy the docs',
- 
- featH:'See what the AI is doing without watching a terminal',
- f1h:'A chat window, not a terminal',f1p:'Files the AI read and commands it ran appear as cards. When it asks a question or needs approval, you answer right there.',f1q:'How much of the test suite should I run?',f1a:'Only tests related to the changed files',f1b:'All tests',
- f2h:'No account, on your own computer',f2p:'There is nothing to sign up for, and conversations are stored on your computer. You can back them up and restore them in Settings.',f2k1:'Account',f2v1:'None',f2k2:'Conversations',f2v2:'Your computer',f2k3:'Data sent',f2v3:'Only to the AI service you choose',
- f3h:'See how long work has waited',f3p:'The list shows which work is waiting for you and for how long.',
- f4h:'Several AIs, one window',f4p:'Choose the AI for each piece of work, and keep several open side by side.',f4a:'AI tool A',f4b:'AI tool B',
- phH:'Want to use it from your phone?',phP:'By default, Aether opens only on the computer it is installed on. Install Tailscale on the computer and your phone, sign in to the same account, then turn on Use on your phone in Settings to get the same screen in your phone browser. It will not open while the computer is asleep.',
- insH:'Three steps to install',s1h:'Move the app to Applications',s1p:'Open the downloaded file and drag Aether into the Applications folder.',
- s2h:'Get past the security warning',s2p:'The app is not notarized by Apple, so a security warning appears the first time.',s2m:'If it will not open, go to Privacy & Security in System Settings and choose “Open Anyway”.',
- s3h:'Initial setup',s3p:'When you first open the app, the setup page opens in your browser. Follow it and you are ready to go.',
- needH:'Before you start',need:'Aether does not include an AI tool. Install the one you want to use and sign in first.',
- updH:'Updates',upd:'When a new version is out, press Update in Settings under Server info. The app downloads the new version, replaces itself, and reopens. Your conversations and settings are kept, and running sessions stop during the swap.',
- notesH:'Changes in this version',shaSum:'Show SHA256 checksums',endH:'Install it and use it, no account needed'
+// 영어 글은 HTML에 그대로 있다. 한국어 브라우저만 아래 한국어로 바꾼다.
+var KO={
+ navFeatures:'기능',navInstall:'설치 방법',navDl:'다운로드',tagline:'채팅으로 다루는 AI 에이전트',fProduct:'제품',fRes:'자료',fChanges:'변경 사항',fIssues:'문제 신고',fTerms:'사용 조건',fProject:'프로젝트',fLicense:'라이선스',fOss:'오픈소스, Apache 2.0 라이선스',h1:'AI 에이전트를 터미널 대신 채팅으로',lead:'Aether는 내 컴퓨터에 설치해 쓰는 앱입니다. 채팅 화면에서 AI에게 작업을 맡기고, 승인 요청에도 바로 답할 수 있습니다. 계정은 필요 없습니다.',windowLabel:'Aether 화면 예시. 왼쪽에 작업 목록이 있고, 오른쪽 대화에 파일 수정 승인 요청이 떠 있습니다.',mModel:'모델 A',mS1:'로그인 테스트 고치기',mS1s:'승인 대기',mAge:'2분째',mS2:'결제 화면 다듬기',mS2s:'작업 중',mS3:'문서 정리',featH:'터미널을 지켜보지 않아도 AI가 뭘 하는지 보입니다',f1h:'터미널 대신 채팅 화면',f1p:'AI가 읽은 파일과 실행한 명령이 카드로 표시됩니다. AI가 질문하거나 승인을 요청하면 그 자리에서 답하면 됩니다.',f1q:'테스트를 어디까지 실행할까요?',f1a:'변경된 파일 관련 테스트만',f1b:'전체 테스트',f2h:'계정 없이 내 컴퓨터에서',f2p:'회원가입이 필요 없고, 대화 기록은 내 컴퓨터에 저장됩니다. 설정 화면에서 백업과 복원도 할 수 있습니다.',f2k1:'계정',f2v1:'없음',f2k2:'대화 기록',f2v2:'내 컴퓨터',f2k3:'데이터 전송',f2v3:'내가 선택한 AI 서비스로만',f3h:'얼마나 기다렸는지 목록에서',f3p:'어떤 작업이 얼마나 오래 내 답을 기다리는지 목록에서 바로 확인할 수 있습니다.',f4h:'여러 AI를 한 화면에서',f4p:'작업마다 사용할 AI를 고르고, 여러 작업을 나란히 열어 둘 수 있습니다.',f4a:'AI 도구 A',f4b:'AI 도구 B',phH:'폰에서도 쓰고 싶다면',phP:'기본 설정에서는 설치한 컴퓨터에서만 열립니다. 컴퓨터와 폰에 Tailscale을 설치해 같은 계정으로 로그인한 뒤, 설정의 「폰에서 쓰기」를 켜면 폰 브라우저에서도 같은 화면을 쓸 수 있습니다. 컴퓨터가 잠들면 폰에서 열리지 않습니다.',insH:'설치는 세 단계면 끝납니다',s1h:'앱을 응용 프로그램 폴더로',s1p:'다운로드한 파일을 열고, Aether를 응용 프로그램 폴더로 끌어 넣습니다.',s2h:'보안 경고 넘어가기',s2p:'Apple의 인증을 받지 않은 앱이라 처음 실행할 때 보안 경고가 나타납니다.',s2m:'열리지 않으면 「시스템 설정」의 「개인정보 보호 및 보안」에서 「그래도 열기」를 누릅니다.',s3h:'초기 설정',s3p:'앱을 처음 열면 브라우저에 초기 설정 화면이 열립니다. 안내를 따라 마치면 바로 쓸 수 있습니다.',needH:'사전 준비',need:'Aether에는 AI 도구가 포함되어 있지 않습니다. 사용할 AI 도구를 먼저 설치하고 로그인해 두세요.',updH:'업데이트',upd:'새 버전이 나오면 설정의 서버 정보에서 업데이트 버튼을 누르세요. 앱이 새 버전을 받아 스스로 교체하고 다시 열립니다. 대화와 설정은 그대로 유지되고, 교체하는 동안 실행 중인 세션은 멈춥니다.',notesH:'이번 버전 변경 사항',shaSum:'SHA256 체크섬 보기',endH:'계정 없이 설치해서 바로 쓸 수 있습니다'
 };
 var T=ko?{
  dl:{mac:'Mac용 다운로드'},
@@ -291,14 +273,14 @@ var T=ko?{
 };
 function $(id){return document.getElementById(id)}
 function all(sel,fn){[].forEach.call(document.querySelectorAll(sel),fn)}
-if(!ko){
- document.documentElement.lang='en';
- all('[data-t]',function(el){el.textContent=EN[el.getAttribute('data-t')]});
- all('[data-t-label]',function(el){var l=EN[el.getAttribute('data-t-label')];el.setAttribute(el.tagName==='IMG'?'alt':'aria-label',l)});
- all('.shot source',function(el){el.srcset=el.srcset.replace('-ko-','-en-')});
- all('.shot img',function(el){el.src=el.getAttribute('src').replace('-ko-','-en-')});
+if(ko){
+ document.documentElement.lang='ko';
+ all('[data-t]',function(el){el.textContent=KO[el.getAttribute('data-t')]});
+ all('[data-t-label]',function(el){var l=KO[el.getAttribute('data-t-label')];el.setAttribute(el.tagName==='IMG'?'alt':'aria-label',l)});
+ all('.shot source',function(el){el.srcset=el.srcset.replace('-en-','-ko-')});
+ all('.shot img',function(el){el.src=el.getAttribute('src').replace('-en-','-ko-')});
+ document.title='Aether — 채팅으로 다루는 AI 에이전트';
 }
-if(!ko)document.title='Aether — Run your AI agents from a chat';
 function mb(n){return (n/1048576).toFixed(1)+' MB'}
 function osOf(){
  var p=((navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||'')+' '+(navigator.userAgent||'');

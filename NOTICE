@@ -9,3 +9,8 @@ This product includes:
 - TypeScript types in server/codex/protocol/, generated from OpenAI Codex
   (https://github.com/openai/codex), Copyright 2025 OpenAI, licensed under the
   Apache License 2.0.
+
+- Pretendard (https://github.com/orioncactus/pretendard), Copyright 2021
+  Kil Hyung-jin, licensed under the SIL Open Font License 1.1.
+- Geist Mono (https://github.com/vercel/geist-font), Copyright 2024 The Geist
+  Project Authors, licensed under the SIL Open Font License 1.1.

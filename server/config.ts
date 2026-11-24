@@ -128,7 +128,8 @@ const PROJECT_ROOT = path.resolve(
 // 시험·실험 파일을 직접 실행하면 데이터 폴더 지정이 빠져 운영 server/data에 쓰게 된다. 그래서 새 임시 폴더를 쓰게 하고,
 //   환경변수에 적어 그 파일이 띄우는 서버도 같은 폴더를 물려받게 한다. scripts/는 운영 도구라 넣지 않는다.
 const entry = process.argv[1] ? path.resolve(process.argv[1]) : "";
-const sandboxed = ["test", "spikes", "../.private/spikes"].some((d) => entry.startsWith(path.join(here, d) + path.sep));
+// spikes는 위치와 상관없이 폴더 이름으로 가린다.
+const sandboxed = entry.startsWith(path.join(here, "test") + path.sep) || path.dirname(entry).split(path.sep).includes("spikes");
 if (sandboxed && !process.env.AETHER_DATA_DIR?.trim()) {
   process.env.AETHER_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "aether-test-"));
 }

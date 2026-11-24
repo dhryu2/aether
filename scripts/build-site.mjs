@@ -72,6 +72,9 @@ fs.cpSync(termsDir, path.join(out, "terms"), { recursive: true });
 fs.copyFileSync(icon, path.join(out, "icon.png"));
 fs.copyFileSync(font, path.join(out, path.basename(font))); // shortcut: 2MB 전체 글꼴을 그대로 쓴다, 페이지 첫 표시가 느리다는 보고가 있으면 쓰는 글자만 추리기
 fs.copyFileSync(mono, path.join(out, path.basename(mono)));
+// 두 글꼴은 SIL OFL 1.1이라 글꼴을 배포할 때 라이선스 원문을 함께 둔다.
+fs.copyFileSync(path.join(REPO, "web/node_modules/pretendard/dist/LICENSE.txt"), path.join(out, "Pretendard-LICENSE.txt"));
+fs.copyFileSync(path.join(REPO, "web/node_modules/@fontsource/geist-mono/LICENSE"), path.join(out, "GeistMono-LICENSE.txt"));
 const versionBytes = Buffer.from(JSON.stringify(versionJson, null, 2) + "\n");
 fs.writeFileSync(path.join(out, "version.json"), versionBytes);
 // 앱 안 업데이트는 이 서명을 확인한 뒤에만 설치한다. 키가 없으면 사이트는 만들되 버튼 설치는 실패하고 직접 다운로드만 된다.

@@ -99,9 +99,9 @@ const anatomy = await evaluate<{
 
 check(anatomy.permission === 1, "pending PermissionCard가 1개여야 합니다.");
 check(anatomy.question === 1, "pending QuestionCard가 1개여야 합니다.");
-check(anatomy.articles >= 1, "Stream 본문에 SEED Article wrapper가 있어야 합니다.");
-check(anatomy.radioCount === 2, "QuestionCard의 SEED radio option이 2개여야 합니다.");
-check(anatomy.otherField, "QuestionCard의 SEED TextField가 있어야 합니다.");
+check(anatomy.articles >= 1, "Stream 본문에 Article wrapper가 있어야 합니다.");
+check(anatomy.radioCount === 2, "QuestionCard의 radio option이 2개여야 합니다.");
+check(anatomy.otherField, "QuestionCard의 TextField가 있어야 합니다.");
 if (width < 700) {
   for (const action of anatomy.actionSizes) {
     check(
@@ -131,7 +131,7 @@ await evaluate(`document.querySelector('.aether-question-other input')?.focus()`
 const otherFocused = await evaluate<boolean>(
   `document.activeElement === document.querySelector('.aether-question-other input')`,
 );
-check(otherFocused, "기타 입력 SEED TextField로 focus가 이동해야 합니다.");
+check(otherFocused, "기타 입력 TextField로 focus가 이동해야 합니다.");
 
 await evaluate(`(() => {
   const stream = document.querySelector('.stream-scroll');

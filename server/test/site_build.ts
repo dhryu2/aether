@@ -53,7 +53,7 @@ check(html.includes(`href="${WIN}"`), "스크립트 없이도 받을 수 있는 
 check(!/src="https?:|<link[^>]+href="https?:|@import|url\(\s*["']?https?:/.test(html), "외부 자원 참조 없음");
 check(/<title>Aether — /.test(html) && !/document\.title=[^;]*version/.test(html), "탭 제목에 버전을 넣지 않는다");
 check(html.includes('href="https://github.com/dhryu2/aether"') && html.includes('href="#features"'), "GitHub 링크와 페이지 안 링크");
-check(fs.readdirSync(out).sort().join() === [MAC, WIN, "PretendardVariable.woff2", "geist-mono-latin-400-normal.woff2", "icon.png", "index.html", "terms", "version.json"].sort().join(), "출력은 정해진 8개 항목뿐", fs.readdirSync(out));
+check(fs.readdirSync(out).sort().join() === [MAC, WIN, "PretendardVariable.woff2", "Pretendard-LICENSE.txt", "geist-mono-latin-400-normal.woff2", "GeistMono-LICENSE.txt", "icon.png", "index.html", "terms", "version.json"].sort().join(), "출력은 정해진 10개 항목뿐", fs.readdirSync(out));
 
 const termsPage = fs.readFileSync(path.join(out, "terms", `${TERMS_VERSION}.html`), "utf8");
 check(html.includes(`href="terms/${TERMS_VERSION}.html"`), "footer가 지금 판의 사용 조건을 가리킨다");

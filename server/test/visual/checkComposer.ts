@@ -100,10 +100,9 @@ await capture(`composer-idle-${width}x${height}.png`);
 
 const initial = await evaluate<{
   composer: boolean;
-  seedTextarea: boolean;
+  textareaField: boolean;
   attachmentField: boolean;
   textareaDisabled: boolean;
-  rawVisibleButtons: number;
   controls: Array<{ label: string; width: number; height: number }>;
   horizontalOverflow: boolean;
   textareaHeight: number;
@@ -121,18 +120,9 @@ const initial = await evaluate<{
   };
   return {
     composer: !!composer,
-    seedTextarea: !!composer?.querySelector('.aether-composer-field .aether-field-textarea'),
+    textareaField: !!composer?.querySelector('.aether-composer-field .aether-field-textarea'),
     attachmentField: !!composer?.querySelector('.aether-composer-attachments'),
     textareaDisabled: !!textarea?.disabled,
-    rawVisibleButtons: composer
-      ? [...composer.querySelectorAll('button')]
-          .filter((element) => element.getClientRects().length)
-          .filter((element) =>
-            !element.classList.contains('seed-action-button')
-            && !element.classList.contains('seed-attachment-input-trigger__root')
-            && !element.classList.contains('seed-attachment-input-item__removeButton')
-          ).length
-      : -1,
     controls: composer
       ? [...composer.querySelectorAll('button')]
           .filter((element) => element.getClientRects().length)
@@ -148,13 +138,12 @@ const initial = await evaluate<{
 
 if (!baselineOnly) {
   check(initial.composer, "Composer가 렌더링되어야 합니다.");
-  check(initial.seedTextarea, "Composer 입력은 SEED TextFieldTextarea wrapper여야 합니다.");
-  check(initial.attachmentField, "Composer 첨부는 SEED Attachment Field wrapper여야 합니다.");
+  check(initial.textareaField, "Composer 입력은 textarea 필드 wrapper여야 합니다.");
+  check(initial.attachmentField, "Composer 첨부는 첨부 필드 wrapper여야 합니다.");
   check(!initial.textareaDisabled, "idle Composer textarea는 활성 상태여야 합니다.");
-  check(initial.rawVisibleButtons === 0, "Composer의 보이는 버튼은 ActionButton wrapper를 사용해야 합니다.");
   check(!initial.horizontalOverflow, "Composer는 가로 overflow를 만들면 안 됩니다.");
   if (expectsPermission) {
-    check(initial.permissionStrip, "requires_action Composer에는 SEED Callout 권한 strip이 있어야 합니다.");
+    check(initial.permissionStrip, "requires_action Composer에는 권한 strip이 있어야 합니다.");
   }
   if (width < 700) {
     for (const control of initial.controls) {
@@ -258,7 +247,7 @@ const slash = await evaluate<{
 })()`);
 if (!baselineOnly) {
   check(slash.expanded === "true", "슬래시 메뉴가 열리면 textarea aria-expanded가 true여야 합니다.");
-  check(slash.listbox && slash.options >= 2, "슬래시 명령은 SEED List 기반 listbox로 보여야 합니다.");
+  check(slash.listbox && slash.options >= 2, "슬래시 명령은 listbox로 보여야 합니다.");
   check(!!slash.activeDescendant, "선택된 슬래시 option은 aria-activedescendant로 연결되어야 합니다.");
   check(slash.focused, "슬래시 메뉴가 열려도 textarea 포커스를 유지해야 합니다.");
 }

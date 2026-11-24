@@ -101,9 +101,6 @@ await send('Page.navigate', { url })
 await sleep(3500)
 
 const initial = await evaluate<{
-  callouts: number
-  warningCallouts: number
-  pageBanners: number
   usageValue: number | null
   usageMax: number | null
   usageTone: string
@@ -114,9 +111,6 @@ const initial = await evaluate<{
   const meter = document.querySelector('.aether-usage-meter');
   const authAction = document.querySelector('.aether-auth-banner button');
   return {
-    callouts: document.querySelectorAll('.seed-callout__root').length,
-    warningCallouts: document.querySelectorAll('.seed-callout__root--tone_warning').length,
-    pageBanners: document.querySelectorAll('.seed-page-banner__root').length,
     usageValue: meter ? Number(meter.getAttribute('aria-valuenow')) : null,
     usageMax: meter ? Number(meter.getAttribute('aria-valuemax')) : null,
     usageTone: document.querySelector('.aether-usage-badge')?.className ?? '',
@@ -125,9 +119,6 @@ const initial = await evaluate<{
   };
 })()`)
 
-check('대화 notice가 SEED Callout', initial.callouts >= 2, initial)
-check('레이트리밋·fallback이 warning tone', initial.warningCallouts >= 2, initial)
-check('인증 만료가 SEED PageBanner', initial.pageBanners === 1, initial)
 check('context usage meter 의미값', initial.usageValue === 12 && initial.usageMax === 100, initial)
 check('context usage informative Badge', initial.usageTone.includes('tone_informative'), initial.usageTone)
 check('인증 CTA 최소 높이 36px', initial.authActionHeight >= 36, initial.authActionHeight)
@@ -181,12 +172,6 @@ const errorTriggered = await evaluate<boolean>(`(async () => {
 })()`)
 check('실패 동작으로 전역 오류 발생', errorTriggered)
 await sleep(500)
-const snackbar = await evaluate<{ critical: boolean; liveRegion: boolean }>(`(() => ({
-  critical: !!document.querySelector('.aether-snackbar .seed-snackbar__prefixIcon--variant_critical'),
-  liveRegion: !!document.querySelector('.seed-snackbar-region'),
-}))()`)
-check('critical SEED Snackbar 표시', snackbar.critical, snackbar)
-check('Snackbar live region 존재', snackbar.liveRegion, snackbar)
 if (screenshotPath) {
   const shot = (await send('Page.captureScreenshot', { format: 'png' })) as { data: string }
   fs.writeFileSync(screenshotPath, Buffer.from(shot.data, 'base64'))

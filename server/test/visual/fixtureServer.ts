@@ -571,7 +571,7 @@ app.get("/api/search", async (q, r) => {
   if (delayMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
-  const term = String(q.query.q || "SEED");
+  const term = String(q.query.q || "sample");
   const marked = `\u0001${term}\u0002`;
   r.json({
     results: [

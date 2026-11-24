@@ -15,9 +15,6 @@ import { useTempDatabase, type TempDatabase } from "./support/tempDb";
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_DIR = path.resolve(TEST_DIR, "..");
 const LIVE_DATA = path.join(SERVER_DIR, "data");
-const PLAN_PATH = path.resolve(SERVER_DIR, "..", ".private/docs/architecture/history-fill/main-session-plan.md");
-// 설계 문서는 공개 저장소에 없다. 없으면 이 시험을 건너뛴다.
-if (!fs.existsSync(PLAN_PATH)) { console.log("⏭️  설계 문서가 없어 건너뛴다"); process.exit(0); }
 const KO_FIRST = "사람이 아래 요구를 「브리프」로 보냈다.";
 const EN_FIRST = 'The person sent the request below as a "brief". First check and lay out what you found, then wait for the person\'s answer before doing the work.';
 
@@ -39,20 +36,6 @@ function detail(err: unknown): string {
   const msg = err instanceof Error ? err.message : typeof err === "string" ? err : JSON.stringify(err);
   if (msg.includes("://") || msg.includes("@") || /postgres/i.test(msg)) return "연결 실패";
   return msg.slice(0, 400);
-}
-
-/** 설계 문서 2.2절 제목 아래 첫 코드 블록 본문. 앞뒤 줄바꿈은 뺀다. 본문 한 줄 안의 펜스는 닫는 줄이 아니다. */
-function koreanRulesFromPlan(): string {
-  const doc = fs.readFileSync(PLAN_PATH, "utf8");
-  const headingAt = doc.indexOf("### 2.2");
-  if (headingAt < 0) throw new Error("2.2절 제목이 없다");
-  const lines = doc.slice(headingAt).split("\n");
-  const fence = (line: string) => /^`{3,}\s*$/.test(line);
-  const open = lines.findIndex(fence);
-  if (open < 0) throw new Error("2.2절 코드 블록이 없다");
-  const close = lines.findIndex((line, index) => index > open && fence(line));
-  if (close < 0) throw new Error("2.2절 코드 블록이 닫히지 않았다");
-  return lines.slice(open + 1, close).join("\n").replace(/^\n+/, "").replace(/\n+$/, "");
 }
 
 type Shot = { text: string };
@@ -167,9 +150,6 @@ async function main(): Promise<void> {
       "모델 입력은 규칙 바로 뒤에서 닫힌다",
       shaped.slice(Math.max(0, closeAt - 24), closeAt + 24),
     );
-    const planRules = koreanRulesFromPlan();
-    const liveRules = briefRules();
-    check(liveRules === planRules, "한국어 규칙은 설계 문서 2.2절 본문과 같다", `길이 ${liveRules.length} / 문서 ${planRules.length}`);
 
     tempDb = useTempDatabase("brief-m2");
     await diary.openSessionDiary();

@@ -14,7 +14,12 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-0068d1" alt="Apache 2.0 license"></a>
+  <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-0068d1" alt="macOS Apple Silicon">
   <img src="https://img.shields.io/badge/Node.js-24-0068d1" alt="Node.js 24">
+</p>
+
+<p align="center">
+  <a href="https://aether.dhryu.dev"><strong>Website</strong></a> · <a href="https://aether.dhryu.dev/#install"><strong>Download for macOS</strong></a>
 </p>
 
 <p align="center">
